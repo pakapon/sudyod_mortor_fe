@@ -1,0 +1,28 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^Select-String -Path \"c:\\\\Users\\\\MoonChild\\\\AppData\\\\Roaming\\\\Code\\\\User\\\\workspaceStorage\\\\a70f3c163f076189d312fc654356b975\\\\GitHub\\.copilot-chat\\\\chat-session-resources\\\\da1034ea-e84a-4f28-98b4-d44a30f80712\\\\toolu_bdrk_011BuyhXPrSJhEp8YefBVy1G__vscode-1776145579107\\\\content\\.txt\" -Pattern 'name=\"\\[\\^\"\\]\\*\"' \\| ForEach-Object \\{ if \\(\\$_\\.Line -match 'name=\"\\(\\[\\^\"\\]\\*\\)\"'\\) \\{ \\$matches\\[1\\] \\} \\} \\| Sort-Object -Unique \\| Where-Object \\{ \\$_ -match '\\(ใบเสนอราคา\\|ใบสั่งซื้อ\\|ใบจ่าย\\|ใบแจ้งหนี้\\|invoice\\|quotation\\|ใบวางบิล\\|ชำระ\\|รับเงิน\\|รับชำระ\\|งานซ่อม\\|ใบสั่งซ่อม\\|รับรถ\\|ส่งรถ\\|นัดหมาย\\|ตั้งค่า\\|setting\\|report\\|รายงาน\\|ผู้ใช้\\|user\\|role\\|permission\\|การเงิน\\|finance\\|จ่าย\\|เงินสด\\|บัญชี\\|account\\|POS\\|pos\\|mobile\\|Mobile\\|4\\\\\\.\\|5\\\\\\.\\|6\\\\\\.\\|7\\\\\\.\\|8\\\\\\.\\|9\\\\\\.\\)' \\} \\| Select-Object -First 100$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^Select-String -Path \"c:\\\\Users\\\\MoonChild\\\\AppData\\\\Roaming\\\\Code\\\\User\\\\workspaceStorage\\\\a70f3c163f076189d312fc654356b975\\\\GitHub\\.copilot-chat\\\\chat-session-resources\\\\da1034ea-e84a-4f28-98b4-d44a30f80712\\\\toolu_bdrk_011BuyhXPrSJhEp8YefBVy1G__vscode-1776145579107\\\\content\\.txt\" -Pattern 'name=\"\\[\\^\"\\]\\*\"' \\| ForEach-Object \\{ if \\(\\$_\\.Line -match 'name=\"\\(\\[\\^\"\\]\\*\\)\"'\\) \\{ \\$matches\\[1\\] \\} \\} \\| Sort-Object -Unique \\| Where-Object \\{ \\$_ -match '\\^\\(ใบ\\|การ\\|งาน\\|บริการ\\|ขาย\\|ซ่อม\\|นัด\\|รับรถ\\|ส่งรถ\\|POS\\|สั่งซื้อ\\|ตั้งค่า\\|รายงาน\\|ผู้ใช้\\|สิทธิ์\\|หน้า\\|เมนู\\|Sidebar\\|รายละเอียด\\)' \\} \\| Select-Object -First 80$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^Select-String -Path \"c:\\\\Users\\\\MoonChild\\\\AppData\\\\Roaming\\\\Code\\\\User\\\\workspaceStorage\\\\a70f3c163f076189d312fc654356b975\\\\GitHub\\.copilot-chat\\\\chat-session-resources\\\\da1034ea-e84a-4f28-98b4-d44a30f80712\\\\toolu_bdrk_011BuyhXPrSJhEp8YefBVy1G__vscode-1776145579107\\\\content\\.txt\" -Pattern 'name=\"\\[\\^\"\\]\\*\"' \\| ForEach-Object \\{ if \\(\\$_\\.Line -match 'name=\"\\(\\[\\^\"\\]\\*\\)\"'\\) \\{ \\$matches\\[1\\] \\} \\} \\| Sort-Object -Unique \\| Where-Object \\{ \\$_ -match '\\(ขาย\\|สั่งซื้อ\\|PO\\|SO\\|แคชเชียร์\\|ตั้งค่า\\|setting\\|config\\|สาขา\\|branch\\|พนักงาน\\|employee\\|role\\|permission\\|สิทธิ์\\|login\\|Login\\|register\\|forgot\\|reset\\|OTP\\|หน้าหลัก\\|dashboard\\|noti\\|แจ้ง\\|นัดหมาย\\|appointment\\|schedule\\|calendar\\|promotion\\|โปรโมชั่น\\|ส่วนลด\\|discount\\|warranty\\|รับประกัน\\|QC\\|checklist\\|เช็กลิสต์\\|photo\\|ถ่ายภาพ\\|ล้างรถ\\|wash\\|Mobile\\|mobile\\)' \\} \\| Select-Object -First 80$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^Get-Content \"e:\\\\work\\\\codes\\\\sudyod_mortor_fe\\\\api_doc\\\\sudyod_motor_full_collection\\.json\" \\| ConvertFrom-Json \\| Select-Object -Property info \\| ConvertTo-Json -Depth 3$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^\\$json = Get-Content \"e:\\\\work\\\\codes\\\\sudyod_mortor_fe\\\\api_doc\\\\sudyod_motor_full_collection\\.json\" -Raw \\| ConvertFrom-Json; \\$authFolder = \\$json\\.item \\| Where-Object \\{ \\$_\\.name -eq 'Auth' \\}; \\$authFolder\\.item \\| ForEach-Object \\{ \"\\$\\(\\$_\\.request\\.method\\) \\$\\(\\$_\\.request\\.url\\.raw\\) \\[\\$\\(\\$_\\.name\\)\\]\" \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^\\$json = Get-Content \"e:\\\\work\\\\codes\\\\sudyod_mortor_fe\\\\api_doc\\\\sudyod_motor_full_collection\\.json\" -Raw \\| ConvertFrom-Json; \\$authFolder = \\$json\\.item \\| Where-Object \\{ \\$_\\.name -eq 'Auth' \\}; foreach \\(\\$ep in \\$authFolder\\.item\\) \\{ Write-Host \"=== \\$\\(\\$ep\\.name\\) ===\" -ForegroundColor Cyan; if \\(\\$ep\\.request\\.body\\) \\{ Write-Host \"Body: \\$\\(\\$ep\\.request\\.body\\.raw\\)\" \\}; if \\(\\$ep\\.response\\) \\{ foreach \\(\\$r in \\$ep\\.response\\) \\{ Write-Host \"Response \\(\\$\\(\\$r\\.name\\)\\): \\$\\(\\$r\\.body\\)\" \\} \\}; Write-Host \"\" \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

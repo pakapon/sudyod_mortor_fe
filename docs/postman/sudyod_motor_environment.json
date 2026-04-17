@@ -1,0 +1,28 @@
+{
+  "id": "sudyod-motor-env-dev",
+  "name": "Sudyod Motor - Dev",
+  "values": [
+    { "key": "base_url", "value": "http://localhost:8009/api/v1", "type": "default", "enabled": true },
+    { "key": "auth_token", "value": "", "type": "secret", "enabled": true },
+    { "key": "refresh_token", "value": "", "type": "secret", "enabled": true },
+    { "key": "employee_id", "value": "", "type": "default", "enabled": true },
+    { "key": "branch_id", "value": "", "type": "default", "enabled": true },
+    { "key": "test_email", "value": "admin@sudyodmotor.com", "type": "default", "enabled": true },
+    { "key": "test_password", "value": "P@ssw0rd!2026", "type": "secret", "enabled": true },
+    { "key": "test_phone", "value": "0812345678", "type": "default", "enabled": true },
+    { "key": "language", "value": "th", "type": "default", "enabled": true },
+    { "key": "last_created_id", "value": "", "type": "default", "enabled": true },
+    { "key": "customer_id", "value": "", "type": "default", "enabled": true },
+    { "key": "vendor_id", "value": "", "type": "default", "enabled": true },
+    { "key": "product_id", "value": "", "type": "default", "enabled": true },
+    { "key": "warehouse_id", "value": "", "type": "default", "enabled": true },
+    { "key": "service_order_id", "value": "", "type": "default", "enabled": true },
+    { "key": "quotation_id", "value": "", "type": "default", "enabled": true },
+    { "key": "invoice_id", "value": "", "type": "default", "enabled": true },
+    { "key": "loan_application_id", "value": "", "type": "default", "enabled": true },
+    { "key": "store_loan_id", "value": "", "type": "default", "enabled": true },
+    { "key": "finance_company_id", "value": "", "type": "default", "enabled": true },
+    { "key": "job_secret", "value": "", "type": "secret", "enabled": true }
+  ],
+  "_postman_variable_scope": "environment"
+}

@@ -1,0 +1,54 @@
+# Module 1.1: แดชบอร์ด (Dashboard)
+
+## สรุปสิ่งที่พัฒนาเสร็จสิ้น
+ดำเนินการสร้างโครงสร้างหลักของระบบหลังร้าน (Back-office Layout) และหน้าแดชบอร์ดตามแบบ Figma อย่างสมบูรณ์ครบถ้วน โดยแบ่งออกเป็นส่วนเนื้อหาและการจัดการ Routing ให้ทำงานภายใต้เงื่อนไข Authentication (Protected Route)
+
+---
+
+## ไฟล์และโครงสร้างแอปที่สร้างใหม่
+
+### ✅ Layout Components
+| File | หน้าที่ |
+|------|---------|
+| [Sidebar.tsx](file:///e:/work/codes/sudyod_mortor_fe/src/components/layout/Sidebar.tsx) | แถบเมนูด้านซ้ายสีแดง พร้อมการนำทางกว่า 9 หมวดหมู่ รองรับการขยาย/พับเก็บเมนูย่อยและซ่อน Sidebar |
+| [Navbar.tsx](file:///e:/work/codes/sudyod_mortor_fe/src/components/layout/Navbar.tsx) | ส่วนหัวด้านบน แสดงชื่อหน้าต่าง ๆ พร้อมปุ่มการแจ้งเตือน (Notifications Dropdown) และข้อมูลโปรไฟล์ผู้ใช้งาน |
+| [AppLayout.tsx](file:///e:/work/codes/sudyod_mortor_fe/src/components/layout/AppLayout.tsx) | Wrapper รวม Sidebar โครงสร้าง UI เพื่อใช้งานสอดคล้องกับหน้า Content ด้านใน |
+
+### ✅ Pages
+| File | หน้าที่ |
+|------|---------|
+| [DashboardPage.tsx](file:///e:/work/codes/sudyod_mortor_fe/src/pages/DashboardPage.tsx) | หน้าแดชบอร์ดหลัก ประกอบกับไพ่สถิติ (Stat Cards) จำนวน 5 ส่วน, Bar Chart, Donut Chart (SVG ล้วนเพื่อลดการใช้ Libraries อ้วน), กิจกรรมล่าสุด (Feed Update) และตารางใบเสร็จแบบย่อ |
+
+### ✅ API & Types
+| File | หน้าที่ |
+|------|---------|
+| [dashboardService.ts](file:///e:/work/codes/sudyod_mortor_fe/src/api/dashboardService.ts) | การประกาศ Service ฝั่ง Axios แบบร่าง เพื่อรอเชื่อมต่อกับ Endpoint API ตามเอกสาร |
+| [dashboard.ts](file:///e:/work/codes/sudyod_mortor_fe/src/types/dashboard.ts) | Typescript interfaces สำหรับข้อมูลสถิติ กราฟ และแจ้งเตือน เช่น `DashboardStats`, `ServiceBreakdown` เป็นต้น |
+
+---
+
+## ภาพรวม UI ผลลัพธ์จากการเรนเดอร์
+
+ภาพถ่ายจากตัวแอปพลิเคชันจริงที่เรนเดอร์ในโหมด Developer: 
+
+### ภาพรวมแดชบอร์ด (มุมมองกว้าง)
+> แสดงให้เห็นถึงการทำงานร่วมกันระหว่าง Sidebar, Navbar และ แดชบอร์ดเนื้อหาหลักอย่างสมบูรณ์ รวมถึงโทนสีกราฟต์ที่ดูพรีเมี่ยมตาม Figma
+
+![Dashboard Preview 1](/C:/Users/MoonChild/.gemini/antigravity/brain/ce4ae06f-0186-45b3-9c65-46266e23eab9/artifacts/dashboard_screenshot.png)
+
+### คุณสมบัติ Sidebar: ยุบ/ขยาย และสถานะการเลื่อนเมาส์
+> เมนูแต่ละหมวดรองรับการจัดวางแยกส่วนเมนูย่อย เมื่อผู้ใช้งานคลิกก็จะเผยรายละเอียดหมวดย่อยอย่างนุ่มนวล
+
+![Dashboard Preview 2](/C:/Users/MoonChild/.gemini/antigravity/brain/ce4ae06f-0186-45b3-9c65-46266e23eab9/artifacts/dashboard_screenshot_2.png)
+
+---
+
+## จุดเด่นของดีไซน์ (Design Highlights)
+
+1. **Colors & Thematic Aesthetics:** อิงระบบสีโทน Modern แดง (แบรนด์ **สุดยอด**) พื้นหลังสว่าง สะอาดตา ดึงดูดผู้ใช้งานได้ดี
+2. **Icons Everywhere:** ใช้ Inline SVG ขนาดเล็ก เพื่อประสิทธิภาพโหลดที่รวดเร็ว แต่ยังทำให้ความสวยงามของแท็บ เมนู และการ์ดทำงานได้อย่างกลมกลืน
+3. **No Heavy Chart Libraries (Yet):** สำหรับเวอร์ชั่นเริ่มต้น กราฟแท่งและ Donut Chart ถูกสร้างด้วย Pure CSS + SVG ทำให้ Application โหลดรวดเร็วโดยไม่ต้องยึดติดกับ Chart.js หรือ Echarts เสมอไป
+4. **Scrollbar Design:** ปรับปรุง Custom CSS Scrollbar ทางด้านซ้ายให้ดูเนียนลื่นเป็นเนื้อเดียวกัน
+
+## 🚀 ขั้นตอนถัดไป
+หลังจากโครงสร้าง Layout พร้อมใช้งานแล้ว ระบบพร้อมรับมือการทำ **Module ถัดไป (เช่น Module ลูกค้า หรือ บริการซ่อม)** โดยใช้ `AppLayout` นี้เป็นโครงสร้างหลักได้ทันที 

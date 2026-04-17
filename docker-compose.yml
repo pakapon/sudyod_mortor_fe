@@ -1,0 +1,19 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sudyod_mortor_fe
+    ports:
+      - "8099:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8009/api/v1
+    networks:
+      - sudyod_mortor_v2_default
+
+networks:
+  sudyod_mortor_v2_default:
+    external: true
