@@ -11,7 +11,7 @@ export function FinanceCompanyFormPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FinanceCompanyPayload>({
-    defaultValues: { name: '', address: '', phone: '', contact_name: '', is_active: true },
+    defaultValues: { name: '', logo_url: '', contact_person: '', phone: '', email: '', address: '', commission_rate: '', note: '', is_active: true },
   })
 
   useEffect(() => {
@@ -20,9 +20,13 @@ export function FinanceCompanyFormPage() {
         .then(({ data }) => {
           reset({
             name: data.data.name,
-            address: data.data.address || '',
+            logo_url: data.data.logo_url || '',
+            contact_person: data.data.contact_person || '',
             phone: data.data.phone || '',
-            contact_name: data.data.contact_name || '',
+            email: data.data.email || '',
+            address: data.data.address || '',
+            commission_rate: data.data.commission_rate || '',
+            note: data.data.note || '',
             is_active: data.data.is_active,
           })
         })
@@ -47,7 +51,7 @@ export function FinanceCompanyFormPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link to="/settings/finance-companies" className="p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-900 rounded-full transition-colors">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -71,21 +75,55 @@ export function FinanceCompanyFormPage() {
         </div>
 
         <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">URL โลโก้</label>
+          <input
+            {...register('logo_url')}
+            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+            placeholder="https://spaces.example.com/finance-companies/logos/..."
+          />
+          <p className="mt-1 text-xs text-gray-500">วาง URL ของรูปโลโก้ที่อัปโหลดไว้บน DO Spaces (ถ้ามี)</p>
+        </div>
+
+        <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700">ชื่อผู้ติดต่อ</label>
           <input
-            {...register('contact_name')}
+            {...register('contact_person')}
             className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
             placeholder="ชื่อผู้ติดต่อ (ถ้ามี)"
           />
         </div>
 
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">เบอร์โทรศัพท์</label>
+            <input
+              {...register('phone')}
+              type="tel"
+              className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+              placeholder="เช่น 02-123-4567"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">อีเมล</label>
+            <input
+              {...register('email')}
+              type="email"
+              className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+              placeholder="example@company.com"
+            />
+          </div>
+        </div>
+
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">เบอร์โทรศัพท์</label>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">ค่าคอมมิชชั่น (%)</label>
           <input
-            {...register('phone')}
-            type="tel"
+            {...register('commission_rate')}
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
             className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
-            placeholder="เช่น 02-123-4567"
+            placeholder="เช่น 3.50"
           />
         </div>
 
@@ -96,6 +134,16 @@ export function FinanceCompanyFormPage() {
             rows={3}
             className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
             placeholder="ที่อยู่บริษัท (ถ้ามี)"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">หมายเหตุ</label>
+          <textarea
+            {...register('note')}
+            rows={2}
+            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+            placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"
           />
         </div>
 

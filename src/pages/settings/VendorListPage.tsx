@@ -2,17 +2,25 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { Vendor } from '@/types/hr'
-import { cn } from '@/lib/utils'
+import { cn, sortRows } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 
 export function VendorListPage() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterActive, setFilterActive] = useState<string>('')
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const { permissions } = useAuthStore()
+
+  const handleSort = (key: string) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   useEffect(() => {
     fetchData()
@@ -40,16 +48,20 @@ export function VendorListPage() {
     }
   }
 
-  const filtered = vendors.filter((v) => {
-    const matchSearch = search
-      ? `${v.name} ${v.code || ''} ${v.contact_name || ''} ${v.tax_id || ''}`.toLowerCase().includes(search.toLowerCase())
-      : true
-    const matchActive =
-      filterActive === 'true' ? v.is_active :
-      filterActive === 'false' ? !v.is_active :
-      true
-    return matchSearch && matchActive
-  })
+  const filtered = sortRows(
+    vendors.filter((v) => {
+      const matchSearch = search
+        ? `${v.name} ${v.code || ''} ${v.contact_name || ''} ${v.tax_id || ''}`.toLowerCase().includes(search.toLowerCase())
+        : true
+      const matchActive =
+        filterActive === 'true' ? v.is_active :
+        filterActive === 'false' ? !v.is_active :
+        true
+      return matchSearch && matchActive
+    }),
+    sortKey,
+    sortDir,
+  )
 
   return (
     <div className="space-y-6">
@@ -104,10 +116,10 @@ export function VendorListPage() {
           <table className="w-full text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
-                <th className="px-6 py-4 font-semibold">ชื่อ Supplier</th>
-                <th className="px-6 py-4 font-semibold">รหัส</th>
-                <th className="px-6 py-4 font-semibold">ผู้ติดต่อ</th>
-                <th className="px-6 py-4 font-semibold">เลขผู้เสียภาษี</th>
+                <SortableHeader label="ชื่อ Supplier" sortKey="name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="รหัส" sortKey="code" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="ผู้ติดต่อ" sortKey="contact_name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="เลขผู้เสียภาษี" sortKey="tax_id" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-6 py-4 font-semibold text-center">สถานะ</th>
                 <th className="px-6 py-4 text-right font-semibold">จัดการ</th>
               </tr>

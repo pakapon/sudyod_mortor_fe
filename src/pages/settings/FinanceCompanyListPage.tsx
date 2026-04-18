@@ -1,17 +1,26 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { FinanceCompany } from '@/types/hr'
-import { cn } from '@/lib/utils'
+import { cn, sortRows } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 
 export function FinanceCompanyListPage() {
   const [companies, setCompanies] = useState<FinanceCompany[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const { permissions } = useAuthStore()
+  const navigate = useNavigate()
+
+  const handleSort = (key: string) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   useEffect(() => {
     fetchData()
@@ -35,8 +44,12 @@ export function FinanceCompanyListPage() {
     }
   }
 
-  const filteredCompanies = companies.filter((c) =>
-    `${c.name} ${c.contact_name || ''} ${c.phone || ''}`.toLowerCase().includes(search.toLowerCase()),
+  const filteredCompanies = sortRows(
+    companies.filter((c) =>
+      `${c.name} ${c.contact_person || ''} ${c.phone || ''} ${c.email || ''}`.toLowerCase().includes(search.toLowerCase()),
+    ),
+    sortKey,
+    sortDir,
   )
 
   return (
@@ -83,10 +96,11 @@ export function FinanceCompanyListPage() {
           <table className="w-full text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
-                <th className="px-6 py-4 font-semibold">ชื่อบริษัท</th>
-                <th className="px-6 py-4 font-semibold">ผู้ติดต่อ</th>
-                <th className="px-6 py-4 font-semibold">เบอร์โทร</th>
-                <th className="px-6 py-4 font-semibold">ที่อยู่</th>
+                <th className="px-6 py-4 font-semibold w-14">โลโก้</th>
+                <SortableHeader label="ชื่อบริษัท" sortKey="name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="ผู้ติดต่อ" sortKey="contact_person" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="เบอร์โทร" sortKey="phone" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="ค่าคอมมิชชั่น (%)" sortKey="commission_rate" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-6 py-4 font-semibold text-center">สถานะ</th>
                 <th className="px-6 py-4 text-right font-semibold">จัดการ</th>
               </tr>
@@ -94,23 +108,50 @@ export function FinanceCompanyListPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     กำลังโหลดข้อมูล...
                   </td>
                 </tr>
               ) : filteredCompanies.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     ไม่พบข้อมูลบริษัทไฟแนนซ์
                   </td>
                 </tr>
               ) : (
                 filteredCompanies.map((company) => (
-                  <tr key={company.id} className="hover:bg-gray-50/50">
-                    <td className="px-6 py-4 font-medium text-gray-900">{company.name}</td>
-                    <td className="px-6 py-4 text-gray-600">{company.contact_name || '-'}</td>
+                  <tr
+                    key={company.id}
+                    className="hover:bg-gray-50/50 cursor-pointer"
+                    onClick={() => navigate(`/settings/finance-companies/${company.id}`)}
+                  >
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="h-10 w-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden">
+                        {company.logo_url ? (
+                          <img
+                            src={company.logo_url}
+                            alt={company.name}
+                            className="h-full w-full object-contain"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                          />
+                        ) : (
+                          <svg className="h-5 w-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+                          </svg>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900">{company.name}</div>
+                      {company.email && (
+                        <div className="mt-0.5 text-xs text-gray-400">{company.email}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">{company.contact_person || '-'}</td>
                     <td className="px-6 py-4 text-gray-600">{company.phone || '-'}</td>
-                    <td className="px-6 py-4 text-gray-600 max-w-xs truncate">{company.address || '-'}</td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {company.commission_rate ? `${company.commission_rate}%` : '-'}
+                    </td>
                     <td className="px-6 py-4 text-center">
                       <span className={cn(
                         'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -119,7 +160,7 @@ export function FinanceCompanyListPage() {
                         {company.is_active ? 'ใช้งาน' : 'ปิดใช้งาน'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
                         {hasPermission(permissions, 'finance_companies', 'can_edit') && (
                           <ActionIconLink variant="edit" to={`/settings/finance-companies/${company.id}/edit`} />

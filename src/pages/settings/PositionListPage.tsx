@@ -2,16 +2,24 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { Position } from '@/types/hr'
-import { cn } from '@/lib/utils'
+import { cn, sortRows } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 
 export function PositionListPage() {
   const [positions, setPositions] = useState<Position[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const { permissions } = useAuthStore()
+
+  const handleSort = (key: string) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   useEffect(() => {
     fetchData()
@@ -35,8 +43,10 @@ export function PositionListPage() {
     }
   }
 
-  const filteredPositions = positions.filter((p) =>
-    `${p.name} ${p.description || ''}`.toLowerCase().includes(search.toLowerCase()),
+  const filteredPositions = sortRows(
+    positions.filter((p) => `${p.name} ${p.description || ''}`.toLowerCase().includes(search.toLowerCase())),
+    sortKey,
+    sortDir,
   )
 
   return (
@@ -83,8 +93,8 @@ export function PositionListPage() {
           <table className="w-full text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
-                <th className="px-6 py-4 font-semibold">ชื่อตำแหน่ง</th>
-                <th className="px-6 py-4 font-semibold">รายละเอียด</th>
+                <SortableHeader label="ชื่อตำแหน่ง" sortKey="name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="รายละเอียด" sortKey="description" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-6 py-4 font-semibold text-center">สถานะ</th>
                 <th className="px-6 py-4 text-right font-semibold">จัดการ</th>
               </tr>

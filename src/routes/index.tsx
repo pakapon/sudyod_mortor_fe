@@ -23,6 +23,7 @@ import { PositionListPage } from '@/pages/settings/PositionListPage'
 import { PositionFormPage } from '@/pages/settings/PositionFormPage'
 import { FinanceCompanyListPage } from '@/pages/settings/FinanceCompanyListPage'
 import { FinanceCompanyFormPage } from '@/pages/settings/FinanceCompanyFormPage'
+import { FinanceCompanyDetailPage } from '@/pages/settings/FinanceCompanyDetailPage'
 import { BrandListPage } from '@/pages/settings/BrandListPage'
 import { CategoryListPage } from '@/pages/settings/CategoryListPage'
 import { UnitListPage } from '@/pages/settings/UnitListPage'
@@ -195,6 +196,7 @@ export const router = createBrowserRouter([
             children: [
               { path: '/settings/finance-companies', element: <FinanceCompanyListPage /> },
               { path: '/settings/finance-companies/create', element: <FinanceCompanyFormPage /> },
+              { path: '/settings/finance-companies/:id', element: <FinanceCompanyDetailPage /> },
               { path: '/settings/finance-companies/:id/edit', element: <FinanceCompanyFormPage /> },
             ],
           },

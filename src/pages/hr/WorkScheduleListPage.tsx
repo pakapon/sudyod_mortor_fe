@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { WorkSchedule } from '@/types/hr'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { sortRows } from '@/lib/utils'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 // Replaced with raw implementations for now
 
 export function WorkScheduleListPage() {
@@ -10,6 +12,13 @@ export function WorkScheduleListPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [, setIsDeleting] = useState(false)
   const [, setScheduleToDelete] = useState<WorkSchedule | null>(null)
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (key: string) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
   
   // Basic mock fetch if no API available yet or to mix with true API
   const fetchSchedules = async () => {
@@ -63,10 +72,10 @@ export function WorkScheduleListPage() {
           <thead className="bg-gray-50 text-xs uppercase text-gray-700">
             <tr>
               <th className="px-6 py-3">รหัส</th>
-              <th className="px-6 py-3">ชื่อตารางเวลา/กะ</th>
+              <SortableHeader label="ชื่อตารางเวลา/กะ" sortKey="name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} className="px-6 py-3" />
               <th className="px-6 py-3">ประเภท</th>
               <th className="px-6 py-3">ช่วงเวลาที่ให้ลงชื่อเข้า</th>
-              <th className="px-6 py-3">สายได้ไม่เกิน (นาที)</th>
+              <SortableHeader label="สายได้ไม่เกิน (นาที)" sortKey="grace_minutes" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} className="px-6 py-3" />
               <th className="px-6 py-3">สถานะ</th>
               <th className="px-6 py-3 text-right">จัดการ</th>
             </tr>
@@ -77,7 +86,7 @@ export function WorkScheduleListPage() {
             ) : schedules.length === 0 ? (
               <tr><td colSpan={7} className="px-6 py-4 text-center">ไม่พบข้อมูล</td></tr>
             ) : (
-              schedules.map(row => (
+              sortRows(schedules, sortKey, sortDir).map(row => (
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 font-mono text-gray-500">#{row.id}</td>
                   <td className="px-6 py-4 font-medium text-gray-900">{row.name}</td>

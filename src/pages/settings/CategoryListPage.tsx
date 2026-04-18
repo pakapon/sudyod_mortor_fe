@@ -6,6 +6,22 @@ import { useAuthStore } from '@/stores/authStore'
 import { ActionIconButton } from '@/components/ui/ActionIconButton'
 import { hasPermission } from '@/lib/permissions'
 
+type CategoryWithDepth = { cat: ProductCategory; depth: number }
+
+function buildTreeOrder(cats: ProductCategory[]): CategoryWithDepth[] {
+  const result: CategoryWithDepth[] = []
+  const addNode = (parentId: number | null, depth: number) => {
+    cats
+      .filter((c) => c.parent_id === parentId)
+      .forEach((c) => {
+        result.push({ cat: c, depth })
+        addNode(c.id, depth + 1)
+      })
+  }
+  addNode(null, 0)
+  return result
+}
+
 const defaultForm: ProductCategoryPayload = {
   name: '',
   code: '',
@@ -23,6 +39,7 @@ export function CategoryListPage() {
   const [form, setForm] = useState<ProductCategoryPayload>(defaultForm)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set())
   const { permissions } = useAuthStore()
 
   useEffect(() => {
@@ -106,17 +123,62 @@ export function CategoryListPage() {
     }
   }
 
-  // หมวดหลัก (parent_id = null)
-  const rootCategories = categories.filter((c) => c.parent_id == null)
+  const treeRows = buildTreeOrder(categories)
 
-  const filtered = (rootCategories.length > 0 ? categories : categories).filter((c) =>
-    `${c.name} ${c.code || ''}`.toLowerCase().includes(search.toLowerCase()),
-  )
+  const hasChildren = (id: number) => categories.some((c) => c.parent_id === id)
+
+  const toggleCollapse = (id: number) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const isAncestorCollapsed = (cat: ProductCategory): boolean => {
+    if (cat.parent_id === null) return false
+    if (collapsedIds.has(cat.parent_id)) return true
+    const parent = categories.find((c) => c.id === cat.parent_id)
+    return parent ? isAncestorCollapsed(parent) : false
+  }
+
+  const filteredRows: CategoryWithDepth[] = (() => {
+    if (!search.trim()) {
+      return treeRows.filter(({ cat }) => !isAncestorCollapsed(cat))
+    }
+    const q = search.toLowerCase()
+    const matchedIds = new Set(
+      categories
+        .filter((c) => `${c.name} ${c.code || ''}`.toLowerCase().includes(q))
+        .map((c) => c.id),
+    )
+    // หา matched ancestor ที่ใกล้ที่สุดในสายบรรพบุรุษ
+    const nearestMatchedAncestor = (cat: ProductCategory): number | null => {
+      if (cat.parent_id === null) return null
+      if (matchedIds.has(cat.parent_id)) return cat.parent_id
+      const parent = categories.find((c) => c.id === cat.parent_id)
+      return parent ? nearestMatchedAncestor(parent) : null
+    }
+    // ตรวจว่า cat ถูกซ่อนโดย collapse state ในสายระหว่าง matchedAncId → cat
+    const isHiddenFromMatchedAncestor = (cat: ProductCategory, matchedAncId: number): boolean => {
+      if (cat.parent_id === matchedAncId) return collapsedIds.has(matchedAncId)
+      if (cat.parent_id === null) return false
+      if (collapsedIds.has(cat.parent_id)) return true
+      const parent = categories.find((c) => c.id === cat.parent_id)
+      return parent ? isHiddenFromMatchedAncestor(parent, matchedAncId) : false
+    }
+    return treeRows.filter(({ cat }) => {
+      if (matchedIds.has(cat.id)) return true // ตัวที่ match โดยตรง — แสดงเสมอ
+      const ancId = nearestMatchedAncestor(cat)
+      if (ancId === null) return false // ไม่มี matched ancestor — ไม่แสดง
+      return !isHiddenFromMatchedAncestor(cat, ancId) // แสดงถ้ายังไม่ถูก collapse
+    })
+  })()
 
   const getParentName = (parentId: number | null) => {
     if (!parentId) return null
-    const parent = categories.find((c) => c.id === parentId)
-    return parent?.name || null
+    return categories.find((c) => c.id === parentId)?.name || null
   }
 
   return (
@@ -163,9 +225,8 @@ export function CategoryListPage() {
           <table className="w-full text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
-                <th className="px-6 py-4 font-semibold">ชื่อหมวด</th>
+                <th className="px-6 py-4 font-semibold">ชื่อหมวด / ระดับ</th>
                 <th className="px-6 py-4 font-semibold">รหัส</th>
-                <th className="px-6 py-4 font-semibold">หมวดหลัก</th>
                 <th className="px-6 py-4 font-semibold">คำอธิบาย</th>
                 <th className="px-6 py-4 font-semibold text-center">สถานะ</th>
                 <th className="px-6 py-4 text-right font-semibold">จัดการ</th>
@@ -174,31 +235,80 @@ export function CategoryListPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                     กำลังโหลดข้อมูล...
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                     ไม่พบข้อมูลหมวดสินค้า
                   </td>
                 </tr>
               ) : (
-                filtered.map((cat) => (
-                  <tr key={cat.id} className={cn('hover:bg-gray-50/50', cat.parent_id ? 'bg-gray-50/40' : '')}>
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {cat.parent_id && <span className="mr-2 text-gray-400">↳</span>}
-                      {cat.name}
+                filteredRows.map(({ cat, depth }) => (
+                  <tr
+                    key={cat.id}
+                    className={cn(
+                      'hover:bg-gray-50/60 transition-colors',
+                      depth === 0 ? 'bg-white' : depth === 1 ? 'bg-blue-50/20' : 'bg-gray-50/40',
+                    )}
+                  >
+                    <td className="px-6 py-3.5">
+                      <div
+                        className="flex items-start gap-1"
+                        style={{ paddingLeft: `${depth * 24}px` }}
+                      >
+                        {/* toggle button — แสดงเฉพาะแถวหมวดที่มีลูก */}
+                        {hasChildren(cat.id) ? (
+                          <button
+                            onClick={() => toggleCollapse(cat.id)}
+                            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                            title={collapsedIds.has(cat.id) ? 'ขยาย' : 'ย่อ'}
+                          >
+                            <svg
+                              className={cn('w-3.5 h-3.5 transition-transform', collapsedIds.has(cat.id) ? '-rotate-90' : 'rotate-0')}
+                              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        ) : depth > 0 ? (
+                          <svg className="mt-0.5 ml-0.5 w-3.5 h-3.5 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                          </svg>
+                        ) : (
+                          <span className="w-5 shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={cn('font-medium', depth === 0 ? 'text-gray-900' : 'text-gray-700')}>
+                              {cat.name}
+                            </span>
+                            <span
+                              className={cn(
+                                'inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium border',
+                                depth === 0
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : depth === 1
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-gray-100 text-gray-600 border-gray-200',
+                              )}
+                            >
+                              {depth === 0 ? 'หมวดหลัก' : `ระดับ ${depth + 1}`}
+                            </span>
+                          </div>
+                          {depth > 0 && (
+                            <p className="mt-0.5 text-xs text-gray-400">
+                              ภายใต้: {getParentName(cat.parent_id)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 font-mono text-gray-600">{cat.code || '-'}</td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {getParentName(cat.parent_id) || (
-                        <span className="text-xs text-blue-600 font-medium">หมวดหลัก</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-gray-500 max-w-xs truncate">{cat.description || '-'}</td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-3.5 font-mono text-gray-600 text-sm">{cat.code || '-'}</td>
+                    <td className="px-6 py-3.5 text-gray-500 text-sm max-w-xs truncate">{cat.description || '-'}</td>
+                    <td className="px-6 py-3.5 text-center">
                       <span className={cn(
                         'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
                         cat.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800',
@@ -206,7 +316,7 @@ export function CategoryListPage() {
                         {cat.is_active ? 'ใช้งาน' : 'ปิดใช้งาน'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {hasPermission(permissions, 'product_categories', 'can_edit') && (
                           <ActionIconButton variant="edit" onClick={() => openEdit(cat)} />
@@ -276,10 +386,12 @@ export function CategoryListPage() {
                     className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
                   >
                     <option value="">— ไม่มี (หมวดหลัก) —</option>
-                    {categories
-                      .filter((c) => c.parent_id == null && c.id !== editTarget?.id)
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                    {buildTreeOrder(categories)
+                      .filter(({ cat }) => cat.id !== editTarget?.id)
+                      .map(({ cat, depth }) => (
+                        <option key={cat.id} value={cat.id}>
+                          {'　'.repeat(depth)}{depth > 0 ? '↳ ' : ''}{cat.name}
+                        </option>
                       ))}
                   </select>
                 </div>

@@ -63,6 +63,7 @@
 | 3.1 | BranchListPage + BranchFormPage | `src/pages/settings/Branch*.tsx` | ✅ |
 | 3.2 | PositionListPage + PositionFormPage | `src/pages/settings/Position*.tsx` | ✅ |
 | 3.3 | FinanceCompanyListPage + FinanceCompanyFormPage | `src/pages/settings/FinanceCompany*.tsx` | ✅ |
+| 3.3a | FinanceCompanyDetailPage (2 tabs: ข้อมูล + เอกสาร, logo upload multipart, doc upload multipart) | `src/pages/settings/FinanceCompanyDetailPage.tsx` | ✅ |
 | 3.4 | BrandListPage (ยี่ห้อ — modal CRUD) | `src/pages/settings/BrandListPage.tsx` | ✅ |
 | 3.5 | CategoryListPage (หมวดสินค้า — modal CRUD + parent_id) | `src/pages/settings/CategoryListPage.tsx` | ✅ |
 | 3.6 | UnitListPage (หน่วยนับ — modal CRUD) | `src/pages/settings/UnitListPage.tsx` | ✅ |
@@ -76,6 +77,7 @@
 |-----------|------|------------|
 | ActionIconButton / ActionIconLink | `src/components/ui/ActionIconButton.tsx` | Icon button สำหรับ edit/delete/view/config — ใช้ทุกหน้า list |
 | TimeSelect24h | `src/components/ui/TimeSelect24h.tsx` | Dropdown เลือกเวลา 24h (HH:MM) — ใช้ใน WorkScheduleFormPage |
+| SortableHeader | `src/components/ui/SortableHeader.tsx` | Column header พร้อม sort arrow — ใช้ทุกหน้า list |
 
 ---
 
@@ -218,7 +220,7 @@
 | Auth & Layout | 9 | 9 | 0 |
 | Dashboard | 1 | 1 (mock) | 0 (API จริง) |
 | HR | 12 | 12 | 0 |
-| Settings (Master Data) | 12 | 12 | 0 |
+| Settings (Master Data) | 13 | 13 | 0 |
 | Shared Components | — | ActionIconButton, TimeSelect24h | — |
 | ลูกค้า (Customers) | 3 | 0 | 3 |
 | สินค้า (Products) | 3 | 0 | 3 |
@@ -229,7 +231,7 @@
 | ใบสั่งซื้อ (Purchase Orders) | 2 | 0 | 2 |
 | แจ้งเตือน & Audit | 2 | 0 | 2 |
 
-**คืบหน้ารวม: ~40% (Phase 0–3 เสร็จแล้วทั้งหมด)**
+**คืบหน้ารวม: ~40% (Phase 0–3 เสร็จแล้วทั้งหมด — รวม FinanceCompanyDetailPage + multipart uploads)**
 
 ---
 

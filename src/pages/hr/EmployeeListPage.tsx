@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { Employee } from '@/types/hr'
-import { cn } from '@/lib/utils'
+import { cn, sortRows } from '@/lib/utils'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 
 function PlusIcon() {
   return (
@@ -29,6 +30,13 @@ export function EmployeeListPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sortKey, setSortKey] = useState('employee_code')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (key: string) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   useEffect(() => {
     fetchData()
@@ -62,13 +70,18 @@ export function EmployeeListPage() {
     }
   }
 
-  const filteredEmployees = employees.filter((emp) => {
-    const posName = emp.position?.name || positions[emp.position_id] || ''
-    const branchName = emp.branch?.name || branches[emp.branch_id] || ''
-    return `${emp.first_name} ${emp.last_name} ${emp.nickname || ''} ${emp.employee_code} ${posName} ${branchName}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  })
+  const filteredEmployees = sortRows(
+    employees.filter((emp) => {
+      const posName = emp.position?.name || positions[emp.position_id] || ''
+      const branchName = emp.branch?.name || branches[emp.branch_id] || ''
+      return `${emp.first_name} ${emp.last_name} ${emp.nickname || ''} ${emp.employee_code} ${posName} ${branchName}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    }),
+    sortKey,
+    sortDir,
+    sortKey === 'first_name' ? (emp) => `${emp.first_name} ${emp.last_name}` : undefined,
+  )
 
   return (
     <div className="space-y-6">
@@ -106,8 +119,8 @@ export function EmployeeListPage() {
           <table className="w-full text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
-                <th className="px-6 py-4 font-semibold">รหัสพนักงาน</th>
-                <th className="px-6 py-4 font-semibold">พนักงาน</th>
+                <SortableHeader label="รหัสพนักงาน" sortKey="employee_code" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="พนักงาน" sortKey="first_name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-6 py-4 font-semibold">ตำแหน่ง/สาขา</th>
                 <th className="px-6 py-4 font-semibold">เบอร์โทร</th>
                 <th className="px-6 py-4 font-semibold text-center">สถานะ</th>

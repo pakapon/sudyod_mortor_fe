@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { hrService } from '@/api/hrService'
-import type { EmployeePayload, Role, Branch, Position, WorkSchedule } from '@/types/hr'
+import type { EmployeePayload, Role, Branch, Position } from '@/types/hr'
 
 export function EmployeeFormPage() {
   const { id } = useParams()
@@ -19,20 +19,18 @@ export function EmployeeFormPage() {
   const [availableRoles, setAvailableRoles] = useState<Role[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [positions, setPositions] = useState<Position[]>([])
-  const [workSchedules, setWorkSchedules] = useState<WorkSchedule[]>([])
 
   useEffect(() => {
     Promise.all([
       hrService.getRoles().then(res => setAvailableRoles(res.data.data || [])).catch(() => setAvailableRoles([{ id: 1, name: 'Super Admin', is_active: true, description: null }])),
       hrService.getBranches().then(res => setBranches(res.data.data || [])).catch(() => setBranches([{ id: 1, name: 'สุดยอดมอเตอร์ สาขาใหญ่', code: 'HQ', is_active: true }])),
       hrService.getPositions().then(res => setPositions(res.data.data || [])).catch(() => setPositions([{ id: 1, name: 'ช่าง', is_active: true }, { id: 6, name: 'ผู้จัดการ', is_active: true }])),
-      hrService.getWorkSchedules({ limit: 100 }).then(res => setWorkSchedules(res.data.data || [])).catch(() => setWorkSchedules([{ id: 1, name: 'เข้างานปกติ', owner_id: 1, owner_type: 'position', is_active: true, login_start_time: '08:00:00', login_end_time: '09:00:00', grace_minutes: 15 }]))
     ])
   }, [])
 
   const { register, handleSubmit, reset, setValue } = useForm<EmployeePayload>({
     defaultValues: {
-      first_name: '', last_name: '', nickname: '', position_id: 0, branch_id: 0, email: '', phone: '', employee_code: '', is_active: true, status: 'active', role_id: 0, work_schedule_id: 0
+      first_name: '', last_name: '', nickname: '', position_id: 0, branch_id: 0, email: '', phone: '', employee_code: '', is_active: true, status: 'active', role_id: 0
     }
   })
 
@@ -56,7 +54,7 @@ export function EmployeeFormPage() {
           })
         })
         .catch(() => {
-          reset({ first_name: 'Admin', last_name: 'Sudyod', nickname: 'แอดมิน', position_id: 6, branch_id: 1, employee_code: 'ADM-001', work_schedule_id: 1, is_active: true, status: 'active', role_id: 1 })
+          reset({ first_name: 'Admin', last_name: 'Sudyod', nickname: 'แอดมิน', position_id: 6, branch_id: 1, employee_code: 'ADM-001', is_active: true, status: 'active', role_id: 1 })
         })
     }
   }, [isEditing, id, reset])
@@ -80,7 +78,7 @@ export function EmployeeFormPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link to="/hr/employees" className="text-gray-500 hover:text-gray-900">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -142,19 +140,7 @@ export function EmployeeFormPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-900">ตารางเวลาทำงาน (Work Schedule)</label>
-                <select
-                  {...register('work_schedule_id', { valueAsNumber: true })}
-                  className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
-                >
-                  <option value={0}>-- เลือกตารางเวลาทำงาน --</option>
-                  {workSchedules.map(schedule => (
-                    <option key={schedule.id} value={schedule.id}>{schedule.name} ({schedule.login_start_time.substring(0,5)} - {schedule.login_end_time.substring(0,5)})</option>
-                  ))}
-                </select>
-              </div>
 
-              <div>
                 <label className="mb-2 block text-sm font-medium text-gray-900">ชื่อจริง <span className="text-red-500">*</span></label>
                 <input
                   {...register('first_name', { required: true })}

@@ -146,7 +146,6 @@ export function RoleManagementPage() {
               <tr>
                 <th className="px-6 py-4 font-semibold">ชื่อ Role</th>
                 <th className="px-6 py-4 font-semibold">รายละเอียด</th>
-                <th className="px-6 py-4 font-semibold text-center w-28">พนักงาน</th>
                 <th className="px-6 py-4 font-semibold text-center w-28">สถานะ</th>
                 <th className="px-6 py-4 font-semibold text-right w-40">จัดการ</th>
               </tr>
@@ -154,11 +153,11 @@ export function RoleManagementPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400">กำลังโหลดข้อมูล...</td>
+                  <td colSpan={4} className="px-6 py-12 text-center text-gray-400">กำลังโหลดข้อมูล...</td>
                 </tr>
               ) : filteredRoles.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400">ไม่พบ Role ที่ตรงกับการค้นหา</td>
+                  <td colSpan={4} className="px-6 py-12 text-center text-gray-400">ไม่พบ Role ที่ตรงกับการค้นหา</td>
                 </tr>
               ) : (
                 filteredRoles.map(role => (
@@ -176,11 +175,6 @@ export function RoleManagementPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{role.description || <span className="italic text-gray-300">—</span>}</td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="inline-flex items-center justify-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                        {role.employee_count ?? 0} คน
-                      </span>
-                    </td>
                     <td className="px-6 py-4 text-center">
                       <span className={cn(
                         'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',

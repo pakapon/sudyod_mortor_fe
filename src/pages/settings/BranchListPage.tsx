@@ -2,16 +2,24 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { Branch } from '@/types/hr'
-import { cn } from '@/lib/utils'
+import { cn, sortRows } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 
 export function BranchListPage() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const { permissions } = useAuthStore()
+
+  const handleSort = (key: string) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   useEffect(() => {
     fetchData()
@@ -35,8 +43,10 @@ export function BranchListPage() {
     }
   }
 
-  const filteredBranches = branches.filter((b) =>
-    `${b.name} ${b.code}`.toLowerCase().includes(search.toLowerCase()),
+  const filteredBranches = sortRows(
+    branches.filter((b) => `${b.name} ${b.code}`.toLowerCase().includes(search.toLowerCase())),
+    sortKey,
+    sortDir,
   )
 
   return (
@@ -83,8 +93,8 @@ export function BranchListPage() {
           <table className="w-full text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
-                <th className="px-6 py-4 font-semibold">รหัสสาขา</th>
-                <th className="px-6 py-4 font-semibold">ชื่อสาขา</th>
+                <SortableHeader label="รหัสสาขา" sortKey="code" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="ชื่อสาขา" sortKey="name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-6 py-4 font-semibold text-center">สถานะ</th>
                 <th className="px-6 py-4 text-right font-semibold">จัดการ</th>
               </tr>

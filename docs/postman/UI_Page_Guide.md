@@ -95,6 +95,49 @@ Sidebar Menu:
 
 ---
 
+## 1.5 UI Component Conventions (Implemented)
+
+### Sortable Table Headers
+
+ทุกตารางในหน้า list ที่ implement แล้วใช้ `SortableHeader` component (`src/components/ui/SortableHeader.tsx`)
+
+- คลิกหัวคอลัมน์ → เรียงจากน้อยไปมาก (asc)
+- คลิกซ้ำ → สลับ asc / desc
+- ลูกศร ▲/▼ ที่ active คอลัมน์ จะเปลี่ยนเป็นสี **แดง** (`text-red-600`)
+- ลูกศรที่ inactive จะเป็นสีเทา และเข้มขึ้นเมื่อ hover
+- ใช้ utility `sortRows<T>()` จาก `src/lib/utils.ts` ในการเรียงข้อมูล
+- Sort เกิดใน frontend (ไม่ส่ง query param ไป API)
+
+```tsx
+// ตัวอย่างการใช้
+import { SortableHeader } from '@/components/ui/SortableHeader'
+import { sortRows } from '@/lib/utils'
+
+const [sortKey, setSortKey] = useState('name')
+const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+const handleSort = (key: string) => {
+  if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+  else { setSortKey(key); setSortDir('asc') }
+}
+
+const sorted = sortRows(rows, sortKey, sortDir)
+```
+
+### Full-Width Form Layout
+
+ทุกหน้า form ต้องแสดงแบบ **เต็มจอ** (ไม่มี `mx-auto max-w-*` ที่ root div)
+
+```tsx
+// ✅ ถูกต้อง
+<div className="p-6">
+
+// ❌ ผิด — จะทำให้ไม่เต็มจอ
+<div className="mx-auto max-w-4xl p-6">
+```
+
+---
+
 ## 2. Login & Auth
 
 ### 2.1 หน้า Login
@@ -304,8 +347,9 @@ Body: { identifier, password }
 
 **Tab เอกสาร (Documents):**
 - List เอกสารที่อัปโหลด (สำเนาบัตร, ทะเบียนบ้าน ฯลฯ)
-- ปุ่ม "อัปโหลด" → file upload (multipart/form-data)
-- Fields: `type` (select), `file` (file input)
+- ปุ่ม "อัปโหลด" → modal `multipart/form-data`
+- Fields: `file` (file input, required — PDF/JPG/PNG/DOC/DOCX/XLS/XLSX), `file_type` (select, required), `file_name` (text, optional), `note` (text, optional)
+- Upload ตรงไปยัง server — server อัปโหลดไป DO Spaces เอง ไม่ต้อง upload เองก่อน
 - API: `GET /customers/{id}/documents`, `POST /customers/{id}/documents`
 
 **Tab Timeline:**
@@ -831,15 +875,7 @@ draft → issued → paid
 
 ## 15. สินเชื่อ & ไฟแนนซ์ (Loans & Finance)
 
-### 15.1 บริษัทไฟแนนซ์ (Finance Companies)
-
-**Route:** `/settings/finance-companies`
-**Permission:** `finance_companies.can_view`
-
-- CRUD: ชื่อบริษัท, ที่อยู่, เบอร์โทร, ผู้ติดต่อ
-- API: CRUD `/finance-companies`
-
-### 15.2 ใบสมัครสินเชื่อ (Loan Applications)
+### 15.1 ใบสมัครสินเชื่อ (Loan Applications)
 
 **Route:** `/loan-applications`
 **Permission:** `loan_applications.can_view`
@@ -863,7 +899,7 @@ draft → issued → paid
 
 **Status:** `pending → approved / rejected / cancelled`
 
-### 15.3 สินเชื่อร้าน (Store Loans)
+### 15.2 สินเชื่อร้าน (Store Loans)
 
 **Route:** `/store-loans`
 **Permission:** `store_loans.can_view`
@@ -884,7 +920,7 @@ draft → issued → paid
 
 **Status:** `active → completed / overdue / cancelled`
 
-### 15.4 ค้นหาสินเชื่อ (Loan Search)
+### 15.3 ค้นหาสินเชื่อ (Loan Search)
 
 **Route:** `/loans/search`
 
@@ -940,7 +976,9 @@ draft → issued → paid
 **มุมมอง Admin:**
 - ดูลงเวลาทุกคน: `GET /attendance?date=2026-04-16&branch_id=1`
 - Filter: วันที่, สาขา, สถานะ (present/late/absent/holiday)
-- Table: พนักงาน, เข้า, ออก, สถานะ, ชั่วโมง, สาย?
+- Table: พนักงาน, สาขา, วันที่, เข้างาน, ออกงาน, สถานะ, ชั่วโมง, สาย?
+- **Sortable columns:** พนักงาน (`employee_name` — composite first+last name), วันที่ (`date`)
+- Default sort: `date` asc
 - ปุ่ม "แก้ไข" → modal: แก้เวลาเข้า/ออก, สถานะ, หมายเหตุ — `PUT /attendance/{id}`
 - Export: `GET /attendance/export?branch_id=1&month=2026-04` (CSV)
 
@@ -958,6 +996,8 @@ draft → issued → paid
 
 - ปฏิทินรายปี → จุดสีแดงวันที่เป็นวันหยุด
 - Table: วันที่, ชื่อวันหยุด, สาขา (ทุกสาขา / เฉพาะสาขา)
+- **Sortable columns:** วันที่ (`date`), ชื่อวันหยุด (`name`)
+- Default sort: `date` asc
 - สร้าง: `POST /holidays { name, date, branch_id(null=ทุกสาขา) }`
 - API: `GET /holidays?year=2026`
 
@@ -970,6 +1010,8 @@ draft → issued → paid
 **Route:** `/settings/branches`
 
 - CRUD: ชื่อสาขา, ที่อยู่, เบอร์โทร, `allowed_ip_range`
+- **Sortable columns:** รหัสสาขา (`code`), ชื่อสาขา (`name`)
+- Default sort: `name` asc
 - API: CRUD `/branches`
 
 ### 17.2 ตำแหน่ง (Positions)
@@ -978,6 +1020,8 @@ draft → issued → paid
 **Permission:** `positions.can_view`
 
 - CRUD: ชื่อตำแหน่ง, คำอธิบาย
+- **Sortable columns:** ชื่อตำแหน่ง (`name`), รายละเอียด (`description`)
+- Default sort: `name` asc
 - API: CRUD `/positions`
 
 ### 17.3 บทบาท & สิทธิ์ (Roles & Permissions) ⭐
@@ -1153,6 +1197,9 @@ PUT /permissions/roles/{id}
 - ดูรายละเอียด (`GET /work-schedules/{id}`): แสดง schedule + days ทั้ง 7
 - ลบ (`DELETE /work-schedules/{id}`)
 
+- **Sortable columns:** ชื่อตาราง/กะ (`name`), สายได้ไม่เกิน (`grace_minutes`)
+- Default sort: `name` asc
+
 **Resolve ลำดับความสำคัญ (ตอน Check-in):**
 1. `employee_schedule_overrides` — override เฉพาะวันนั้น
 2. Work Schedule ที่ `owner_type = employee` — ตารางเฉพาะคน
@@ -1161,9 +1208,314 @@ PUT /permissions/roles/{id}
 ### 17.5 Master Data อื่นๆ
 
 **ยี่ห้อ (Brands):** `/settings/brands` → CRUD `/brands`
-**หมวดสินค้า (Categories):** `/settings/categories` → CRUD `/product-categories`
+- **Sortable columns:** ชื่อยี่ห้อ (`name`), รหัส (`code`) — Default sort: `name` asc
+
 **หน่วยนับ (Units):** `/settings/units` → CRUD `/product-units`
+- **Sortable columns:** ชื่อหน่วยนับ (`name`), ตัวย่อ (`abbreviation`) — Default sort: `name` asc
+
 **Supplier (Vendors):** `/settings/vendors` → CRUD `/vendors` + phones + documents
+- **Sortable columns:** ชื่อ Supplier (`name`), รหัส (`code`), ผู้ติดต่อ (`contact_name`), เลขผู้เสียภาษี (`tax_id`) — Default sort: `name` asc
+- **Tab เอกสาร**: ปุ่ม "อัปโหลดเอกสาร" → modal `multipart/form-data` — fields: `file` (required), `file_type`, `file_name` (optional), `note` (optional)
+  - Upload ตรงไปยัง server — server อัปโหลดไป DO Spaces เอง ไม่ต้อง upload เองก่อน
+  - `POST /vendors/{id}/documents` | `GET /vendors/{id}/documents` | `DELETE /vendors/{id}/documents/{docId}`
+  - รองรับ: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX
+
+---
+
+### 17.6 หมวดสินค้า (Product Categories)
+
+**Route:** `/settings/categories`
+**Permission:** `product_categories.can_view`
+**API Base:** `/product-categories`
+
+#### โครงสร้าง
+
+- หมวดสินค้ารองรับ **ลำดับชั้นไม่จำกัด** (parent → children → grandchildren → ...)
+- แต่ละหมวดสามารถมี `parent_id` ชี้ไปยังหมวดแม่ (null = root/หมวดหลัก)
+- ลบได้เฉพาะหมวดที่ **ไม่มีหมวดย่อย** และ **ยังไม่มีสินค้า** อ้างอิง (Hard Delete)
+
+#### Fields
+
+| Field | Type | หมายเหตุ |
+|-------|------|----------|
+| `id` | int | Auto |
+| `parent_id` | int \| null | null = root category |
+| `name` | string (max 100) | ชื่อหมวด (required) |
+| `code` | string (max 50) | รหัสหมวด (required, unique) |
+| `description` | string \| null | คำอธิบาย (optional) |
+| `is_active` | bool | เปิด/ปิดใช้งาน (default: true) |
+| `parent` | object \| null | ข้อมูลหมวดแม่ (nested, ถ้ามี) |
+| `children` | array | หมวดย่อยระดับถัดไป (ใน show/tree response) |
+
+#### API Endpoints
+
+| Method | Endpoint | หน้าที่ | Permission |
+|--------|----------|---------|------------|
+| `GET` | `/product-categories` | List (paginated / tree) | `product_categories.can_view` |
+| `POST` | `/product-categories` | สร้างหมวดใหม่ | `product_categories.can_create` |
+| `GET` | `/product-categories/{id}` | ดูรายละเอียด + children | `product_categories.can_view` |
+| `PUT` | `/product-categories/{id}` | แก้ไข | `product_categories.can_edit` |
+| `DELETE` | `/product-categories/{id}` | ลบ (hard delete) | `product_categories.can_delete` |
+
+#### GET `/product-categories` — Query Params
+
+| Param | Type | หมายเหตุ |
+|-------|------|----------|
+| `search` | string | ค้นหาจาก name หรือ code |
+| `parent_id` | int | Filter เฉพาะหมวดย่อยของ parent นี้ |
+| `roots_only` | bool | `true` = แสดงเฉพาะ root categories (parent_id = null) |
+| `is_active` | bool | Filter สถานะ |
+| `tree` | bool | `true` = คืน tree ทั้งหมด (ไม่มี pagination) |
+| `page` | int | Default: 1 |
+| `limit` | int | Default: 20 |
+
+> **Tree mode** (`tree=true`): คืน root categories พร้อม nested `children` ทุกระดับ — ใช้สำหรับ render dropdown/tree picker ในหน้า product form
+
+#### ตัวอย่าง Request — สร้างหมวดหลัก
+
+```json
+POST /product-categories
+{
+  "name": "อะไหล่รถจักรยานยนต์",
+  "code": "MOTO-PARTS",
+  "description": "อะไหล่และชิ้นส่วนสำหรับรถจักรยานยนต์",
+  "is_active": true
+}
+```
+
+#### ตัวอย่าง Request — สร้างหมวดย่อย
+
+```json
+POST /product-categories
+{
+  "parent_id": 1,
+  "name": "อะไหล่เครื่องยนต์",
+  "code": "MOTO-ENGINE",
+  "is_active": true
+}
+```
+
+#### ตัวอย่าง Response — Show (GET /product-categories/{id})
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "parent_id": null,
+    "name": "อะไหล่รถจักรยานยนต์",
+    "code": "MOTO-PARTS",
+    "description": "อะไหล่และชิ้นส่วนสำหรับรถจักรยานยนต์",
+    "is_active": true,
+    "parent": null,
+    "children": [
+      {
+        "id": 2,
+        "parent_id": 1,
+        "name": "อะไหล่เครื่องยนต์",
+        "code": "MOTO-ENGINE",
+        "is_active": true,
+        "children": []
+      }
+    ]
+  }
+}
+```
+
+#### ตัวอย่าง Response — Tree (GET /product-categories?tree=true)
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "อะไหล่รถจักรยานยนต์",
+      "code": "MOTO-PARTS",
+      "is_active": true,
+      "children": [
+        {
+          "id": 2,
+          "name": "อะไหล่เครื่องยนต์",
+          "code": "MOTO-ENGINE",
+          "is_active": true,
+          "children": [
+            {
+              "id": 5,
+              "name": "ลูกสูบ",
+              "code": "MOTO-ENGINE-PISTON",
+              "is_active": true,
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+> หมายเหตุ: Tree mode **ไม่มี pagination** — คืน `data` array โดยตรง
+
+#### UI Patterns — CategoryListPage (`/settings/categories`)
+
+**Table Layout (Tree View)**
+
+- ดึงข้อมูลทั้งหมดด้วย `GET /product-categories` (flat list) แล้ว render เป็น tree ใน frontend
+- เรียงลำดับแบบ **tree order** (depth-first): หมวดหลัก → หมวดย่อยระดับ 1 → หมวดย่อยระดับ 2 → ...
+- แต่ละแถวแสดง indent ตาม depth (`paddingLeft = depth × 24px`)
+
+**Level Badges**
+
+| Depth | Badge | สี |
+|-------|-------|----|
+| 0 | หมวดหลัก | น้ำเงิน |
+| 1 | ระดับ 2 | เหลือง (amber) |
+| 2+ | ระดับ N+1 | เทา |
+
+**Expand / Collapse**
+
+- หมวดที่มีลูก → แสดงปุ่ม **▼ / ▶** (chevron) ที่หน้าชื่อหมวด
+- กดปุ่ม → ย่อ/ขยายหมวดย่อยทั้งหมดใต้หมวดนั้น (ทุกระดับ)
+- state เก็บใน `collapsedIds: Set<number>` ใน frontend (ไม่ผ่าน API)
+- หมวดย่อยที่ไม่มีลูก → แสดงไอคอน `›` แทน (ไม่ clickable)
+
+**ค้นหา (Search)**
+
+- ช่องค้นหาใช้ `search` ใน frontend (filter จาก flat list ที่โหลดมาแล้ว ไม่ได้ส่ง query ไป API)
+- ผลการค้นหา: แสดง **ทั้งตัวที่ match และหมวดย่อยทุกระดับใต้ตัวที่ match** (เพื่อให้เห็น context)
+- หมวดย่อยของ matched category ยังสามารถ collapse/expand ได้ตามปกติ
+- เมื่อล้างการค้นหา → กลับไปแสดง tree view พร้อม collapse state เดิม
+
+**Modal เพิ่ม/แก้ไข**
+
+- Dropdown เลือก parent ใช้ข้อมูลจาก flat list เดิม (ไม่โหลดใหม่) เรียงแบบ tree order
+- แสดง indent ด้วย ideographic space (`　`) + ลูกศร (`↳`) ตาม depth
+
+**ลบ**
+
+- ถ้า API คืน error → แสดง toast "ไม่สามารถลบได้ อาจมีสินค้าหรือหมวดย่อยใช้หมวดนี้อยู่"
+
+---
+
+### 17.7 บริษัทไฟแนนซ์ (Finance Companies)
+
+**Route:** `/settings/finance-companies`
+**Permission:** `finance_companies.can_view`
+**API Base:** `/finance-companies`
+
+บริษัทที่รับสมัครสินเชื่อรถจักรยานยนต์ — ใช้เลือกตอนสร้างใบสมัครสินเชื่อ เก็บข้อมูลติดต่อ, อัตราค่าคอมมิชชั่น, โลโก้, และเอกสารสัญญา
+
+#### Fields
+
+| Field | Type | หมายเหตุ |
+|-------|------|----------|
+| `id` | int | Auto |
+| `name` | string (max 255) | ชื่อบริษัทไฟแนนซ์ (required) |
+| `logo_url` | string \| null | URL ของโลโก้บน DO Spaces (max 500 chars) |
+| `contact_person` | string \| null | ชื่อผู้ติดต่อ |
+| `phone` | string \| null | เบอร์โทร |
+| `email` | string \| null | Email |
+| `address` | string \| null | ที่อยู่ |
+| `commission_rate` | decimal | % commission (default: 0.00) |
+| `note` | string \| null | หมายเหตุ |
+| `is_active` | bool | เปิด/ปิดใช้งาน |
+
+#### API Endpoints
+
+| Method | Endpoint | หน้าที่ | Permission |
+|--------|----------|---------|------------|
+| `GET` | `/finance-companies` | List (paginated) | `finance_companies.can_view` |
+| `POST` | `/finance-companies` | สร้างบริษัทใหม่ | `finance_companies.can_create` |
+| `GET` | `/finance-companies/{id}` | ดูรายละเอียด | `finance_companies.can_view` |
+| `PUT` | `/finance-companies/{id}` | แก้ไข | `finance_companies.can_edit` |
+| `DELETE` | `/finance-companies/{id}` | ลบ | `finance_companies.can_delete` |
+| `POST` | `/finance-companies/{id}/logo` | อัปโหลดโลโก้ (multipart) | `finance_companies.can_edit` |
+| `GET` | `/finance-companies/{id}/documents` | รายการเอกสาร | `finance_companies.can_view` |
+| `POST` | `/finance-companies/{id}/documents` | อัปโหลดเอกสาร | `finance_companies.can_edit` |
+| `DELETE` | `/finance-companies/{id}/documents/{docId}` | ลบเอกสาร | `finance_companies.can_edit` |
+
+#### GET `/finance-companies` — Query Params
+
+| Param | Type | หมายเหตุ |
+|-------|------|----------|
+| `search` | string | ค้นหาจาก `name`, `contact_person`, `phone` |
+| `is_active` | bool | Filter สถานะ |
+| `sort` | string | `name` \| `commission_rate` (default: `name`) |
+| `order` | string | `asc` \| `desc` (default: `asc`) |
+| `page` | int | Default: 1 |
+| `limit` | int | Default: 20 |
+
+#### ตัวอย่าง Request — สร้าง/แก้ไขบริษัทไฟแนนซ์
+
+```json
+POST /finance-companies
+{
+  "name": "กสิกรไทย ลิสซิ่ง",
+  "logo_url": "https://spaces.example.com/finance-companies/logos/kbank-leasing.png",
+  "contact_person": "คุณสมศรี",
+  "phone": "02-111-2222",
+  "email": "contact@kbank-leasing.co.th",
+  "address": "123 ถนนสาทร กรุงเทพ",
+  "commission_rate": 2.50,
+  "is_active": true
+}
+```
+
+#### UI Patterns — หน้า List (`/settings/finance-companies`)
+
+- แสดง thumbnail โลโก้ (ถ้า `logo_url` ไม่เป็น null) — ถ้าไม่มีให้แสดง placeholder icon
+- **Sortable columns:** ชื่อบริษัท (`name`), ผู้ติดต่อ (`contact_person`), เบอร์โทร (`phone`), ค่าคอมมิชชั่น (`commission_rate`) — Default sort: `name` asc
+- Filter: toggle `is_active`
+- คลิกแถว → ไปหน้า Detail `/settings/finance-companies/{id}`
+- ปุ่ม "เพิ่มบริษัทไฟแนนซ์" → modal/form → `POST /finance-companies` (permission: `finance_companies.can_create`)
+
+#### UI Patterns — หน้า Detail (`/settings/finance-companies/{id}`)
+
+มี **2 Tab:**
+
+**Tab 1: ข้อมูลบริษัท**
+- แสดงและแก้ไขข้อมูลทั้งหมด
+- **โลโก้**: ปุ่ม "อัปโหลดโลโก้" → `POST /finance-companies/{id}/logo` (multipart/form-data, field: `logo`) → ได้ `logo_url` กลับมา → แสดงทันที
+  - Path บน DO Spaces: `finance-companies/{id}/logo/{filename}`
+  - รองรับ: JPG, PNG, WebP, GIF
+  - ถ้า `logo_url` เป็น null → แสดง placeholder icon
+- บันทึกข้อมูลอื่น: `PUT /finance-companies/{id}`
+
+**Tab 2: เอกสาร**
+- แสดงรายการไฟล์จาก `GET /finance-companies/{id}/documents`
+- แต่ละแถวแสดง: ชื่อไฟล์, ประเภท, ผู้อัปโหลด, วันที่, ปุ่ม **Download**, ปุ่ม **Delete**
+- ปุ่ม "อัปโหลดเอกสาร" → modal `multipart/form-data` — เลือกไฟล์ + กรอก `file_type`, `file_name` (optional), `note` (optional) → `POST /finance-companies/{id}/documents`
+- Upload ตรงไปยัง server — server อัปโหลดไป DO Spaces เอง ไม่ต้อง upload เองก่อน
+- ลบ: confirm dialog → `DELETE /finance-companies/{id}/documents/{docId}`
+
+#### Sub-resource: เอกสาร (Documents)
+
+เก็บในตาราง `finance_company_documents` — รองรับหลายไฟล์ต่อบริษัท (สัญญา, ตารางอัตราดอกเบี้ย, แบบฟอร์มสมัคร ฯลฯ)
+
+**Document Fields (POST — multipart/form-data):**
+
+| Field | Required | หมายเหตุ |
+|-------|----------|----------|
+| `file` | ✅ | ไฟล์จริง — รองรับ PDF, JPG, PNG, DOC, DOCX, XLS, XLSX |
+| `file_type` | ✅ | `contract` \| `rate_sheet` \| `application_form` \| `other` |
+| `file_name` | ❌ | ชื่อไฟล์ที่แสดง — ถ้าไม่ระบุ ใช้ชื่อไฟล์ต้นฉบับ |
+| `note` | ❌ | หมายเหตุเพิ่มเติม |
+
+> `uploaded_by` ถูก set อัตโนมัติจาก JWT (employee_id) — ไม่ต้องส่งจาก client  
+> `file_url` ถูก set อัตโนมัติโดย server หลัง upload ไป DO Spaces สำเร็จ — ไม่ต้องส่งจาก client
+
+**ตัวอย่าง Request — อัปโหลดเอกสาร:**
+
+```
+POST /finance-companies/3/documents
+Content-Type: multipart/form-data
+
+file=<binary>
+file_type=rate_sheet
+file_name=ตารางอัตราดอกเบี้ย 2026.pdf
+note=อัตราดอกเบี้ยสำหรับรถจักรยานยนต์ ปี 2026
+```
 
 ---
 
@@ -1311,6 +1663,8 @@ PUT /permissions/roles/{id}
 | **GPS** | ขอ permission จาก browser สำหรับ GPS photos + check-in |
 | **Date Format** | `YYYY-MM-DD`, Datetime `YYYY-MM-DDTHH:mm:ss` (ไม่มี Z — Bangkok) |
 | **ใบเสร็จต้องกดเอง** | `POST /invoices/{id}/issue-receipt` ไม่ออกอัตโนมัติ |
+| **Sortable Headers** | ทุก list page เรียงข้อมูลใน frontend ผ่าน `SortableHeader` + `sortRows()` — ไม่ส่ง sort param ไป API |
+| **Form Layout** | ทุก form page ใช้ layout เต็มจอ (ไม่มี `mx-auto max-w-*`) |
 | **ใบเสร็จมัดจำ** | ออกอัตโนมัติตอน `POST /deposits` |
 | **ตัดสต็อกซ่อม** | เกิดตอน SO: approved → in_progress |
 | **ตัดสต็อกขาย** | เกิดตอน INV: draft → issued |

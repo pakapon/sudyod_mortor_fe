@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { hrService } from '@/api/hrService'
 import type { Attendance, AttendanceStatus, Branch } from '@/types/hr'
-import { cn } from '@/lib/utils'
+import { cn, sortRows } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconButton } from '@/components/ui/ActionIconButton'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 
 const STATUS_MAP: Record<AttendanceStatus, { label: string; className: string }> = {
   normal: { label: 'ปกติ', className: 'bg-emerald-100 text-emerald-800' },
@@ -84,6 +85,23 @@ export function AttendanceListPage() {
       return true
     })
   }, [records, filterStatus, search])
+
+  const [sortKey, setSortKey] = useState('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (key: string) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  const sortedRecords = sortRows(
+    filteredRecords,
+    sortKey,
+    sortDir,
+    sortKey === 'employee_name'
+      ? (r) => `${r.employee?.first_name || ''} ${r.employee?.last_name || ''}`.trim()
+      : undefined,
+  )
 
   const handleEdit = (record: Attendance) => {
     setEditingRecord(record)
@@ -210,9 +228,9 @@ export function AttendanceListPage() {
           <table className="w-full text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
-                <th className="px-6 py-4 font-semibold">พนักงาน</th>
+                <SortableHeader label="พนักงาน" sortKey="employee_name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-6 py-4 font-semibold">สาขา</th>
-                <th className="px-6 py-4 font-semibold">วันที่</th>
+                <SortableHeader label="วันที่" sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-6 py-4 font-semibold text-center">เข้างาน</th>
                 <th className="px-6 py-4 font-semibold text-center">ออกงาน</th>
                 <th className="px-6 py-4 font-semibold text-center">สถานะ</th>
@@ -235,7 +253,7 @@ export function AttendanceListPage() {
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((rec) => {
+                sortedRecords.map((rec) => {
                   const statusInfo = STATUS_MAP[rec.status] || STATUS_MAP.normal
                   return (
                     <tr key={rec.id} className="hover:bg-gray-50/50">

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { hrService } from '@/api/hrService'
 import type { Brand, BrandPayload } from '@/types/hr'
-import { cn } from '@/lib/utils'
+import { cn, sortRows } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { ActionIconButton } from '@/components/ui/ActionIconButton'
 import { hasPermission } from '@/lib/permissions'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 
 const defaultForm: BrandPayload = { name: '', code: '', is_active: true }
 
@@ -17,7 +18,14 @@ export function BrandListPage() {
   const [form, setForm] = useState<BrandPayload>(defaultForm)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const { permissions } = useAuthStore()
+
+  const handleSort = (key: string) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   useEffect(() => {
     fetchData()
@@ -92,8 +100,10 @@ export function BrandListPage() {
     }
   }
 
-  const filtered = brands.filter((b) =>
-    `${b.name} ${b.code}`.toLowerCase().includes(search.toLowerCase()),
+  const filtered = sortRows(
+    brands.filter((b) => `${b.name} ${b.code}`.toLowerCase().includes(search.toLowerCase())),
+    sortKey,
+    sortDir,
   )
 
   return (
@@ -140,8 +150,8 @@ export function BrandListPage() {
           <table className="w-full text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
-                <th className="px-6 py-4 font-semibold">ชื่อยี่ห้อ</th>
-                <th className="px-6 py-4 font-semibold">รหัส</th>
+                <SortableHeader label="ชื่อยี่ห้อ" sortKey="name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="รหัส" sortKey="code" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-6 py-4 font-semibold text-center">สถานะ</th>
                 <th className="px-6 py-4 text-right font-semibold">จัดการ</th>
               </tr>

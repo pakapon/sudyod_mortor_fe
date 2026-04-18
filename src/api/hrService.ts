@@ -1,6 +1,6 @@
 import { apiClient } from '@/api/client'
 import type { ApiResponse, PaginatedResponse } from '@/types/api'
-import type { Employee, EmployeePayload, Role, RolePayload, RolePermission, WorkSchedule, WorkSchedulePayload, Position, Branch, BranchPayload, PositionPayload, FinanceCompany, FinanceCompanyPayload, Attendance, AttendanceQuery, AttendanceUpdatePayload, Holiday, HolidayPayload, Brand, BrandPayload, ProductCategory, ProductCategoryPayload, ProductUnit, ProductUnitPayload, Vendor, VendorPayload } from '@/types/hr'
+import type { Employee, EmployeePayload, Role, RolePayload, RolePermission, WorkSchedule, WorkSchedulePayload, Position, Branch, BranchPayload, PositionPayload, FinanceCompany, FinanceCompanyPayload, FinanceCompanyDocument, FinanceCompanyDocumentPayload, Attendance, AttendanceQuery, AttendanceUpdatePayload, Holiday, HolidayPayload, Brand, BrandPayload, ProductCategory, ProductCategoryPayload, ProductUnit, ProductUnitPayload, Vendor, VendorPayload } from '@/types/hr'
 
 export const hrService = {
   // Branch Endpoints
@@ -64,6 +64,33 @@ export const hrService = {
 
   deleteFinanceCompany(id: number) {
     return apiClient.delete<ApiResponse<null>>(`/finance-companies/${id}`)
+  },
+
+  uploadFinanceCompanyLogo(id: number, file: File) {
+    const formData = new FormData()
+    formData.append('logo', file)
+    return apiClient.post<ApiResponse<FinanceCompany>>(`/finance-companies/${id}/logo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
+  getFinanceCompanyDocuments(id: number) {
+    return apiClient.get<ApiResponse<FinanceCompanyDocument[]>>(`/finance-companies/${id}/documents`)
+  },
+
+  uploadFinanceCompanyDocument(id: number, file: File, payload: FinanceCompanyDocumentPayload) {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('file_type', payload.file_type)
+    if (payload.file_name) formData.append('file_name', payload.file_name)
+    if (payload.note) formData.append('note', payload.note)
+    return apiClient.post<ApiResponse<FinanceCompanyDocument>>(`/finance-companies/${id}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
+  deleteFinanceCompanyDocument(id: number, docId: number) {
+    return apiClient.delete<ApiResponse<null>>(`/finance-companies/${id}/documents/${docId}`)
   },
 
   // Employee Endpoints

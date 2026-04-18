@@ -5,6 +5,8 @@ import type { Holiday, Branch } from '@/types/hr'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { sortRows } from '@/lib/utils'
+import { SortableHeader } from '@/components/ui/SortableHeader'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('th-TH', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
@@ -16,7 +18,14 @@ export function HolidayListPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [filterYear, setFilterYear] = useState(new Date().getFullYear())
   const [filterBranch, setFilterBranch] = useState<string>('')
+  const [sortKey, setSortKey] = useState('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const { permissions } = useAuthStore()
+
+  const handleSort = (key: string) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('asc') }
+  }
 
   useEffect(() => {
     hrService.getBranches().then((res) => setBranches(res.data.data || [])).catch(() => {})
@@ -46,6 +55,8 @@ export function HolidayListPage() {
       hrService.deleteHoliday(id).then(() => fetchData())
     }
   }
+
+  const sortedHolidays = sortRows(holidays, sortKey, sortDir)
 
   const getBranchLabel = (branchId: number | null) => {
     if (branchId === null) return 'ทุกสาขา'
@@ -106,8 +117,8 @@ export function HolidayListPage() {
           <table className="w-full text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
-                <th className="px-6 py-4 font-semibold">วันที่</th>
-                <th className="px-6 py-4 font-semibold">ชื่อวันหยุด</th>
+                <SortableHeader label="วันที่" sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="ชื่อวันหยุด" sortKey="name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-6 py-4 font-semibold">สาขา</th>
                 <th className="px-6 py-4 text-right font-semibold">จัดการ</th>
               </tr>
@@ -126,7 +137,7 @@ export function HolidayListPage() {
                   </td>
                 </tr>
               ) : (
-                holidays.map((h) => (
+                sortedHolidays.map((h) => (
                   <tr key={h.id} className="hover:bg-gray-50/50">
                     <td className="px-6 py-4 font-medium text-gray-900">{formatDate(h.date)}</td>
                     <td className="px-6 py-4 text-gray-900">{h.name}</td>

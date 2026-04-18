@@ -101,10 +101,35 @@ export interface WorkSchedulePayload {
 export interface FinanceCompany {
   id: number
   name: string
-  address?: string
+  logo_url?: string | null
+  contact_person?: string
   phone?: string
-  contact_name?: string
+  email?: string
+  address?: string
+  commission_rate?: string
+  note?: string
   is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export type FinanceCompanyDocumentFileType = 'contract' | 'rate_sheet' | 'application_form' | 'other'
+
+export interface FinanceCompanyDocument {
+  id: number
+  finance_company_id: number
+  file_type: FinanceCompanyDocumentFileType
+  file_url: string
+  file_name: string
+  note?: string | null
+  uploaded_by?: number
+  created_at?: string
+}
+
+export interface FinanceCompanyDocumentPayload {
+  file_type: FinanceCompanyDocumentFileType
+  file_name?: string
+  note?: string
 }
 
 export interface BranchPayload {
@@ -121,9 +146,13 @@ export interface PositionPayload {
 
 export interface FinanceCompanyPayload {
   name: string
-  address?: string
+  logo_url?: string | null
+  contact_person?: string
   phone?: string
-  contact_name?: string
+  email?: string
+  address?: string
+  commission_rate?: string
+  note?: string
   is_active: boolean
 }
 
