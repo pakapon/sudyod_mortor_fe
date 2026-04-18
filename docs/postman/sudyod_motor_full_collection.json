@@ -3533,20 +3533,34 @@
                     "name": "Upload Customer Document",
                     "request": {
                         "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
+                        "header": [],
                         "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"file_type\": \"id_card\",\n    \"file_url\": \"https:\\/\\/spaces.example.com\\/customers\\/1\\/docs\\/id_card.pdf\",\n    \"file_name\": \"บัตรประชาชน.pdf\",\n    \"note\": null\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "file",
+                                    "type": "file",
+                                    "description": "ไฟล์เอกสาร (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX)"
+                                },
+                                {
+                                    "key": "file_type",
+                                    "value": "id_card",
+                                    "type": "text",
+                                    "description": "id_card | house_registration | other"
+                                },
+                                {
+                                    "key": "file_name",
+                                    "value": "บัตรประชาชน.pdf",
+                                    "type": "text",
+                                    "description": "ชื่อไฟล์ที่แสดง (optional — ถ้าไม่ระบุใช้ชื่อไฟล์ต้นฉบับ)"
+                                },
+                                {
+                                    "key": "note",
+                                    "value": "",
+                                    "type": "text",
+                                    "description": "หมายเหตุ (optional)"
                                 }
-                            }
+                            ]
                         },
                         "url": {
                             "raw": "{{base_url}}/customers/:id/documents",
@@ -3566,7 +3580,7 @@
                                 }
                             ]
                         },
-                        "description": "อัปโหลดเอกสาร — file_type: id_card, house_registration, etc."
+                        "description": "อัปโหลดเอกสารลูกค้าไปยัง DigitalOcean Spaces (multipart/form-data)\n\nfile_type: id_card | house_registration | other\nfile upload โดยตรง — ไม่ต้อง upload เองก่อน"
                     },
                     "response": [
                         {
@@ -4822,20 +4836,34 @@
                     "name": "Upload Vendor Document",
                     "request": {
                         "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
+                        "header": [],
                         "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"file_type\": \"contract\",\n    \"file_url\": \"https:\\/\\/spaces.example.com\\/vendors\\/1\\/docs\\/contract.pdf\",\n    \"file_name\": \"สัญญา.pdf\",\n    \"note\": \"สัญญาซื้อขายปี 2026\"\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "file",
+                                    "type": "file",
+                                    "description": "ไฟล์เอกสาร (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX)"
+                                },
+                                {
+                                    "key": "file_type",
+                                    "value": "contract",
+                                    "type": "text",
+                                    "description": "contract | tax_cert | other"
+                                },
+                                {
+                                    "key": "file_name",
+                                    "value": "สัญญา.pdf",
+                                    "type": "text",
+                                    "description": "ชื่อไฟล์ที่แสดง (optional — ถ้าไม่ระบุใช้ชื่อไฟล์ต้นฉบับ)"
+                                },
+                                {
+                                    "key": "note",
+                                    "value": "สัญญาซื้อขายปี 2026",
+                                    "type": "text",
+                                    "description": "หมายเหตุ (optional)"
                                 }
-                            }
+                            ]
                         },
                         "url": {
                             "raw": "{{base_url}}/vendors/:id/documents",
@@ -4855,7 +4883,7 @@
                                 }
                             ]
                         },
-                        "description": "อัปโหลดเอกสารซัพพลายเออร์"
+                        "description": "อัปโหลดเอกสารซัพพลายเออร์ไปยัง DigitalOcean Spaces (multipart/form-data)\n\nfile_type: contract | tax_cert | other\nfile upload โดยตรง — ไม่ต้อง upload เองก่อน"
                     },
                     "response": [
                         {
@@ -12260,6 +12288,241 @@
                                 }
                             ],
                             "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูลที่ต้องการลบ\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Upload Finance Company Logo",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                                    "var json = pm.response.json();",
+                                    "if (json.data && json.data.logo_url) pm.environment.set('finance_company_logo_url', json.data.logo_url);"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "logo",
+                                    "type": "file",
+                                    "src": "",
+                                    "description": "ไฟล์โลโก้ (JPG, PNG, WebP, GIF)"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/finance-companies/:id/logo",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "finance-companies",
+                                ":id",
+                                "logo"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "FC ID"
+                                }
+                            ]
+                        },
+                        "description": "อัปโหลดโลโก้บริษัทไฟแนนซ์ไปยัง DO Spaces\n\nBody: multipart/form-data\n- logo: ไฟล์รูปภาพ (JPG, PNG, WebP, GIF)\n\nResponse: คืนข้อมูล finance company พร้อม logo_url ที่อัปเดตแล้ว"
+                    },
+                    "response": [
+                        {
+                            "name": "Logo Uploaded",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"แก้ไขสำเร็จ\",\n  \"data\": {\n    \"id\": 1,\n    \"name\": \"AEON\",\n    \"logo_url\": \"https://spaces.example.com/finance-companies/1/logo/abc123.jpg\",\n    \"is_active\": true\n  }\n}"
+                        },
+                        {
+                            "name": "Invalid Image Type",
+                            "status": "Bad Request",
+                            "code": 400,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไฟล์รูปภาพไม่ถูกต้อง (รองรับ JPG, PNG, WebP, GIF)\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "List Finance Company Documents",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/finance-companies/:id/documents",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "finance-companies",
+                                ":id",
+                                "documents"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "FC ID"
+                                }
+                            ]
+                        },
+                        "description": "รายการเอกสารของบริษัทไฟแนนซ์"
+                    },
+                    "response": [
+                        {
+                            "name": "Documents List",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"finance_company_id\": 1,\n      \"file_type\": \"contract\",\n      \"file_url\": \"https://spaces.example.com/fc-docs/contract.pdf\",\n      \"file_name\": \"สัญญา AEON 2026.pdf\",\n      \"note\": null,\n      \"uploaded_by\": 1\n    }\n  ]\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Upload Finance Company Document",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "file",
+                                    "type": "file",
+                                    "description": "ไฟล์เอกสาร (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX)"
+                                },
+                                {
+                                    "key": "file_type",
+                                    "value": "contract",
+                                    "type": "text",
+                                    "description": "contract | rate_sheet | application_form | other"
+                                },
+                                {
+                                    "key": "file_name",
+                                    "value": "สัญญา AEON 2026.pdf",
+                                    "type": "text",
+                                    "description": "ชื่อไฟล์ที่แสดง (optional — ถ้าไม่ระบุใช้ชื่อไฟล์ต้นฉบับ)"
+                                },
+                                {
+                                    "key": "note",
+                                    "value": "",
+                                    "type": "text",
+                                    "description": "หมายเหตุ (optional)"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/finance-companies/:id/documents",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "finance-companies",
+                                ":id",
+                                "documents"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "FC ID"
+                                }
+                            ]
+                        },
+                        "description": "อัปโหลดเอกสารบริษัทไฟแนนซ์ไปยัง DigitalOcean Spaces (multipart/form-data)\n\nfile_type: contract | rate_sheet | application_form | other\nuploaded_by จะถูก set อัตโนมัติจาก JWT\nfile upload โดยตรง — ไม่ต้อง upload เองก่อน"
+                    },
+                    "response": [
+                        {
+                            "name": "Document Created",
+                            "status": "Created",
+                            "code": 201,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\"id\": 1, \"finance_company_id\": 1, \"file_type\": \"contract\", \"file_name\": \"สัญญา AEON 2026.pdf\"}\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Delete Finance Company Document",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/finance-companies/:id/documents/:docId",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "finance-companies",
+                                ":id",
+                                "documents",
+                                ":docId"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "FC ID"
+                                },
+                                {
+                                    "key": "docId",
+                                    "value": "1",
+                                    "description": "Document ID"
+                                }
+                            ]
+                        },
+                        "description": "ลบเอกสารของบริษัทไฟแนนซ์"
+                    },
+                    "response": [
+                        {
+                            "name": "Document Deleted",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"ลบสำเร็จ\"\n}"
                         }
                     ]
                 }
