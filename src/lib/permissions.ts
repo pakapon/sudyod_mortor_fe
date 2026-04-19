@@ -80,7 +80,6 @@ export const ROUTE_PERMISSION_MAP: Record<string, ModuleKey> = {
   '/hr/holidays': 'holidays',
   '/hr/work-schedules': 'work_schedules',
   '/settings/work-schedules': 'work_schedules',
-  '/settings/branches': 'branches',
   '/settings/positions': 'positions',
   '/settings/roles': 'positions', // roles permission ใช้ roles.can_view แต่ไม่มีใน 22 modules
   '/settings/brands': 'brands',

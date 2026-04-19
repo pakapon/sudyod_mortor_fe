@@ -13,6 +13,9 @@ export interface Branch {
   id: number
   name: string
   code: string
+  address?: string
+  phone?: string
+  allowed_ip_range?: string
   is_active: boolean
 }
 
@@ -135,6 +138,9 @@ export interface FinanceCompanyDocumentPayload {
 export interface BranchPayload {
   name: string
   code: string
+  address?: string
+  phone?: string
+  allowed_ip_range?: string
   is_active: boolean
 }
 

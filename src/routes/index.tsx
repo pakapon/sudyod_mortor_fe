@@ -13,6 +13,9 @@ import { PermissionMatrixPage } from '@/pages/settings/PermissionMatrixPage'
 import { RoleDetailPage } from '@/pages/settings/RoleDetailPage'
 import { MyProfilePage } from '@/pages/settings/MyProfilePage'
 import { WorkScheduleListPage } from '@/pages/hr/WorkScheduleListPage'
+import { CustomerListPage } from '@/pages/customers/CustomerListPage'
+import { CustomerFormPage } from '@/pages/customers/CustomerFormPage'
+import { CustomerDetailPage } from '@/pages/customers/CustomerDetailPage'
 import { WorkScheduleFormPage } from '@/pages/hr/WorkScheduleFormPage'
 import { AttendanceListPage } from '@/pages/hr/AttendanceListPage'
 import { HolidayListPage } from '@/pages/hr/HolidayListPage'
@@ -93,7 +96,7 @@ export const router = createBrowserRouter([
 
       // ─── Settings ───
       {
-        element: <PermissionGuard module="branches" />,
+        element: <ProtectedRoute />,
         children: [
           {
             element: <AppLayout title="สาขา" />,
@@ -210,7 +213,10 @@ export const router = createBrowserRouter([
           {
             element: <AppLayout title="ลูกค้า" />,
             children: [
-              { path: '/customers', element: <PlaceholderPage title="ลูกค้า" /> },
+              { path: '/customers', element: <CustomerListPage /> },
+              { path: '/customers/create', element: <CustomerFormPage /> },
+              { path: '/customers/:id', element: <CustomerDetailPage /> },
+              { path: '/customers/:id/edit', element: <CustomerFormPage /> },
             ],
           },
         ],

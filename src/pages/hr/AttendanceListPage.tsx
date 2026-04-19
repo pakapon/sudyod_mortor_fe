@@ -118,9 +118,7 @@ export function AttendanceListPage() {
       })
       setEditingRecord(null)
       fetchData()
-    } catch {
-      alert('เกิดข้อผิดพลาด กรุณาลองอีกครั้ง')
-    }
+    } catch { /* interceptor handles display */ }
   }
 
   const handleExport = async () => {
@@ -136,9 +134,7 @@ export function AttendanceListPage() {
       link.download = `attendance_${month}.csv`
       link.click()
       window.URL.revokeObjectURL(url)
-    } catch {
-      alert('ไม่สามารถ export ข้อมูลได้')
-    }
+    } catch { /* interceptor handles display */ }
   }
 
   return (

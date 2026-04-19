@@ -148,7 +148,7 @@ export function WorkScheduleFormPage() {
       }
       navigate('/settings/work-schedules')
     } catch (e: any) {
-      toast.error(isEdit ? 'อัปเดตไม่สำเร็จ กรุณาลองใหม่' : 'สร้างไม่สำเร็จ กรุณาลองใหม่')
+      // interceptor handles display
     } finally {
       setIsSubmitting(false)
     }

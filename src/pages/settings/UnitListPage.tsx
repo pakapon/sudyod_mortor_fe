@@ -95,9 +95,7 @@ export function UnitListPage() {
     try {
       await hrService.deleteProductUnit(id)
       fetchData()
-    } catch {
-      alert('ไม่สามารถลบได้ อาจมีสินค้าใช้หน่วยนับนี้อยู่')
-    }
+    } catch { /* interceptor handles display */ }
   }
 
   const filtered = sortRows(

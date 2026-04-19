@@ -218,7 +218,7 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
           const isActive = item.path
             ? location.pathname === item.path
             : item.children?.some((c) => location.pathname.startsWith(c.path))
-          const isExpanded = expandedMenus.has(item.id)
+          const isExpanded = expandedMenus.has(item.id) || !!isActive
 
           return (
             <div key={item.id} className="mb-0.5">

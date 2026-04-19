@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { FinanceCompany } from '@/types/hr'
 import { cn, sortRows } from '@/lib/utils'
+import { toast } from 'react-hot-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
 import { SortableHeader } from '@/components/ui/SortableHeader'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 export function FinanceCompanyListPage() {
   const [companies, setCompanies] = useState<FinanceCompany[]>([])
@@ -14,6 +16,7 @@ export function FinanceCompanyListPage() {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [deleteId, setDeleteId] = useState<number | null>(null)
   const { permissions } = useAuthStore()
   const navigate = useNavigate()
 
@@ -38,9 +41,17 @@ export function FinanceCompanyListPage() {
     }
   }
 
-  const handleDelete = (id: number) => {
-    if (confirm('คุณต้องการลบบริษัทไฟแนนซ์นี้ใช่หรือไม่?')) {
-      hrService.deleteFinanceCompany(id).then(() => fetchData())
+  const handleDelete = (id: number) => setDeleteId(id)
+
+  const handleConfirmDelete = async () => {
+    if (deleteId === null) return
+    try {
+      await hrService.deleteFinanceCompany(deleteId)
+      setDeleteId(null)
+      fetchData()
+      toast.success('ลบบริษัทไฟแนนซ์สำเร็จ')
+    } catch {
+      setDeleteId(null)
     }
   }
 
@@ -177,6 +188,16 @@ export function FinanceCompanyListPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        title="ยืนยันการลบบริษัทไฟแนนซ์"
+        message="คุณต้องการลบบริษัทไฟแนนซ์นี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถเรียกคืนได้"
+        confirmLabel="ลบบริษัทไฟแนนซ์"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   )
 }

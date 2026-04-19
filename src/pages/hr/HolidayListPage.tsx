@@ -6,7 +6,9 @@ import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
 import { sortRows } from '@/lib/utils'
+import { toast } from 'react-hot-toast'
 import { SortableHeader } from '@/components/ui/SortableHeader'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('th-TH', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
@@ -20,6 +22,7 @@ export function HolidayListPage() {
   const [filterBranch, setFilterBranch] = useState<string>('')
   const [sortKey, setSortKey] = useState('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [deleteId, setDeleteId] = useState<number | null>(null)
   const { permissions } = useAuthStore()
 
   const handleSort = (key: string) => {
@@ -50,9 +53,17 @@ export function HolidayListPage() {
     }
   }
 
-  const handleDelete = (id: number) => {
-    if (confirm('คุณต้องการลบวันหยุดนี้ใช่หรือไม่?')) {
-      hrService.deleteHoliday(id).then(() => fetchData())
+  const handleDelete = (id: number) => setDeleteId(id)
+
+  const handleConfirmDelete = async () => {
+    if (deleteId === null) return
+    try {
+      await hrService.deleteHoliday(deleteId)
+      setDeleteId(null)
+      fetchData()
+      toast.success('ลบวันหยุดสำเร็จ')
+    } catch {
+      setDeleteId(null)
     }
   }
 
@@ -166,6 +177,16 @@ export function HolidayListPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        title="ยืนยันการลบวันหยุด"
+        message="คุณต้องการลบวันหยุดนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถเรียกคืนได้"
+        confirmLabel="ลบวันหยุด"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   )
 }

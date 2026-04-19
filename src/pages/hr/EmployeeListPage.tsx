@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { Employee } from '@/types/hr'
 import { cn, sortRows } from '@/lib/utils'
+import { toast } from 'react-hot-toast'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
 import { SortableHeader } from '@/components/ui/SortableHeader'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 function PlusIcon() {
   return (
@@ -32,6 +34,7 @@ export function EmployeeListPage() {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState('employee_code')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const handleSort = (key: string) => {
     if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -175,11 +178,7 @@ export function EmployeeListPage() {
                         <ActionIconLink variant="edit" to={`/hr/employees/${emp.id}`} title="แก้ไข" />
                         <ActionIconButton
                           variant="delete"
-                          onClick={() => {
-                            if (confirm('คุณต้องการลบพนักงานท่านนี้ใช่หรือไม่?')) {
-                              hrService.deleteEmployee(emp.id).then(() => fetchData())
-                            }
-                          }}
+                          onClick={() => setDeleteId(emp.id)}
                         />
                       </div>
                     </td>
@@ -190,6 +189,26 @@ export function EmployeeListPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        title="ยืนยันการลบพนักงาน"
+        message="คุณต้องการลบพนักงานท่านนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถเรียกคืนได้"
+        confirmLabel="ลบพนักงาน"
+        variant="danger"
+        onConfirm={async () => {
+          if (deleteId === null) return
+          try {
+            await hrService.deleteEmployee(deleteId)
+            setDeleteId(null)
+            fetchData()
+            toast.success('ลบพนักงานสำเร็จ')
+          } catch {
+            setDeleteId(null)
+          }
+        }}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import type { Role, RolePermission } from '@/types/hr'
 import { cn } from '@/lib/utils'
 
 const ALL_MODULES: { key: string; label: string }[] = [
+  { key: 'branches', label: 'สาขา' },
   { key: 'dashboard', label: 'แดชบอร์ด' },
   { key: 'employees', label: 'พนักงาน' },
   { key: 'positions', label: 'ตำแหน่งงาน' },

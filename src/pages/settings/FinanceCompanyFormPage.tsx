@@ -44,7 +44,7 @@ export function FinanceCompanyFormPage() {
       }
       navigate('/settings/finance-companies')
     } catch {
-      alert('เกิดข้อผิดพลาด กรุณาลองอีกครั้ง')
+      // interceptor handles display
     } finally {
       setIsSubmitting(false)
     }

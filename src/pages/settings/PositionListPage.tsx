@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { Position } from '@/types/hr'
 import { cn, sortRows } from '@/lib/utils'
+import { toast } from 'react-hot-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
 import { SortableHeader } from '@/components/ui/SortableHeader'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 export function PositionListPage() {
   const [positions, setPositions] = useState<Position[]>([])
@@ -14,6 +16,7 @@ export function PositionListPage() {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [deleteId, setDeleteId] = useState<number | null>(null)
   const { permissions } = useAuthStore()
 
   const handleSort = (key: string) => {
@@ -37,9 +40,17 @@ export function PositionListPage() {
     }
   }
 
-  const handleDelete = (id: number) => {
-    if (confirm('คุณต้องการลบตำแหน่งนี้ใช่หรือไม่?')) {
-      hrService.deletePosition(id).then(() => fetchData())
+  const handleDelete = (id: number) => setDeleteId(id)
+
+  const handleConfirmDelete = async () => {
+    if (deleteId === null) return
+    try {
+      await hrService.deletePosition(deleteId)
+      setDeleteId(null)
+      fetchData()
+      toast.success('ลบตำแหน่งสำเร็จ')
+    } catch {
+      setDeleteId(null)
     }
   }
 
@@ -142,6 +153,16 @@ export function PositionListPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        title="ยืนยันการลบตำแหน่ง"
+        message="คุณต้องการลบตำแหน่งนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถเรียกคืนได้"
+        confirmLabel="ลบตำแหน่ง"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   )
 }

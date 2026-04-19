@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
+import { toast } from 'react-hot-toast'
 import { hrService } from '@/api/hrService'
 import type { BranchPayload } from '@/types/hr'
 
@@ -11,7 +12,7 @@ export function BranchFormPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<BranchPayload>({
-    defaultValues: { name: '', code: '', is_active: true },
+    defaultValues: { name: '', code: '', address: '', phone: '', allowed_ip_range: '', is_active: true },
   })
 
   useEffect(() => {
@@ -21,6 +22,9 @@ export function BranchFormPage() {
           reset({
             name: data.data.name,
             code: data.data.code,
+            address: data.data.address || '',
+            phone: data.data.phone || '',
+            allowed_ip_range: '',
             is_active: data.data.is_active,
           })
         })
@@ -36,9 +40,9 @@ export function BranchFormPage() {
       } else {
         await hrService.createBranch(payload)
       }
+      toast.success(isEditing ? 'แก้ไขสาขาสำเร็จ' : 'เพิ่มสาขาสำเร็จ')
       navigate('/settings/branches')
     } catch {
-      alert('เกิดข้อผิดพลาด กรุณาลองอีกครั้ง')
     } finally {
       setIsSubmitting(false)
     }
@@ -76,6 +80,25 @@ export function BranchFormPage() {
             placeholder="เช่น สุดยอดมอเตอร์ สาขาใหญ่"
           />
           {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">ที่อยู่</label>
+          <textarea
+            {...register('address')}
+            rows={3}
+            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+            placeholder="ที่อยู่สาขา"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">เบอร์โทร</label>
+          <input
+            {...register('phone')}
+            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+            placeholder="เช่น 02-123-4567"
+          />
         </div>
 
         <div className="flex items-center gap-2">

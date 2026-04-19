@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { ApiResponse } from '@/types/api'
+import { useErrorStore } from '@/stores/errorStore'
 
 const TOKEN_KEY = 'access_token'
 const REFRESH_KEY = 'refresh_token'
@@ -83,6 +84,14 @@ apiClient.interceptors.response.use(
       } finally {
         isRefreshing = false
       }
+    }
+
+    // Show global error modal for all non-401 errors (covers 403, 400, 404, 422, 5xx, etc.)
+    if (error.response?.status !== 401) {
+      const msg =
+        (error.response?.data as { message?: string } | undefined)?.message ??
+        'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'
+      useErrorStore.getState().setError(msg)
     }
 
     return Promise.reject(error)

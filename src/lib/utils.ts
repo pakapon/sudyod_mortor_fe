@@ -36,3 +36,13 @@ export function sortRows<T>(
     return 0
   })
 }
+
+/** Extract the `message` field from an Axios API error response.
+ *  Falls back to the provided fallback string if no message is found. */
+export function getApiErrorMessage(error: unknown, fallback = 'เกิดข้อผิดพลาด กรุณาลองอีกครั้ง'): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const msg = (error as { response?: { data?: { message?: string } } }).response?.data?.message
+    if (msg) return msg
+  }
+  return fallback
+}

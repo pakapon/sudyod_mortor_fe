@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { hrService } from '@/api/hrService'
 import type { ProductCategory, ProductCategoryPayload } from '@/types/hr'
-import { cn } from '@/lib/utils'
+import { cn, getApiErrorMessage } from '@/lib/utils'
+import { toast } from 'react-hot-toast'
+
 import { useAuthStore } from '@/stores/authStore'
 import { ActionIconButton } from '@/components/ui/ActionIconButton'
 import { hasPermission } from '@/lib/permissions'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 type CategoryWithDepth = { cat: ProductCategory; depth: number }
 
@@ -40,6 +43,7 @@ export function CategoryListPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [collapsedIds, setCollapsedIds] = useState<Set<number>>(new Set())
+  const [deleteId, setDeleteId] = useState<number | null>(null)
   const { permissions } = useAuthStore()
 
   useEffect(() => {
@@ -106,20 +110,24 @@ export function CategoryListPage() {
       }
       closeModal()
       fetchData()
-    } catch {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง')
+    } catch (err) {
+      setError(getApiErrorMessage(err))
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('คุณต้องการลบหมวดสินค้านี้ใช่หรือไม่?')) return
+  const handleDelete = (id: number) => setDeleteId(id)
+
+  const handleConfirmDelete = async () => {
+    if (deleteId === null) return
     try {
-      await hrService.deleteProductCategory(id)
+      await hrService.deleteProductCategory(deleteId)
+      setDeleteId(null)
       fetchData()
+      toast.success('ลบหมวดสินค้าสำเร็จ')
     } catch {
-      alert('ไม่สามารถลบได้ อาจมีสินค้าหรือหมวดย่อยใช้หมวดนี้อยู่')
+      setDeleteId(null)
     }
   }
 
@@ -448,6 +456,16 @@ export function CategoryListPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        title="ยืนยันการลบหมวดสินค้า"
+        message="คุณต้องการลบหมวดสินค้านี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถเรียกคืนได้"
+        confirmLabel="ลบหมวดสินค้า"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   )
 }

@@ -38,7 +38,7 @@ export function PositionFormPage() {
       }
       navigate('/settings/positions')
     } catch {
-      alert('เกิดข้อผิดพลาด กรุณาลองอีกครั้ง')
+      // interceptor handles display
     } finally {
       setIsSubmitting(false)
     }

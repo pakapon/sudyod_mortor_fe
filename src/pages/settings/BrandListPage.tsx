@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { hrService } from '@/api/hrService'
 import type { Brand, BrandPayload } from '@/types/hr'
-import { cn, sortRows } from '@/lib/utils'
+import { cn, sortRows, getApiErrorMessage } from '@/lib/utils'
+import { toast } from 'react-hot-toast'
+
 import { useAuthStore } from '@/stores/authStore'
 import { ActionIconButton } from '@/components/ui/ActionIconButton'
 import { hasPermission } from '@/lib/permissions'
 import { SortableHeader } from '@/components/ui/SortableHeader'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 const defaultForm: BrandPayload = { name: '', code: '', is_active: true }
 
@@ -20,6 +23,7 @@ export function BrandListPage() {
   const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [deleteId, setDeleteId] = useState<number | null>(null)
   const { permissions } = useAuthStore()
 
   const handleSort = (key: string) => {
@@ -83,20 +87,24 @@ export function BrandListPage() {
       }
       closeModal()
       fetchData()
-    } catch {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง')
+    } catch (err) {
+      setError(getApiErrorMessage(err))
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('คุณต้องการลบยี่ห้อนี้ใช่หรือไม่?')) return
+  const handleDelete = (id: number) => setDeleteId(id)
+
+  const handleConfirmDelete = async () => {
+    if (deleteId === null) return
     try {
-      await hrService.deleteBrand(id)
+      await hrService.deleteBrand(deleteId)
+      setDeleteId(null)
       fetchData()
+      toast.success('ลบยี่ห้อสำเร็จ')
     } catch {
-      alert('ไม่สามารถลบได้ อาจมีสินค้าใช้ยี่ห้อนี้อยู่')
+      setDeleteId(null)
     }
   }
 
@@ -287,6 +295,16 @@ export function BrandListPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        title="ยืนยันการลบยี่ห้อ"
+        message="คุณต้องการลบยี่ห้อนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถเรียกคืนได้"
+        confirmLabel="ลบยี่ห้อ"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   )
 }

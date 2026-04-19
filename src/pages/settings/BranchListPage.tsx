@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { Branch } from '@/types/hr'
 import { cn, sortRows } from '@/lib/utils'
-import { useAuthStore } from '@/stores/authStore'
-import { hasPermission } from '@/lib/permissions'
+import { toast } from 'react-hot-toast'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
 import { SortableHeader } from '@/components/ui/SortableHeader'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 export function BranchListPage() {
   const [branches, setBranches] = useState<Branch[]>([])
@@ -14,7 +14,7 @@ export function BranchListPage() {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const { permissions } = useAuthStore()
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const handleSort = (key: string) => {
     if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -37,9 +37,17 @@ export function BranchListPage() {
     }
   }
 
-  const handleDelete = (id: number) => {
-    if (confirm('คุณต้องการลบสาขานี้ใช่หรือไม่?')) {
-      hrService.deleteBranch(id).then(() => fetchData())
+  const handleDelete = (id: number) => setDeleteId(id)
+
+  const handleConfirmDelete = async () => {
+    if (deleteId === null) return
+    try {
+      await hrService.deleteBranch(deleteId)
+      setDeleteId(null)
+      fetchData()
+      toast.success('ลบสาขาสำเร็จ')
+    } catch {
+      setDeleteId(null)
     }
   }
 
@@ -56,8 +64,7 @@ export function BranchListPage() {
           <h1 className="text-2xl font-bold text-gray-900">จัดการสาขา</h1>
           <p className="text-sm text-gray-500">จัดการข้อมูลสาขาของบริษัท</p>
         </div>
-        {hasPermission(permissions, 'branches', 'can_create') && (
-          <Link
+        <Link
             to="/settings/branches/create"
             className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
           >
@@ -66,7 +73,6 @@ export function BranchListPage() {
             </svg>
             <span>เพิ่มสาขา</span>
           </Link>
-        )}
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -95,6 +101,9 @@ export function BranchListPage() {
               <tr>
                 <SortableHeader label="รหัสสาขา" sortKey="code" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <SortableHeader label="ชื่อสาขา" sortKey="name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <th className="px-6 py-4 font-semibold">ที่อยู่</th>
+                <th className="px-6 py-4 font-semibold">เบอร์โทร</th>
+                <th className="px-6 py-4 font-semibold">IP ที่อนุญาต</th>
                 <th className="px-6 py-4 font-semibold text-center">สถานะ</th>
                 <th className="px-6 py-4 text-right font-semibold">จัดการ</th>
               </tr>
@@ -102,13 +111,13 @@ export function BranchListPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     กำลังโหลดข้อมูล...
                   </td>
                 </tr>
               ) : filteredBranches.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     ไม่พบข้อมูลสาขา
                   </td>
                 </tr>
@@ -117,6 +126,9 @@ export function BranchListPage() {
                   <tr key={branch.id} className="hover:bg-gray-50/50">
                     <td className="px-6 py-4 font-medium text-gray-900">{branch.code}</td>
                     <td className="px-6 py-4 text-gray-900">{branch.name}</td>
+                    <td className="px-6 py-4 text-gray-500">{branch.address || '-'}</td>
+                    <td className="px-6 py-4 text-gray-500">{branch.phone || '-'}</td>
+                    <td className="px-6 py-4 text-gray-500">{branch.allowed_ip_range || '-'}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={cn(
                         'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -127,12 +139,8 @@ export function BranchListPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {hasPermission(permissions, 'branches', 'can_edit') && (
-                          <ActionIconLink variant="edit" to={`/settings/branches/${branch.id}/edit`} />
-                        )}
-                        {hasPermission(permissions, 'branches', 'can_delete') && (
-                          <ActionIconButton variant="delete" onClick={() => handleDelete(branch.id)} />
-                        )}
+                        <ActionIconLink variant="edit" to={`/settings/branches/${branch.id}/edit`} />
+                        <ActionIconButton variant="delete" onClick={() => handleDelete(branch.id)} />
                       </div>
                     </td>
                   </tr>
@@ -142,6 +150,16 @@ export function BranchListPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        title="ยืนยันการลบสาขา"
+        message="คุณต้องการลบสาขานี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถเรียกคืนได้"
+        confirmLabel="ลบสาขา"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   )
 }

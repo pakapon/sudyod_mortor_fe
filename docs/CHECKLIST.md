@@ -1,6 +1,6 @@
 # Checklist ระบบ — Sudyod Motor Frontend
 
-> อัปเดตล่าสุด: 18 เมษายน 2026  
+> อัปเดตล่าสุด: 19 เมษายน 2026  
 > Legend: ✅ เสร็จแล้ว | 🔧 กำลังทำ | ⬜ ยังไม่ทำ | 🔶 PlaceholderPage (มี route แล้ว ยังไม่มีหน้าจริง)
 
 ---
@@ -78,19 +78,23 @@
 | ActionIconButton / ActionIconLink | `src/components/ui/ActionIconButton.tsx` | Icon button สำหรับ edit/delete/view/config — ใช้ทุกหน้า list |
 | TimeSelect24h | `src/components/ui/TimeSelect24h.tsx` | Dropdown เลือกเวลา 24h (HH:MM) — ใช้ใน WorkScheduleFormPage |
 | SortableHeader | `src/components/ui/SortableHeader.tsx` | Column header พร้อม sort arrow — ใช้ทุกหน้า list |
+| ConfirmModal | `src/components/ui/ConfirmModal.tsx` | Modal ยืนยันการลบ/action |
+| ApiErrorModal | `src/components/ui/ApiErrorModal.tsx` | Global error modal กลางจอ — รับ message จาก API response ผ่าน errorStore |
+| errorStore | `src/stores/errorStore.ts` | Zustand store สำหรับ global error state — ถูกเรียกจาก Axios interceptor |
 
 ---
 
-## Phase 4 — ลูกค้า (Customers) 🔶
+## Phase 4 — ลูกค้า (Customers) ✅ เสร็จแล้วทั้งหมด
 
 | # | งาน | ไฟล์ | สถานะ |
 |---|-----|------|--------|
-| 4.1 | Customer types | `src/types/customer.ts` | ⬜ |
-| 4.2 | Customer service (`GET/POST/PUT/DELETE /customers`, sub-resources) | `src/api/customerService.ts` | ⬜ |
-| 4.3 | CustomerListPage (search + filter type/branch + export) | `src/pages/customers/CustomerListPage.tsx` | 🔶 |
-| 4.4 | CustomerFormPage (สร้าง/แก้ไข — individual/corporate toggle) | `src/pages/customers/CustomerFormPage.tsx` | ⬜ |
-| 4.5 | CustomerDetailPage (tab: ข้อมูล / เบอร์โทร / ที่อยู่ออกบิล / รถ / เอกสาร / timeline / ประวัติ) | `src/pages/customers/CustomerDetailPage.tsx` | ⬜ |
-| 4.6 | เพิ่ม route `/customers/create`, `/customers/:id`, `/customers/:id/edit` | `src/routes/index.tsx` | ⬜ |
+| 4.1 | Customer types | `src/types/customer.ts` | ✅ |
+| 4.2 | Customer service (`GET/POST/PUT/DELETE /customers`, sub-resources) | `src/api/customerService.ts` | ✅ |
+| 4.3 | CustomerListPage (search + filter type/branch + export) | `src/pages/customers/CustomerListPage.tsx` | ✅ |
+| 4.4 | CustomerFormPage (สร้าง/แก้ไข — individual/corporate toggle) | `src/pages/customers/CustomerFormPage.tsx` | ✅ |
+| 4.5 | CustomerDetailPage (tab: ข้อมูล / เบอร์โทร / ที่อยู่ออกบิล / รถ / เอกสาร / timeline / ประวัติ) | `src/pages/customers/CustomerDetailPage.tsx` | ✅ |
+| 4.5a | ⚠️ **TODO** ประวัติการซื้อ — ปุ่มเลขเอกสารยังแสดง toast แทนการ navigate เพราะ ServiceOrderDetailPage (7.5) และ InvoiceDetailPage (8.8) ยังไม่ได้สร้าง — ต้องกลับมาแก้เมื่อ Phase 7 / 8 เสร็จ | `CustomerDetailPage.tsx` บรรทัด `onClick` ของ invoice button | ⬜ |
+| 4.6 | เพิ่ม route `/customers/create`, `/customers/:id`, `/customers/:id/edit` | `src/routes/index.tsx` | ✅ |
 
 ---
 
@@ -130,7 +134,7 @@
 | 7.2 | Service Order service (`/service-orders`, `/items`, `/gps-photos`, transitions) | `src/api/serviceOrderService.ts` | ⬜ |
 | 7.3 | ServiceOrderListPage (search + filter status × branch × technician + summary bar + export) | `src/pages/service-orders/ServiceOrderListPage.tsx` | 🔶 |
 | 7.4 | ServiceOrderFormPage (สร้าง — เลือกลูกค้า + รถ + ข้อมูล SO) | `src/pages/service-orders/ServiceOrderFormPage.tsx` | ⬜ |
-| 7.5 | ServiceOrderDetailPage ⭐ (header + action buttons ตาม status + 4 tabs) | `src/pages/service-orders/ServiceOrderDetailPage.tsx` | ⬜ |
+| 7.5 | ServiceOrderDetailPage ⭐ (header + action buttons ตาม status + 4 tabs) — **⚠️ ต้องการด้วย: CustomerDetailPage ใช้ navigate ไปที่ `/service-orders/:id`** | `src/pages/service-orders/ServiceOrderDetailPage.tsx` | ⬜ |
 | 7.5a | — Tab: รายการอะไหล่/ค่าแรง (SO Items + สรุปยอด) | ภายใน Detail | ⬜ |
 | 7.5b | — Tab: GPS Photos (upload + watermark + จัดกลุ่ม photo_type) | ภายใน Detail | ⬜ |
 | 7.5c | — Tab: เอกสารที่เกี่ยวข้อง (links ไป QT/INV/DN/WR) | ภายใน Detail | ⬜ |
@@ -155,7 +159,7 @@
 | 8.5 | Invoice types + service | ⬜ |
 | 8.6 | InvoiceListPage (filter status/branch + overdue highlight) | ⬜ |
 | 8.7 | InvoiceFormPage — from QT / retail walk-in | ⬜ |
-| 8.8 | InvoiceDetailPage (issue / cancel / payments / issue-receipt) | ⬜ |
+| 8.8 | InvoiceDetailPage (issue / cancel / payments / issue-receipt) — **⚠️ ต้องการด้วย: CustomerDetailPage ใช้ navigate ไปที่ `/invoices/:id`** | ⬜ |
 
 ### มัดจำ (Deposits)
 | # | งาน | สถานะ |
@@ -222,7 +226,7 @@
 | HR | 12 | 12 | 0 |
 | Settings (Master Data) | 13 | 13 | 0 |
 | Shared Components | — | ActionIconButton, TimeSelect24h | — |
-| ลูกค้า (Customers) | 3 | 0 | 3 |
+| ลูกค้า (Customers) | 3 | 3 | 0 (4.5a pending Phase 7/8) |
 | สินค้า (Products) | 3 | 0 | 3 |
 | คลังสินค้า (Inventory) | 6 | 0 | 6 |
 | ใบสั่งซ่อม (Service Orders) | 3+tabs | 0 | 3+tabs |
@@ -231,7 +235,7 @@
 | ใบสั่งซื้อ (Purchase Orders) | 2 | 0 | 2 |
 | แจ้งเตือน & Audit | 2 | 0 | 2 |
 
-**คืบหน้ารวม: ~40% (Phase 0–3 เสร็จแล้วทั้งหมด — รวม FinanceCompanyDetailPage + multipart uploads)**
+**คืบหน้ารวม: ~50% (Phase 0–4 เสร็จแล้วทั้งหมด — รวม ApiErrorModal + Global Error Handling + Vite Proxy)**
 
 ---
 

@@ -4,9 +4,11 @@ import { useForm } from 'react-hook-form'
 import { hrService } from '@/api/hrService'
 import type { FinanceCompany, FinanceCompanyPayload, FinanceCompanyDocument, FinanceCompanyDocumentFileType } from '@/types/hr'
 import { cn } from '@/lib/utils'
+import { toast } from 'react-hot-toast'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconButton } from '@/components/ui/ActionIconButton'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 const FILE_TYPE_MAP: Record<FinanceCompanyDocumentFileType, string> = {
   contract: 'สัญญา',
@@ -43,6 +45,7 @@ export function FinanceCompanyDetailPage() {
   const docInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const [deleteDocId, setDeleteDocId] = useState<number | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
 
   const { permissions } = useAuthStore()
@@ -96,9 +99,9 @@ export function FinanceCompanyDetailPage() {
       const res = await hrService.updateFinanceCompany(companyId, payload)
       setCompany(res.data.data)
       setSaveSuccess(true)
+      toast.success('บันทึกข้อมูลสำเร็จ')
       setTimeout(() => setSaveSuccess(false), 2500)
     } catch {
-      alert('เกิดข้อผิดพลาด กรุณาลองอีกครั้ง')
     } finally {
       setIsSubmitting(false)
     }
@@ -113,8 +116,8 @@ export function FinanceCompanyDetailPage() {
       const newLogoUrl = res.data.data.logo_url || ''
       setValue('logo_url', newLogoUrl)
       setCompany((prev) => prev ? { ...prev, logo_url: newLogoUrl } : prev)
+      toast.success('อัปโหลดโลโก้สำเร็จ')
     } catch {
-      alert('อัปโหลดโลโก้ไม่สำเร็จ กรุณาลองอีกครั้ง')
     } finally {
       setIsUploadingLogo(false)
       if (logoInputRef.current) logoInputRef.current.value = ''
@@ -135,16 +138,24 @@ export function FinanceCompanyDetailPage() {
       setUploadFile(null)
       if (docInputRef.current) docInputRef.current.value = ''
       loadDocuments()
+      toast.success('อัปโหลดเอกสารสำเร็จ')
     } catch {
-      alert('เกิดข้อผิดพลาด กรุณาลองอีกครั้ง')
     } finally {
       setIsUploading(false)
     }
   }
 
-  const handleDeleteDoc = (docId: number) => {
-    if (confirm('คุณต้องการลบเอกสารนี้ใช่หรือไม่?')) {
-      hrService.deleteFinanceCompanyDocument(companyId, docId).then(() => loadDocuments())
+  const handleDeleteDoc = (docId: number) => setDeleteDocId(docId)
+
+  const handleConfirmDeleteDoc = async () => {
+    if (deleteDocId === null) return
+    try {
+      await hrService.deleteFinanceCompanyDocument(companyId, deleteDocId)
+      setDeleteDocId(null)
+      loadDocuments()
+      toast.success('ลบเอกสารสำเร็จ')
+    } catch {
+      setDeleteDocId(null)
     }
   }
 
@@ -560,6 +571,16 @@ export function FinanceCompanyDetailPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteDocId !== null}
+        title="ยืนยันการลบเอกสาร"
+        message="คุณต้องการลบเอกสารนี้ใช่หรือไม่? ไฟล์จะถูกลบอย่างถาวรและไม่สามารถเรียกคืนได้"
+        confirmLabel="ลบเอกสาร"
+        variant="danger"
+        onConfirm={handleConfirmDeleteDoc}
+        onCancel={() => setDeleteDocId(null)}
+      />
     </div>
   )
 }

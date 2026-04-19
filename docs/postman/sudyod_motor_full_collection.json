@@ -706,7 +706,7 @@
         },
         {
             "name": "Permissions",
-            "description": "บทบาท + สิทธิ์ — 22 modules × 6 actions = 132 permissions per role",
+            "description": "บทบาท + สิทธิ์ — 32 modules × 6 actions = 192 permissions per role",
             "item": [
                 {
                     "name": "My Permissions",
@@ -1759,7 +1759,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"branch_id\": 1,\n    \"position_id\": 2,\n    \"employee_code\": \"EMP-002\",\n    \"first_name\": \"สมศักดิ์\",\n    \"last_name\": \"ช่างเก่ง\",\n    \"email\": \"somsak@sudyodmotor.com\",\n    \"phone\": \"0891234567\",\n    \"password\": \"password123\",\n    \"nickname\": \"เก่ง\",\n    \"avatar_url\": null,\n    \"status\": \"active\",\n    \"is_active\": true,\n    \"role_ids\": [\n        2\n    ]\n}",
+                            "raw": "{\n    \"branch_id\": 1,\n    \"position_id\": 2,\n    \"employee_code\": \"EMP-002\",\n    \"first_name\": \"สมศักดิ์\",\n    \"last_name\": \"ช่างเก่ง\",\n    \"email\": \"somsak@sudyodmotor.com\",\n    \"phone\": \"0891234567\",\n    \"password\": \"password123\",\n    \"nickname\": \"เก่ง\",\n    \"avatar_url\": null,\n    \"status\": \"active\",\n    \"is_active\": true,\n    \"role_ids\": [\n        2\n    ],\n    \"branch_ids\": [\n        2\n    ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -1789,7 +1789,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\"id\": 2, \"employee_code\": \"EMP-002\", \"first_name\": \"สมศักดิ์\", \"last_name\": \"ช่างเก่ง\", \"email\": \"somsak@sudyodmotor.com\", \"phone\": \"0891234567\", \"nickname\": \"เก่ง\", \"branch_id\": 1, \"position_id\": 2, \"status\": \"active\", \"is_active\": true, \"roles\": [{\"id\": 2, \"name\": \"ช่างซ่อม\"}]}\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\"id\": 2, \"employee_code\": \"EMP-002\", \"first_name\": \"สมศักดิ์\", \"last_name\": \"ช่างเก่ง\", \"email\": \"somsak@sudyodmotor.com\", \"phone\": \"0891234567\", \"nickname\": \"เก่ง\", \"branch_id\": 1, \"position_id\": 2, \"status\": \"active\", \"is_active\": true, \"roles\": [{\"id\": 2, \"name\": \"ช่างซ่อม\"}], \"branches\": [{\"id\": 2, \"name\": \"สาขา 2\", \"code\": \"BR02\"}]}\n}"
                         },
                         {
                             "name": "Validation Error",
@@ -1842,7 +1842,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": {\"id\": 1, \"employee_code\": \"EMP-001\", \"first_name\": \"Admin\", \"last_name\": \"System\", \"email\": \"admin@sudyodmotor.com\", \"phone\": \"0812345678\", \"nickname\": null, \"avatar_url\": null, \"branch\": {\"id\": 1, \"name\": \"สาขาใหญ่\"}, \"position\": {\"id\": 1, \"name\": \"ผู้จัดการ\"}, \"status\": \"active\", \"is_active\": true, \"roles\": [{\"id\": 1, \"name\": \"Super Admin\"}]}\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": {\"id\": 1, \"employee_code\": \"EMP-001\", \"first_name\": \"Admin\", \"last_name\": \"System\", \"email\": \"admin@sudyodmotor.com\", \"phone\": \"0812345678\", \"nickname\": null, \"avatar_url\": null, \"branch_id\": 1, \"branch\": {\"id\": 1, \"name\": \"สาขาใหญ่\"}, \"position\": {\"id\": 1, \"name\": \"ผู้จัดการ\"}, \"status\": \"active\", \"is_active\": true, \"roles\": [{\"id\": 1, \"name\": \"Super Admin\"}], \"branches\": []}\n}"
                         },
                         {
                             "name": "Not Found",
@@ -1871,7 +1871,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"branch_id\": 1,\n    \"position_id\": 2,\n    \"first_name\": \"สมศักดิ์\",\n    \"last_name\": \"ช่างเก่ง (แก้ไข)\",\n    \"nickname\": \"เก่ง\",\n    \"email\": \"somsak@sudyodmotor.com\",\n    \"phone\": \"0891234567\",\n    \"avatar_url\": null,\n    \"status\": \"active\",\n    \"is_active\": true,\n    \"role_ids\": [\n        2,\n        3\n    ]\n}",
+                            "raw": "{\n    \"branch_id\": 1,\n    \"position_id\": 2,\n    \"first_name\": \"สมศักดิ์\",\n    \"last_name\": \"ช่างเก่ง (แก้ไข)\",\n    \"nickname\": \"เก่ง\",\n    \"email\": \"somsak@sudyodmotor.com\",\n    \"phone\": \"0891234567\",\n    \"avatar_url\": null,\n    \"status\": \"active\",\n    \"is_active\": true,\n    \"role_ids\": [\n        2,\n        3\n    ],\n    \"branch_ids\": [\n        2\n    ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -1895,7 +1895,7 @@
                                 }
                             ]
                         },
-                        "description": "แก้ไขพนักงาน — ALL fields optional, role_ids จะ sync (ลบเดิมทั้งหมด + ใส่ใหม่)"
+                        "description": "แก้ไขพนักงาน — ALL fields optional, role_ids/branch_ids จะ sync (ลบเดิมทั้งหมด + ใส่ใหม่), ถ้าไม่ส่ง branch_ids จะไม่เปลี่ยนแปลง"
                     },
                     "response": [
                         {
@@ -3003,9 +3003,16 @@
                                     "description": "personal|corporate"
                                 },
                                 {
-                                    "key": "is_active",
+                                    "key": "status",
                                     "value": "",
-                                    "disabled": true
+                                    "disabled": true,
+                                    "description": "active|inactive|blacklisted"
+                                },
+                                {
+                                    "key": "grade",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "good|bad_credit|poor|new|x"
                                 },
                                 {
                                     "key": "search",
@@ -3014,7 +3021,7 @@
                                 }
                             ]
                         },
-                        "description": "รายการลูกค้า"
+                        "description": "รายการลูกค้า\n\nFilter:\n- type: personal|corporate\n- status: active|inactive|blacklisted\n- grade: good|bad_credit|poor|new|x\n- branch_id\n- search: ค้นชื่อ/เบอร์/รหัสลูกค้า/tax_id"
                     },
                     "response": [
                         {
@@ -3028,7 +3035,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [{\"id\": 1, \"type\": \"personal\", \"prefix\": \"นาย\", \"first_name\": \"สมชาย\", \"last_name\": \"ใจดี\", \"branch_id\": 1, \"is_active\": true, \"phones\": [{\"id\": 1, \"type\": \"mobile\", \"number\": \"0891234567\", \"is_primary\": true}]}],\n  \"pagination\": {\"page\": 1, \"limit\": 20, \"total\": 1, \"total_pages\": 1}\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"customer_code\": \"CUS001\",\n      \"type\": \"personal\",\n      \"prefix\": \"นาย\",\n      \"first_name\": \"ธนากร\",\n      \"last_name\": \"มหาวงศ์\",\n      \"company_name\": null,\n      \"primary_phone\": \"083-456-7890\",\n      \"purchase_count\": 1,\n      \"grade\": \"good\",\n      \"status\": \"active\",\n      \"total_spending\": 120500.00,\n      \"updated_at\": \"2025-09-27T10:30:00\"\n    },\n    {\n      \"id\": 2,\n      \"customer_code\": \"CUS002\",\n      \"type\": \"personal\",\n      \"prefix\": \"นางสาว\",\n      \"first_name\": \"นันทิยา\",\n      \"last_name\": \"ศรีสวัสดิ์\",\n      \"company_name\": null,\n      \"primary_phone\": \"084-567-8901\",\n      \"purchase_count\": 2,\n      \"grade\": \"bad_credit\",\n      \"status\": \"active\",\n      \"total_spending\": 15750.00,\n      \"updated_at\": \"2025-09-26T09:00:00\"\n    },\n    {\n      \"id\": 3,\n      \"customer_code\": \"CUS003\",\n      \"type\": \"corporate\",\n      \"prefix\": \"บริษัท\",\n      \"first_name\": null,\n      \"last_name\": null,\n      \"company_name\": \"Bright Horizon\",\n      \"primary_phone\": \"02-012-3456\",\n      \"purchase_count\": 50,\n      \"grade\": \"good\",\n      \"status\": \"active\",\n      \"total_spending\": 20000.00,\n      \"updated_at\": \"2025-09-26T08:00:00\"\n    }\n  ],\n  \"pagination\": {\"page\": 1, \"limit\": 20, \"total\": 1000, \"total_pages\": 50}\n}"
                         },
                         {
                             "name": "Unauthorized",
@@ -3070,7 +3077,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"branch_id\": 1,\n    \"type\": \"personal\",\n    \"prefix\": \"นาย\",\n    \"first_name\": \"สมชาย\",\n    \"last_name\": \"ใจดี\",\n    \"id_card\": \"1234567890123\",\n    \"tax_id\": null,\n    \"company_branch\": null,\n    \"contact_name\": null,\n    \"contact_position\": null,\n    \"email\": \"somchai@example.com\",\n    \"line_id\": \"somchai_jaidee\",\n    \"address\": \"99\\/1 ถ.มิตรภาพ\",\n    \"province\": \"นครราชสีมา\",\n    \"district\": \"เมือง\",\n    \"sub_district\": \"ในเมือง\",\n    \"postal_code\": \"30000\",\n    \"note\": \"ลูกค้าประจำ\",\n    \"photo_url\": null,\n    \"is_active\": true\n}",
+                            "raw": "{\n    \"branch_id\": 1,\n    \"type\": \"personal\",\n    \"prefix\": \"นาย\",\n    \"first_name\": \"สมชาย\",\n    \"last_name\": \"ใจดี\",\n    \"id_card\": \"1234567890123\",\n    \"gender\": \"male\",\n    \"date_of_birth\": \"1990-05-15\",\n    \"status\": \"active\",\n    \"grade\": \"new\",\n    \"credit_limit\": 50000,\n    \"source\": \"walk-in\",\n    \"note\": \"ลูกค้าประจำ\",\n    \"phones\": [\n        {\"type\": \"mobile\", \"number\": \"0891234567\", \"is_primary\": true},\n        {\"type\": \"home\", \"number\": \"044123456\", \"is_primary\": false}\n    ],\n    \"emails\": [\n        {\"email\": \"somchai@example.com\"}\n    ],\n    \"channels\": [\n        {\"channel_type\": \"LINE\", \"channel_id\": \"somchai_jaidee\"}\n    ],\n    \"shipping_addresses\": [\n        {\"label\": \"Home\", \"address\": \"99\\/1 ถ.มิตรภาพ ต.ในเมือง อ.เมือง จ.นครราชสีมา 30000\", \"is_default\": true}\n    ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -3086,7 +3093,7 @@
                                 "customers"
                             ]
                         },
-                        "description": "สร้างลูกค้า — type: personal|corporate\\ncorporate ต้องมี: tax_id, company_branch, contact_name, contact_position"
+                        "description": "สร้างลูกค้า — type: personal|corporate\\ncorporate ต้องมี: company_name (required), tax_id, company_branch, contact_name, contact_position\\nphones[]: type (mobile|home|work), number, is_primary\\nemails[]: email\\nchannels[]: channel_type (LINE|Facebook|other), channel_id\\nshipping_addresses[]: label, address, is_default"
                     },
                     "response": [
                         {
@@ -3100,7 +3107,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\"id\": 1, \"type\": \"personal\", \"first_name\": \"สมชาย\", \"last_name\": \"ใจดี\", \"branch_id\": 1}\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\n    \"id\": 1,\n    \"customer_code\": \"CUS001\",\n    \"branch_id\": 1,\n    \"type\": \"personal\",\n    \"prefix\": \"นาย\",\n    \"first_name\": \"สมชาย\",\n    \"last_name\": \"ใจดี\",\n    \"gender\": \"male\",\n    \"date_of_birth\": \"1990-05-15\",\n    \"registered_at\": \"2026-04-18T10:00:00\",\n    \"status\": \"active\",\n    \"grade\": \"new\",\n    \"credit_limit\": 50000.00,\n    \"source\": \"walk-in\",\n    \"note\": \"ลูกค้าประจำ\",\n    \"phones\": [{\"id\": 1, \"type\": \"mobile\", \"number\": \"0891234567\", \"is_primary\": true}],\n    \"emails\": [{\"id\": 1, \"email\": \"somchai@example.com\"}],\n    \"channels\": [{\"id\": 1, \"channel_type\": \"LINE\", \"channel_id\": \"somchai_jaidee\"}],\n    \"shipping_addresses\": [{\"id\": 1, \"label\": \"Home\", \"address\": \"99\\/1 ถ.มิตรภาพ ต.ในเมือง อ.เมือง จ.นครราชสีมา 30000\", \"is_default\": true}]\n  }\n}"
                         },
                         {
                             "name": "Validation Error",
@@ -3139,7 +3146,7 @@
                                 }
                             ]
                         },
-                        "description": "ดูรายละเอียดลูกค้า + phones, vehicles, billing addresses"
+                        "description": "ดูรายละเอียดลูกค้า + phones, emails, channels, shipping_addresses, vehicles, billing_addresses"
                     },
                     "response": [
                         {
@@ -3153,7 +3160,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": {\"id\": 1, \"type\": \"personal\", \"prefix\": \"นาย\", \"first_name\": \"สมชาย\", \"last_name\": \"ใจดี\", \"id_card\": \"1234567890123\", \"email\": \"somchai@example.com\", \"phones\": [{\"id\": 1, \"type\": \"mobile\", \"number\": \"0891234567\", \"is_primary\": true}], \"vehicles\": [{\"id\": 1, \"plate_number\": \"กข 1234\", \"brand\": \"Honda\", \"model\": \"Wave 110i\"}], \"billing_addresses\": [], \"is_active\": true}\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": {\n    \"id\": 1,\n    \"customer_code\": \"CUS001\",\n    \"branch_id\": 1,\n    \"type\": \"personal\",\n    \"prefix\": \"นาย\",\n    \"first_name\": \"สมชาย\",\n    \"last_name\": \"ใจดี\",\n    \"company_name\": null,\n    \"id_card\": \"1234567890123\",\n    \"tax_id\": null,\n    \"company_branch\": null,\n    \"contact_name\": null,\n    \"contact_position\": null,\n    \"gender\": \"male\",\n    \"date_of_birth\": \"1990-05-15\",\n    \"registered_at\": \"2026-04-18T10:00:00\",\n    \"photo_url\": null,\n    \"status\": \"active\",\n    \"grade\": \"good\",\n    \"grade_updated_at\": \"2026-04-18T10:00:00\",\n    \"credit_limit\": 100000.00,\n    \"source\": \"walk-in\",\n    \"note\": \"ลูกค้าประจำ\",\n    \"created_at\": \"2026-04-18T10:00:00\",\n    \"updated_at\": \"2026-04-18T10:00:00\",\n    \"phones\": [{\"id\": 1, \"type\": \"mobile\", \"number\": \"0891234567\", \"is_primary\": true}],\n    \"emails\": [{\"id\": 1, \"email\": \"somchai@example.com\"}],\n    \"channels\": [{\"id\": 1, \"channel_type\": \"LINE\", \"channel_id\": \"somchai_jaidee\"}],\n    \"shipping_addresses\": [{\"id\": 1, \"label\": \"Home\", \"address\": \"99\\/1 ถ.มิตรภาพ ต.ในเมือง อ.เมือง จ.นครราชสีมา 30000\", \"is_default\": true}],\n    \"vehicles\": [{\"id\": 1, \"plate_number\": \"กข 1234\", \"brand\": \"Honda\", \"model\": \"Wave 110i\"}],\n    \"billing_addresses\": []\n  }\n}"
                         },
                         {
                             "name": "Not Found",
@@ -3182,7 +3189,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"branch_id\": 1,\n    \"type\": \"personal\",\n    \"prefix\": \"นาย\",\n    \"first_name\": \"สมชาย\",\n    \"last_name\": \"ใจดี (แก้ไข)\",\n    \"id_card\": \"1234567890123\",\n    \"tax_id\": null,\n    \"company_branch\": null,\n    \"contact_name\": null,\n    \"contact_position\": null,\n    \"email\": \"somchai@example.com\",\n    \"line_id\": \"somchai_jaidee\",\n    \"address\": \"99\\/1 ถ.มิตรภาพ\",\n    \"province\": \"นครราชสีมา\",\n    \"district\": \"เมือง\",\n    \"sub_district\": \"ในเมือง\",\n    \"postal_code\": \"30000\",\n    \"note\": \"ลูกค้าประจำ อัปเดต\",\n    \"photo_url\": null,\n    \"is_active\": true\n}",
+                            "raw": "{\n    \"branch_id\": 1,\n    \"type\": \"personal\",\n    \"prefix\": \"นาย\",\n    \"first_name\": \"สมชาย\",\n    \"last_name\": \"ใจดี (แก้ไข)\",\n    \"id_card\": \"1234567890123\",\n    \"gender\": \"male\",\n    \"date_of_birth\": \"1990-05-15\",\n    \"status\": \"active\",\n    \"grade\": \"good\",\n    \"grade_updated_at\": \"2026-04-18T10:00:00\",\n    \"credit_limit\": 100000,\n    \"source\": \"referral\",\n    \"note\": \"ลูกค้าประจำ อัปเดต\",\n    \"phones\": [\n        {\"type\": \"mobile\", \"number\": \"0891234567\", \"is_primary\": true}\n    ],\n    \"emails\": [\n        {\"email\": \"somchai@example.com\"},\n        {\"email\": \"somchai2@gmail.com\"}\n    ],\n    \"channels\": [\n        {\"channel_type\": \"LINE\", \"channel_id\": \"somchai_new\"},\n        {\"channel_type\": \"Facebook\", \"channel_id\": \"somchai.fb\"}\n    ],\n    \"shipping_addresses\": [\n        {\"label\": \"Home\", \"address\": \"99\\/1 ถ.มิตรภาพ ต.ในเมือง อ.เมือง จ.นครราชสีมา 30000\", \"is_default\": true},\n        {\"label\": \"Work\", \"address\": \"1\\/1 ถ.พิบูลมังสาหาร อ.เมือง จ.นครราชสีมา 30000\", \"is_default\": false}\n    ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -3220,7 +3227,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"แก้ไขสำเร็จ\"\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"แก้ไขสำเร็จ\",\n  \"data\": {\n    \"id\": 1,\n    \"customer_code\": \"CUS001\",\n    \"type\": \"personal\",\n    \"first_name\": \"สมชาย\",\n    \"last_name\": \"ใจดี (แก้ไข)\",\n    \"gender\": \"male\",\n    \"status\": \"active\",\n    \"grade\": \"good\",\n    \"credit_limit\": 100000.00,\n    \"phones\": [{\"id\": 2, \"type\": \"mobile\", \"number\": \"0891234567\", \"is_primary\": true}],\n    \"emails\": [{\"id\": 2, \"email\": \"somchai@example.com\"}, {\"id\": 3, \"email\": \"somchai2@gmail.com\"}],\n    \"channels\": [{\"id\": 2, \"channel_type\": \"LINE\", \"channel_id\": \"somchai_new\"}],\n    \"shipping_addresses\": [{\"id\": 2, \"label\": \"Home\", \"address\": \"99\\/1 ถ.มิตรภาพ ต.ในเมือง อ.เมือง จ.นครราชสีมา 30000\", \"is_default\": true}]\n  }\n}"
                         },
                         {
                             "name": "Validation Error",
@@ -3291,6 +3298,71 @@
                     ]
                 },
                 {
+                    "name": "Upload Customer Photo",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "photo",
+                                    "type": "file",
+                                    "src": "",
+                                    "description": "JPG / GIF / PNG — max 800k"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/customers/:id/photo",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "customers",
+                                ":id",
+                                "photo"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Customer ID"
+                                }
+                            ]
+                        },
+                        "description": "อัปโหลดรูปโปรไฟล์ลูกค้า — multipart/form-data\\nรองรับ JPG, GIF, PNG — ขนาดไม่เกิน 800KB"
+                    },
+                    "response": [
+                        {
+                            "name": "Photo Uploaded",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"อัปโหลดรูปสำเร็จ\",\n  \"data\": {\n    \"photo_url\": \"https://spaces.example.com/customers/1/photo_1713434400.jpg\"\n  }\n}"
+                        },
+                        {
+                            "name": "Validation Error",
+                            "status": "Unprocessable Entity",
+                            "code": 422,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"กรุณาอัปโหลดรูปภาพ\"\n}"
+                        }
+                    ]
+                },
+                {
                     "name": "Export Customers (CSV)",
                     "request": {
                         "method": "GET",
@@ -3316,9 +3388,16 @@
                                     "disabled": true
                                 },
                                 {
-                                    "key": "is_active",
+                                    "key": "status",
                                     "value": "",
-                                    "disabled": true
+                                    "disabled": true,
+                                    "description": "active|inactive|blacklisted"
+                                },
+                                {
+                                    "key": "grade",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "good|bad_credit|poor|new|x"
                                 }
                             ]
                         },
@@ -4171,6 +4250,35 @@
                                 {
                                     "key": "limit",
                                     "value": "20"
+                                },
+                                {
+                                    "key": "search",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "ค้นรหัสสินค้า/ชื่อสินค้า/เลขเอกสาร"
+                                },
+                                {
+                                    "key": "item_type",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "vehicle|spare_part"
+                                },
+                                {
+                                    "key": "branch_id",
+                                    "value": "",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "date_from",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "YYYY-MM-DD"
+                                },
+                                {
+                                    "key": "date_to",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "YYYY-MM-DD"
                                 }
                             ],
                             "variable": [
@@ -4181,7 +4289,7 @@
                                 }
                             ]
                         },
-                        "description": "ประวัติการสั่งซื้อ"
+                        "description": "ประวัติการซื้อ — แสดง invoice items ระดับรายการสินค้า\n\nResponse fields:\n- purchased_at: วันที่ซื้อ\n- product_code: รหัสสินค้า\n- item_type: vehicle|spare_part\n- product_name: ชื่อสินค้า/รายการ\n- quantity: จำนวน\n- unit_price: ราคา/หน่วย\n- subtotal: ยอดสุทธิ\n- branch_name: คลัง/สาขา\n- document_no: SO-XXXX หรือ INV-XXXX\n- document_type: service_order|invoice\n- payment_status: paid|installment|overdue\n\nSummary:\n- total_items: จำนวน rows ทั้งหมด\n- total_amount: ยอดรวมทั้งหมด (บาท)"
                     },
                     "response": [
                         {
@@ -4195,7 +4303,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [{\"id\": 1, \"invoice_no\": \"INV-2026-0001\", \"total_amount\": 5000.00, \"status\": \"paid\", \"created_at\": \"2026-04-14T10:00:00\"}],\n  \"pagination\": {\"page\": 1, \"limit\": 20, \"total\": 5, \"total_pages\": 1}\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": {\n    \"summary\": {\n      \"total_items\": 1000,\n      \"total_amount\": 4522320.00\n    },\n    \"items\": [\n      {\n        \"purchased_at\": \"2024-01-05\",\n        \"product_code\": \"JHM123456789\",\n        \"item_type\": \"vehicle\",\n        \"product_name\": \"Honda City 1.5 RS\",\n        \"quantity\": 1,\n        \"unit_price\": 689000.00,\n        \"subtotal\": 680000.00,\n        \"branch_name\": \"สาขากรุงเทพฯ\",\n        \"document_no\": \"SO-1001\",\n        \"document_type\": \"service_order\",\n        \"document_id\": 1001,\n        \"payment_status\": \"installment\"\n      },\n      {\n        \"purchased_at\": \"2024-07-29\",\n        \"product_code\": \"#FWB139485607\",\n        \"item_type\": \"spare_part\",\n        \"product_name\": \"น้ำมันเครื่อง Honda Ultra LEO 0W-20\",\n        \"quantity\": 4,\n        \"unit_price\": 480.00,\n        \"subtotal\": 1920.00,\n        \"branch_name\": \"นครราชสีมา\",\n        \"document_no\": \"INV-1245\",\n        \"document_type\": \"invoice\",\n        \"document_id\": 1245,\n        \"payment_status\": \"installment\"\n      }\n    ]\n  },\n  \"pagination\": {\"page\": 1, \"limit\": 20, \"total\": 1000, \"total_pages\": 50}\n}"
                         },
                         {
                             "name": "Not Found",

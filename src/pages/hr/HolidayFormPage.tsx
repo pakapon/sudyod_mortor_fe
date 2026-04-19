@@ -53,7 +53,7 @@ export function HolidayFormPage() {
       }
       navigate('/hr/holidays')
     } catch {
-      alert('เกิดข้อผิดพลาด กรุณาลองอีกครั้ง')
+      // interceptor handles display
     } finally {
       setIsSubmitting(false)
     }

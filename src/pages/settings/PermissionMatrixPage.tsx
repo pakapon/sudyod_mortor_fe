@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
 import { hrService } from '@/api/hrService'
 import type { Role, RolePermission } from '@/types/hr'
 import { cn } from '@/lib/utils'
 
 // PBAC Modules defined by Backend
 const ALL_MODULES = [
-  'dashboard', 'employees', 'positions', 'roles', 'attendance', 'holidays',
+  'branches', 'dashboard', 'employees', 'positions', 'roles', 'attendance', 'holidays',
   'customers', 'vehicles', 'vendors', 'brands', 'product_categories', 'products',
   'warehouses', 'inventory', 'goods_receipts', 'stock_transfers', 'service_orders',
   'quotations', 'invoices', 'loan_applications', 'store_loans', 'notifications'
@@ -128,10 +129,9 @@ export function PermissionMatrixPage() {
 
     try {
       await hrService.updateRolePermissions(selectedRole.id, payload)
-      // Visual feedback via native alert or a toast
-      alert('บันทึกสิทธิ์การใช้งานสำเร็จ!')
+      toast.success('บันทึกสิทธิ์การใช้งานสำเร็จ')
     } catch {
-      alert('บันทึกสิทธิ์การใช้งานสำเร็จ! (Dev Mode Mock)')
+      // interceptor handles display
     } finally {
       setIsSaving(false)
     }
