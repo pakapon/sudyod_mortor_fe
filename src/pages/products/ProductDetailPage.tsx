@@ -1,0 +1,623 @@
+import { useState, useEffect } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { productService } from '@/api/productService'
+import type {
+  Product,
+  ProductImage,
+  ProductPricing,
+  BOMItem,
+  ProductVariant,
+  AttributeOption,
+} from '@/types/product'
+import { useAuthStore } from '@/stores/authStore'
+import { hasPermission } from '@/lib/permissions'
+import { cn } from '@/lib/utils'
+
+type BottomTabKey = 'sku' | 'pricing' | 'bundle' | 'spare'
+
+const BOTTOM_TABS: { key: BottomTabKey; label: string }[] = [
+  { key: 'sku', label: 'รหัสสินค้า/แบบสินค้า' },
+  { key: 'pricing', label: 'ต้นทุน & ราคาขาย' },
+  { key: 'bundle', label: 'ชุดโอละ' },
+  { key: 'spare', label: 'อะไหล่' },
+]
+
+// ─── Icons ───────────────────────────────────────────────────────────────────
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  )
+}
+function EditIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  )
+}
+function TrashIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  )
+}
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+function SortIcon() {
+  return (
+    <svg className="inline ml-1 opacity-40" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
+    </svg>
+  )
+}
+
+// ─── Field display component ────────────────────────────────────────────────
+function Field({ label, value, className }: { label: string; value?: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn('flex flex-col gap-1', className)}>
+      <span className="text-xs text-gray-500">{label}</span>
+      <div className="min-h-[36px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 flex items-center">
+        {value != null && value !== '' ? value : <span className="text-gray-400">—</span>}
+      </div>
+    </div>
+  )
+}
+
+// ─── Info Panel ──────────────────────────────────────────────────────────────
+function InfoPanel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+      <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
+      <div className="space-y-1.5 text-sm text-gray-700">{children}</div>
+    </div>
+  )
+}
+function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
+  return (
+    <div className="flex gap-1.5">
+      <span className="text-gray-500 shrink-0">{label}:</span>
+      <span className="font-medium">{value ?? '—'}</span>
+    </div>
+  )
+}
+
+// ─── SKU Tab (View) ─────────────────────────────────────────────────────────
+function SkuTabView({ productId, product }: { productId: number; product: Product }) {
+  const [variants, setVariants] = useState<ProductVariant[]>([])
+  const [attrOptions, setAttrOptions] = useState<AttributeOption[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([
+      productService.getProductVariants(productId),
+      productService.getProductAttributeOptions(productId),
+    ])
+      .then(([vRes, aRes]) => {
+        setVariants(Array.isArray(vRes.data.data) ? vRes.data.data : [])
+        setAttrOptions(Array.isArray(aRes.data.data) ? aRes.data.data : [])
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [productId])
+
+  // Build attribute label map: axis → label
+  const axisLabels: Record<number, string> = {}
+  for (const o of attrOptions) {
+    if (o.label && !axisLabels[o.axis]) axisLabels[o.axis] = o.label
+  }
+
+  // Format attributes string: "Size=S / สี=ขาว"
+  const formatAttributes = (attrs?: Record<string, string>) => {
+    if (!attrs || Object.keys(attrs).length === 0) return '—'
+    return Object.entries(attrs)
+      .map(([axis, val]) => {
+        const label = axisLabels[Number(axis)]
+        return label ? `${label}=${val}` : val
+      })
+      .join(' / ')
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-8 w-48 rounded bg-gray-100" />
+        <div className="h-40 rounded-xl bg-gray-100" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* ── Variants Table ── */}
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-gray-800">รายการรหัสสินค้า</h3>
+
+        {variants.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+            ยังไม่มีรหัสสินค้า/แบบสินค้า
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50">
+                <tr>
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">รหัสสินค้า</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">ชื่อสินค้า <SortIcon /></th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">คุณลักษณะสินค้า</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">บาร์โค้ด (หลัก/รอง)</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">หน่วย</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-center text-xs font-semibold text-gray-500">ล็อต /วันหมดอายุ</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-center text-xs font-semibold text-gray-500">หมายเลขซีเรียล</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-center text-xs font-semibold text-gray-500">ขั้นต่ำ / จุดสั่งซื้อซ้ำ</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">มิติการขนส่งมาตรฐาน</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {variants.map((v) => (
+                  <tr key={v.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs font-medium text-gray-800">{v.sku}</span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-900">{v.name}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{formatAttributes(v.attributes)}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs font-mono">—</td>
+                    <td className="px-4 py-3 text-gray-700">{v.unit?.name ?? '—'}</td>
+                    <td className="px-4 py-3 text-center">
+                      {v.track_lot_expiry
+                        ? <span className="text-blue-600"><CheckIcon /></span>
+                        : <span className="text-gray-300">–</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {v.track_serial
+                        ? <span className="text-blue-600"><CheckIcon /></span>
+                        : <span className="text-gray-300">–</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center text-gray-700 tabular-nums">
+                      {v.min_stock != null || v.reorder_point != null
+                        ? `${v.min_stock ?? 0} / ${v.reorder_point ?? 0}`
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">
+                      {[
+                        v.dimensions,
+                        v.weight_kg != null ? `${v.weight_kg}kg` : null,
+                      ].filter(Boolean).join(' · ') || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Info Panels ── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <InfoPanel title="หน่วย & บรรจุภัณฑ์">
+          <InfoRow label="หน่วยหลัก" value={(product as any).base_unit?.name ?? product.unit?.name} />
+          <InfoRow label="น้ำหนัก" value={(product as any).weight_grams != null ? `${(product as any).weight_grams} กรัม` : undefined} />
+          <InfoRow
+            label="ขนาดสินค้า"
+            value={
+              (product as any).width_cm && (product as any).height_cm && (product as any).length_cm
+                ? `${(product as any).width_cm} × ${(product as any).height_cm} × ${(product as any).length_cm} ซม.`
+                : undefined
+            }
+          />
+        </InfoPanel>
+
+        <InfoPanel title="การติดตามสินค้า">
+          {variants.length === 0 ? (
+            <p className="text-gray-400 text-xs">ยังไม่มีรหัสสินค้า</p>
+          ) : (
+            <>
+              <InfoRow
+                label="Lot/EXP"
+                value={
+                  variants.some((v) => v.track_lot_expiry)
+                    ? 'On (บังคับ MFG/EXP ตอนรับเข้า)'
+                    : 'Off'
+                }
+              />
+              <InfoRow
+                label="Serial/IMEI"
+                value={
+                  variants.some((v) => v.track_serial)
+                    ? 'On (เปิดแล้วต้องระบุก่อนขาย)'
+                    : 'Off (เปิดแล้วต้องระบุก่อนขาย)'
+                }
+              />
+            </>
+          )}
+        </InfoPanel>
+
+        <InfoPanel title="นโยบายสต็อก">
+          <p className="text-gray-600 text-xs leading-relaxed">
+            Min / Reorder Point (ROP) ต่อ SKU<br />
+            สามารถ override รายคลัง (Warehouse-level)
+          </p>
+        </InfoPanel>
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Main ProductDetailPage (view-only)
+// ══════════════════════════════════════════════════════════════════
+export function ProductDetailPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { permissions } = useAuthStore()
+
+  const [activeTab, setActiveTab] = useState<BottomTabKey>('sku')
+  const [product, setProduct] = useState<Product | null>(null)
+  const [images, setImages] = useState<ProductImage[]>([])
+  const [pricing, setPricing] = useState<ProductPricing[]>([])
+  const [bom, setBom] = useState<BOMItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const productId = Number(id)
+  const canEdit = hasPermission(permissions, 'products', 'can_edit')
+  const canDelete = hasPermission(permissions, 'products', 'can_delete')
+
+  useEffect(() => {
+    if (!productId) return
+    setIsLoading(true)
+    productService.getProduct(productId)
+      .then((res) => setProduct(res.data.data))
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [productId])
+
+  useEffect(() => {
+    if (!productId) return
+    productService.getProductImages(productId)
+      .then((res) => setImages(Array.isArray(res.data.data) ? res.data.data : []))
+      .catch(() => {})
+  }, [productId])
+
+  useEffect(() => {
+    if (!productId) return
+    if (activeTab === 'pricing') {
+      productService.getProductPricing(productId)
+        .then((res) => {
+          const d = res.data.data
+          setPricing(Array.isArray(d) ? d : d ? [d as unknown as ProductPricing] : [])
+        })
+        .catch(() => {})
+    } else if (activeTab === 'spare') {
+      productService.getProductBOM(productId)
+        .then((res) => setBom(Array.isArray(res.data.data) ? res.data.data : []))
+        .catch(() => {})
+    }
+  }, [activeTab, productId])
+
+  const handleDelete = async () => {
+    if (!window.confirm('ยืนยันการลบสินค้านี้?')) return
+    try {
+      await productService.deleteProduct(productId)
+      navigate('/products')
+    } catch { /* interceptor handles */ }
+  }
+
+  // Loading skeleton
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-7 w-48 rounded bg-gray-100" />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-10 rounded bg-gray-100" />
+            ))}
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+            <div className="h-44 rounded-xl bg-gray-100" />
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 6 }).map((_, i) => <div key={i} className="aspect-square rounded-lg bg-gray-100" />)}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!product) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+        <p className="text-lg">ไม่พบข้อมูลสินค้า</p>
+        <Link to="/products" className="mt-4 text-sm text-blue-600 hover:underline">กลับไปรายการสินค้า</Link>
+      </div>
+    )
+  }
+
+  const tags = Array.isArray(product.tags) ? product.tags : []
+  const mainImage = images[0]
+  const galleryImages = images.slice(1, 7)
+  const sellingPrice = product.selling_price ?? product.pricing?.selling_price
+  const costPrice = product.cost_price ?? product.pricing?.cost_price
+
+  return (
+    <div className="space-y-6">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Link to="/products" className="text-gray-400 hover:text-gray-600"><ChevronLeftIcon /></Link>
+          <h1 className="text-xl font-semibold text-gray-900">ผลิตภัณฑ์ & SKU</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <Link
+              to={`/products/${productId}/edit`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <EditIcon size={14} /> แก้ไข
+            </Link>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+            >
+              <TrashIcon size={14} /> ลบ
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2-column layout */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
+
+        {/* ====== LEFT: Product Info Card (view-only) ====== */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-5 text-base font-semibold text-gray-900">รายละเอียดสินค้า</h2>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="รหัสสินค้า" value={product.sku} />
+            <Field label="ชื่อสินค้า" value={product.name} />
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <Field label="แบรนด์" value={product.brand?.name} />
+            <Field label="หมวดหมู่" value={product.category?.name} />
+            <Field label="ประเภทสินค้า" value={product.product_type === 'standard' ? 'สินค้า (Standard)' : product.product_type === 'service' ? 'บริการ' : product.product_type ?? '—'} />
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <Field label="ผู้จำหน่าย (หลัก)" value={(product as any).vendor?.name ?? (product as any).vendor_name ?? undefined} />
+            <Field label="นโยบายภาษี (VAT Code)" value={product.vat_code} />
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500">แท็ก / คำค้นหา</span>
+              <div className="min-h-[36px] rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 flex flex-wrap gap-1.5 items-center">
+                {tags.length === 0 ? (
+                  <span className="text-sm text-gray-400">—</span>
+                ) : (
+                  tags.map((tag) => (
+                    <span key={tag} className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                      {tag}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+            <Field
+              label="สถานะ"
+              value={
+                <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', product.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500')}>
+                  {product.is_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                </span>
+              }
+            />
+          </div>
+
+          <div className="mt-4">
+            <Field
+              label="ราคา"
+              value={sellingPrice != null ? `฿${Number(sellingPrice).toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : undefined}
+            />
+          </div>
+
+          <div className="mt-4 grid grid-cols-4 gap-4">
+            <Field label="น้ำหนัก (กรัม)" value={(product as any).weight_grams != null ? String((product as any).weight_grams) : undefined} />
+            <Field label="ความสูง (ซม.)" value={(product as any).height_cm != null ? String((product as any).height_cm) : undefined} />
+            <Field label="ความกว้าง (ซม.)" value={(product as any).width_cm != null ? String((product as any).width_cm) : undefined} />
+            <Field label="ความยาว (ซม.)" value={(product as any).length_cm != null ? String((product as any).length_cm) : undefined} />
+          </div>
+
+          <div className="mt-4">
+            <span className="text-xs text-gray-500">คำอธิบาย/คุณสมบัติของสินค้า</span>
+            <div className="mt-1 min-h-[100px] rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap">
+              {product.description || <span className="text-gray-400">—</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* ====== RIGHT: Images Card (view-only — no delete) ====== */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-5 text-base font-semibold text-gray-900">รูปภาพ</h2>
+
+          <p className="mb-2 text-xs text-gray-500">รูปภาพหลัก</p>
+          <div className="mb-4 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+            {mainImage ? (
+              <img src={mainImage.image_url} alt="" className="h-48 w-full object-cover rounded-xl" />
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-2 py-10 text-gray-300">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                <span className="text-sm">ไม่มีรูปภาพ</span>
+              </div>
+            )}
+          </div>
+
+          <p className="mb-2 text-xs text-gray-500">คลังภาพ</p>
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 6 }).map((_, i) => {
+              const img = galleryImages[i]
+              return (
+                <div key={i} className="aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                  {img ? (
+                    <img src={img.image_url} alt="" className="h-full w-full object-cover" />
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ====== Bottom Tabs Section ====== */}
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex px-4">
+            {BOTTOM_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  'border-b-2 px-5 py-3.5 text-sm font-medium transition-colors',
+                  activeTab === tab.key
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700',
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="p-5">
+
+          {/* Tab: รหัสสินค้า/แบบสินค้า */}
+          {activeTab === 'sku' && (
+            <SkuTabView productId={productId} product={product} />
+          )}
+
+          {/* Tab: ต้นทุน & ราคาขาย */}
+          {activeTab === 'pricing' && (
+            <div>
+              <h3 className="mb-4 text-sm font-semibold text-gray-800">รายการราคา</h3>
+
+              {(costPrice != null || sellingPrice != null || product.pricing?.min_price != null) && (
+                <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  {costPrice != null && (
+                    <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                      <p className="text-xs text-gray-500">ราคาทุน</p>
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900">฿{Number(costPrice).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  )}
+                  {sellingPrice != null && (
+                    <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                      <p className="text-xs text-gray-500">ราคาขาย</p>
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900">฿{Number(sellingPrice).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  )}
+                  {product.pricing?.min_price != null && (
+                    <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                      <p className="text-xs text-gray-500">ราคาต่ำสุด</p>
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900">฿{Number(product.pricing.min_price).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {pricing.length === 0 ? (
+                <div className="rounded-lg border border-gray-100 py-8 text-center text-sm text-gray-400">ยังไม่มีข้อมูลระดับราคา</div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-gray-200 bg-gray-50">
+                      <tr>
+                        <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">ระดับราคา</th>
+                        <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-semibold text-gray-500">ราคา</th>
+                        <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">หน่วย</th>
+                        <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">สกุลเงิน</th>
+                        <th className="whitespace-nowrap px-4 py-3 text-center text-xs font-semibold text-gray-500">รวมภาษี</th>
+                        <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-semibold text-gray-500">ส่วนลดสูงสุด</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {pricing.map((p) => (
+                        <tr key={p.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-900">{p.price_type}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-gray-900">
+                            {(p.price ?? p.selling_price) != null
+                              ? Number(p.price ?? p.selling_price).toLocaleString('th-TH', { minimumFractionDigits: 2 })
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{p.unit ?? product.unit?.name ?? '—'}</td>
+                          <td className="px-4 py-3 text-gray-600">{p.currency ?? 'THB'}</td>
+                          <td className="px-4 py-3 text-center">
+                            {p.tax_included === true ? <span className="font-semibold text-green-600">✓</span>
+                              : p.tax_included === false ? <span className="text-gray-400">✗</span>
+                                : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-600">{p.max_discount != null ? `${p.max_discount}%` : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab: ชุดโอละ */}
+          {activeTab === 'bundle' && (
+            <div className="py-8 text-center text-sm text-gray-400">ยังไม่มีข้อมูลชุดโอละ</div>
+          )}
+
+          {/* Tab: อะไหล่ (BOM) */}
+          {activeTab === 'spare' && (
+            bom.length === 0 ? (
+              <div className="py-8 text-center text-sm text-gray-400">ยังไม่มีรายการอะไหล่</div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-gray-200 bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ชิ้นส่วน</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">SKU</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">หน่วย</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {bom.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-900">{item.component?.name ?? '—'}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.component?.sku ?? '—'}</td>
+                        <td className="px-4 py-3 text-right text-gray-900">{item.qty}</td>
+                        <td className="px-4 py-3 text-gray-600">{item.unit?.name ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

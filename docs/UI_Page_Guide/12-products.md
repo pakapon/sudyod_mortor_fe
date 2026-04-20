@@ -19,19 +19,48 @@
 
 ## 12.2 หน้า สร้าง/แก้ไข สินค้า
 
-**Form Fields:**
-| Field | Type | Required | หมายเหตุ |
-|-------|------|----------|---------|
-| `sku` | Text | ✅ | |
-| `name` | Text | ✅ | |
-| `type` | Select: goods / service | ✅ | |
-| `brand_id` | Select | ❌ | dropdown — `GET /brands` |
-| `category_id` | Select | ✅ | dropdown — `GET /product-categories` |
-| `unit_id` | Select | ✅ | dropdown — `GET /product-units` |
-| `description` | Textarea | ❌ | |
-| `cost_price` | Number | ❌ | |
-| `selling_price` | Number | ✅ | |
-| `min_stock` | Number | ❌ | สำหรับ low stock alert |
+**Form Fields (ชื่อ field ที่ UI ส่ง → API จะ map ให้อัตโนมัติ):**
+| Field (UI ส่ง) | Type | Required | DB Column | หมายเหตุ |
+|----------------|------|----------|-----------|---------|
+| `sku` | Text | ✅ | `sku` | |
+| `name` | Text | ✅ | `name` | |
+| `type` | Select | ✅ | `product_type` | `goods` → `standard`, `service` → `service` |
+| `brand_id` | Select | ❌ | `brand_id` | dropdown — `GET /brands` |
+| `category_id` | Select | ✅ | `category_id` | dropdown — `GET /product-categories` |
+| `unit_id` | Select | ✅ | `base_unit_id` | dropdown — `GET /product-units` |
+| `vendor_id` | Select | ❌ | `vendor_id` | ผู้จัดจำหน่าย (integer FK) — `GET /vendors` |
+| `vat_code` | Select | ❌ | `vat_code` | รหัส VAT (เช่น `VAT 7%`, `vat0`, `exempt`) |
+| `description` | Textarea | ❌ | `description` | |
+| `selling_price` | Number | ❌ | — | ราคาขาย (เก็บที่ variants หรือ pricing tiers) |
+| `min_stock` | Number | ❌ | `min_quantity` | สำหรับ low stock alert |
+| `is_active` | Boolean | ❌ | `is_active` | default true |
+| `weight` | Number | ❌ | `weight_grams` | น้ำหนัก (กรัม) |
+| `height` | Number | ❌ | `height_cm` | ความสูง (ซม.) |
+| `width` | Number | ❌ | `width_cm` | ความกว้าง (ซม.) |
+| `length` | Number | ❌ | `length_cm` | ความยาว (ซม.) |
+
+> **หมายเหตุ:** `main_supplier` (text) ไม่รองรับ — ต้องส่งเป็น `vendor_id` (integer) แทน
+
+**Request Body ตัวอย่าง (PUT /products/{id}):**
+```json
+{
+  "sku": "SKU-WAVE110I",
+  "name": "Honda Wave 110i (2025)",
+  "type": "goods",
+  "brand_id": 15,
+  "category_id": 19,
+  "unit_id": 1,
+  "vendor_id": 3,
+  "vat_code": "VAT 7%",
+  "description": "รายละเอียดสินค้า",
+  "min_stock": 5,
+  "is_active": true,
+  "weight": 100,
+  "height": 100,
+  "width": 100,
+  "length": 100
+}
+```
 
 ---
 
@@ -46,8 +75,54 @@
 - เรียงลำดับ: `PUT /products/{id}/images/reorder`
 
 **Tab ราคา (Pricing):**
-- ตารางราคาหลายระดับ (ขายปลีก, ขายส่ง, ราคาพิเศษ)
+- ตารางราคาหลายระดับ (Tiers) — ปลีก, ส่ง, ราคาพิเศษ
 - API: `GET /products/{id}/pricing`, `PUT /products/{id}/pricing`
+
+**คอลัมน์ตารางราคา:**
+| คอลัมน์ | ชนิด | หมายเหตุ |
+|---------|------|---------|
+| `tier_name` | Text | ชื่อระดับราคา (เช่น ปลีก, ส่ง) |
+| `selling_price` | Decimal | ราคาขาย |
+| `cost_price` | Decimal | ราคาทุน |
+| `min_price` | Decimal | ราคาต่ำสุดที่ยอมให้ขาย |
+| `currency` | Text | สกุลเงิน (default: THB) |
+| `include_tax` | Boolean | รวม VAT หรือไม่ |
+| `min_qty` | Integer | จำนวนขั้นต่ำสำหรับ tier นี้ |
+| `min_discount_pct` | Decimal | % ส่วนลดขั้นต่ำที่อนุญาต |
+| `max_discount_pct` | Decimal | % ส่วนลดสูงสุดที่อนุญาต |
+| `effective_date` | Date | วันที่มีผล (YYYY-MM-DD) |
+
+**Request Body (PUT /products/{id}/pricing):**
+```json
+{
+  "tiers": [
+    {
+      "tier_name": "ปลีก",
+      "cost_price": 85.00,
+      "selling_price": 160.00,
+      "min_price": 130.00,
+      "currency": "THB",
+      "include_tax": true,
+      "min_qty": 1,
+      "min_discount_pct": 0,
+      "max_discount_pct": 10,
+      "effective_date": "2026-01-01"
+    },
+    {
+      "tier_name": "ส่ง",
+      "cost_price": 85.00,
+      "selling_price": 140.00,
+      "min_price": 120.00,
+      "currency": "THB",
+      "include_tax": true,
+      "min_qty": 10,
+      "min_discount_pct": 0,
+      "max_discount_pct": 15,
+      "effective_date": "2026-01-01"
+    }
+  ]
+}
+```
 
 **Tab แปลงหน่วย (Unit Conversions):**
 - เช่น 1 กล่อง = 12 ชิ้น
@@ -58,6 +133,169 @@
 - เช่น "ชุดเปลี่ยนถ่าย" = น้ำมันเครื่อง 4L + กรอง 1 ชิ้น + ...
 - API: CRUD `/products/{id}/bom`
 - เช็คสต็อก BOM: `GET /products/{id}/bom/availability` → แสดงว่าทำได้กี่ชุด
+
+**Tab Tags:**
+- ป้ายกำกับสินค้า (ของแท้, สต็อกน้อย, โปรโมชัน ฯลฯ)
+- API:
+  - `GET /products/{id}/tags` — รายการ tags
+  - `POST /products/{id}/tags` — เพิ่ม tag
+  - `DELETE /products/{id}/tags/{tid}` — ลบ tag
+
+**Request Body (POST /products/{id}/tags):**
+```json
+{ "name": "ของแท้" }
+```
+
+**Response (GET /products/{id}/tags):**
+```json
+{
+  "success": true,
+  "message": "สำเร็จ",
+  "data": [
+    { "id": 1, "name": "ของแท้", "product_id": 1 }
+  ]
+}
+```
+
+**Tab ไฟล์แนบ (Attachments):**
+- เอกสารประกอบ เช่น datasheet, คู่มือ, ใบรับประกัน
+- Allowed: `pdf`, `doc`, `docx`, `xls`, `xlsx`, `jpg`, `png`, `webp`
+- API:
+  - `GET /products/{id}/attachments` — รายการไฟล์แนบ
+  - `POST /products/{id}/attachments` — อัปโหลด (multipart/form-data, field: `file`)
+  - `DELETE /products/{id}/attachments/{aid}` — ลบไฟล์แนบ
+
+**Response (GET /products/{id}/attachments):**
+```json
+{
+  "success": true,
+  "message": "สำเร็จ",
+  "data": [
+    {
+      "id": 1,
+      "filename": "datasheet.pdf",
+      "file_url": "https://spaces.example.com/products/1/attachments/datasheet.pdf",
+      "mime_type": "application/pdf",
+      "size_bytes": 102400,
+      "created_at": "2026-04-19T10:00:00"
+    }
+  ]
+}
+```
+
+**Tab Variants (SKU):**
+- รูปแบบย่อยของสินค้า เช่น สี, ขนาด
+- API:
+  - `GET /products/{id}/variants` — รายการ variants
+  - `POST /products/{id}/variants` — สร้าง variant ใหม่
+  - `PUT /products/{id}/variants/{vid}` — แก้ไข variant (ทุก field optional)
+  - `DELETE /products/{id}/variants/{vid}` — ลบ variant (soft delete)
+
+**Fields (POST/PUT /products/{id}/variants):**
+| Field | Type | Required | หมายเหตุ |
+|-------|------|----------|---------|
+| `sku` | Text | ✅ (POST) | unique across all variants |
+| `name` | Text | ✅ (POST) | |
+| `cost_price` | Decimal | ❌ | |
+| `selling_price` | Decimal | ❌ | |
+| `attributes` | Object | ❌ | `{"1": "S", "2": "ขาว"}` — axis → value |
+| `is_active` | Boolean | ❌ | default true |
+| `unit_id` | Integer | ❌ | dropdown — `GET /product-units` |
+| `min_stock` | Integer | ❌ | จำนวนสต็อกขั้นต่ำ (alert) |
+| `reorder_point` | Integer | ❌ | จุด reorder |
+| `track_lot_expiry` | Boolean | ❌ | ติดตาม lot/วันหมดอายุ |
+| `track_serial` | Boolean | ❌ | ติดตาม serial number |
+| `dimensions` | Text | ❌ | เช่น `10x5x3 cm` (max 50 chars) |
+| `weight_kg` | Decimal | ❌ | น้ำหนัก (กิโลกรัม) |
+
+**Request Body (POST /products/{id}/variants):**
+```json
+{
+  "sku": "V-001",
+  "name": "สีแดง ขนาด S",
+  "cost_price": 100.00,
+  "selling_price": 150.00,
+  "attributes": { "1": "S", "2": "แดง" },
+  "is_active": true,
+  "unit_id": 1,
+  "min_stock": 5,
+  "reorder_point": 10,
+  "track_lot_expiry": false,
+  "track_serial": false,
+  "dimensions": "10x5x3 cm",
+  "weight_kg": 0.25
+}
+```
+
+**Response (GET /products/{id}/variants):**
+```json
+{
+  "success": true,
+  "message": "สำเร็จ",
+  "data": [
+    {
+      "id": 1,
+      "product_id": 1,
+      "sku": "V-001",
+      "name": "สีแดง ขนาด S",
+      "cost_price": 100.00,
+      "selling_price": 150.00,
+      "attributes": { "1": "S", "2": "แดง" },
+      "is_active": true,
+      "unit_id": 1,
+      "unit": { "id": 1, "name": "ชิ้น" },
+      "min_stock": 5,
+      "reorder_point": 10,
+      "track_lot_expiry": false,
+      "track_serial": false,
+      "dimensions": "10x5x3 cm",
+      "weight_kg": 0.25,
+      "created_at": "2026-04-20T10:00:00",
+      "updated_at": "2026-04-20T10:00:00"
+    }
+  ]
+}
+```
+
+**Tab Attribute Options:**
+- กำหนดตัวเลือก dropdown ต่อ axis (แบบสินค้า 1/2/3) สำหรับใช้สร้าง variant
+- API:
+  - `GET /products/{id}/attribute-options` — รายการตัวเลือกทั้งหมด
+  - `POST /products/{id}/attribute-options` — เพิ่มตัวเลือก
+  - `DELETE /products/{id}/attribute-options/{oid}` — ลบตัวเลือก
+
+**Request Body (POST /products/{id}/attribute-options):**
+```json
+{
+  "axis": 1,
+  "label": "ขนาด",
+  "value": "S",
+  "sort_order": 0
+}
+```
+
+**Fields:**
+| Field | Type | Required | หมายเหตุ |
+|-------|------|----------|---------|
+| `axis` | Integer | ✅ | 1, 2, หรือ 3 (แบบสินค้า 1/2/3) |
+| `value` | Text | ✅ | ค่าตัวเลือก เช่น "S", "M", "L", "ขาว" (max 100 chars) |
+| `label` | Text | ❌ | ชื่อแกน เช่น "ขนาด", "สี" (max 50 chars) |
+| `sort_order` | Integer | ❌ | ลำดับการแสดงผล (default 0) |
+
+**Response (GET /products/{id}/attribute-options):**
+```json
+{
+  "success": true,
+  "message": "สำเร็จ",
+  "data": [
+    { "id": 1, "product_id": 1, "axis": 1, "label": "ขนาด", "value": "S", "sort_order": 0 },
+    { "id": 2, "product_id": 1, "axis": 1, "label": "ขนาด", "value": "M", "sort_order": 1 },
+    { "id": 3, "product_id": 1, "axis": 1, "label": "ขนาด", "value": "L", "sort_order": 2 },
+    { "id": 4, "product_id": 1, "axis": 2, "label": "สี", "value": "ขาว", "sort_order": 0 },
+    { "id": 5, "product_id": 1, "axis": 2, "label": "สี", "value": "ดำ", "sort_order": 1 }
+  ]
+}
+```
 
 ---
 

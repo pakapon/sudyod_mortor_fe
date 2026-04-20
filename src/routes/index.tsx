@@ -33,6 +33,21 @@ import { UnitListPage } from '@/pages/settings/UnitListPage'
 import { VendorListPage } from '@/pages/settings/VendorListPage'
 import { VendorFormPage } from '@/pages/settings/VendorFormPage'
 
+import { ProductListPage } from '@/pages/products/ProductListPage'
+import { ProductFormPage } from '@/pages/products/ProductFormPage'
+import { ProductDetailPage } from '@/pages/products/ProductDetailPage'
+import { WarehouseListPage } from '@/pages/inventory/WarehouseListPage'
+import { WarehouseFormPage } from '@/pages/inventory/WarehouseFormPage'
+import { WarehouseDetailPage } from '@/pages/inventory/WarehouseDetailPage'
+import { StockBalancePage } from '@/pages/inventory/StockBalancePage'
+import { GoodsReceiptListPage } from '@/pages/inventory/GoodsReceiptListPage'
+import { GoodsReceiptFormPage } from '@/pages/inventory/GoodsReceiptFormPage'
+import { StockTransferListPage } from '@/pages/inventory/StockTransferListPage'
+import { StockTransferFormPage } from '@/pages/inventory/StockTransferFormPage'
+import { PurchaseOrderListPage } from '@/pages/purchase-orders/PurchaseOrderListPage'
+import { PurchaseOrderFormPage } from '@/pages/purchase-orders/PurchaseOrderFormPage'
+import { PurchaseOrderDetailPage } from '@/pages/purchase-orders/PurchaseOrderDetailPage'
+
 export const router = createBrowserRouter([
   {
     path: '/login',
@@ -122,7 +137,7 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        element: <PermissionGuard module="roles" />,
+        element: <PermissionGuard module="positions" />,
         children: [
           {
             element: <AppLayout title="บทบาท & สิทธิ์" />,
@@ -201,6 +216,86 @@ export const router = createBrowserRouter([
               { path: '/settings/finance-companies/create', element: <FinanceCompanyFormPage /> },
               { path: '/settings/finance-companies/:id', element: <FinanceCompanyDetailPage /> },
               { path: '/settings/finance-companies/:id/edit', element: <FinanceCompanyFormPage /> },
+            ],
+          },
+        ],
+      },
+
+      // ─── Products & Inventory ───
+      {
+        element: <PermissionGuard module="products" />,
+        children: [
+          {
+            element: <AppLayout title="สินค้า" />,
+            children: [
+              { path: '/products', element: <ProductListPage /> },
+              { path: '/products/create', element: <ProductFormPage /> },
+              { path: '/products/:id', element: <ProductDetailPage /> },
+              { path: '/products/:id/edit', element: <ProductFormPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        element: <PermissionGuard module="warehouses" />,
+        children: [
+          {
+            element: <AppLayout title="คลังสินค้า" />,
+            children: [
+              { path: '/warehouses', element: <WarehouseListPage /> },
+              { path: '/warehouses/create', element: <WarehouseFormPage /> },
+              { path: '/warehouses/:id', element: <WarehouseDetailPage /> },
+              { path: '/warehouses/:id/edit', element: <WarehouseFormPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        element: <PermissionGuard module="inventory" />,
+        children: [
+          {
+            element: <AppLayout title="สต็อกสินค้า" />,
+            children: [
+              { path: '/inventory', element: <StockBalancePage /> },
+            ],
+          },
+        ],
+      },
+      {
+        element: <PermissionGuard module="goods_receipts" />,
+        children: [
+          {
+            element: <AppLayout title="ใบรับสินค้า" />,
+            children: [
+              { path: '/goods-receipts', element: <GoodsReceiptListPage /> },
+              { path: '/goods-receipts/create', element: <GoodsReceiptFormPage /> },
+              { path: '/goods-receipts/:id', element: <GoodsReceiptFormPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        element: <PermissionGuard module="stock_transfers" />,
+        children: [
+          {
+            element: <AppLayout title="โอนย้ายสต็อก" />,
+            children: [
+              { path: '/stock-transfers', element: <StockTransferListPage /> },
+              { path: '/stock-transfers/create', element: <StockTransferFormPage /> },
+              { path: '/stock-transfers/:id', element: <StockTransferFormPage /> },
+            ],
+          },
+        ],
+      },
+      {
+        element: <PermissionGuard module="purchase_orders" />,
+        children: [
+          {
+            element: <AppLayout title="ใบสั่งซื้อ" />,
+            children: [
+              { path: '/purchase-orders', element: <PurchaseOrderListPage /> },
+              { path: '/purchase-orders/create', element: <PurchaseOrderFormPage /> },
+              { path: '/purchase-orders/:id', element: <PurchaseOrderDetailPage /> },
             ],
           },
         ],

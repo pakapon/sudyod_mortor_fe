@@ -6082,7 +6082,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"sku\": \"PRD-001\",\n    \"name\": \"กรองอากาศ Honda Wave\",\n    \"base_unit_id\": 1,\n    \"product_type\": \"standard\",\n    \"brand_id\": 1,\n    \"category_id\": 2,\n    \"description\": \"กรองอากาศสำหรับ Honda Wave ทุกรุ่น\",\n    \"min_quantity\": 5,\n    \"is_active\": true\n}",
+                            "raw": "{\n    \"sku\": \"PRD-001\",\n    \"name\": \"กรองอากาศ Honda Wave\",\n    \"unit_id\": 1,\n    \"type\": \"goods\",\n    \"brand_id\": 1,\n    \"category_id\": 2,\n    \"description\": \"กรองอากาศสำหรับ Honda Wave ทุกรุ่น\",\n    \"min_stock\": 5,\n    \"is_active\": true\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -6194,7 +6194,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"sku\": \"PRD-001\",\n    \"name\": \"กรองอากาศ Honda Wave (แก้ไข)\",\n    \"brand_id\": 1,\n    \"category_id\": 2,\n    \"base_unit_id\": 1,\n    \"product_type\": \"standard\",\n    \"description\": \"กรองอากาศสำหรับ Honda Wave ทุกรุ่น (แก้ไข)\",\n    \"min_quantity\": 10,\n    \"is_active\": true\n}",
+                            "raw": "{\n    \"sku\": \"PRD-001\",\n    \"name\": \"กรองอากาศ Honda Wave (แก้ไข)\",\n    \"brand_id\": 1,\n    \"category_id\": 2,\n    \"unit_id\": 1,\n    \"type\": \"goods\",\n    \"description\": \"กรองอากาศสำหรับ Honda Wave ทุกรุ่น (แก้ไข)\",\n    \"min_stock\": 10,\n    \"is_active\": true\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -6683,7 +6683,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"cost_price\": 85,\n    \"selling_price\": 160,\n    \"min_price\": 130\n}",
+                            "raw": "{\n    \"tiers\": [\n        {\n            \"tier_name\": \"ปลีก\",\n            \"cost_price\": 85.00,\n            \"selling_price\": 160.00,\n            \"min_price\": 130.00,\n            \"currency\": \"THB\",\n            \"include_tax\": true,\n            \"min_qty\": 1,\n            \"min_discount_pct\": 0,\n            \"max_discount_pct\": 10,\n            \"effective_date\": \"2026-01-01\"\n        },\n        {\n            \"tier_name\": \"ส่ง\",\n            \"cost_price\": 85.00,\n            \"selling_price\": 140.00,\n            \"min_price\": 120.00,\n            \"currency\": \"THB\",\n            \"include_tax\": true,\n            \"min_qty\": 10,\n            \"min_discount_pct\": 0,\n            \"max_discount_pct\": 15,\n            \"effective_date\": \"2026-01-01\"\n        }\n    ]\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -7303,6 +7303,896 @@
                                 }
                             ],
                             "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูล\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "List Product Tags",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/tags",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "tags"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                }
+                            ]
+                        },
+                        "description": "รายการ Tags ของสินค้า"
+                    },
+                    "response": [
+                        {
+                            "name": "Tags List",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [{\"id\": 1, \"name\": \"ของแท้\", \"product_id\": 1}]\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูล\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Add Tag to Product",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                                    "var json = pm.response.json();",
+                                    "if (json.data && json.data.id) pm.environment.set('last_created_id', String(json.data.id));"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"ของแท้\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/tags",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "tags"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                }
+                            ]
+                        },
+                        "description": "เพิ่ม Tag ให้สินค้า"
+                    },
+                    "response": [
+                        {
+                            "name": "Tag Added",
+                            "status": "Created",
+                            "code": 201,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\"id\": 1, \"name\": \"ของแท้\", \"product_id\": 1}\n}"
+                        },
+                        {
+                            "name": "Validation Error",
+                            "status": "Unprocessable Entity",
+                            "code": 422,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบ\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Remove Tag from Product",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/tags/:tid",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "tags",
+                                ":tid"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                },
+                                {
+                                    "key": "tid",
+                                    "value": "1",
+                                    "description": "Tag ID"
+                                }
+                            ]
+                        },
+                        "description": "ลบ Tag ออกจากสินค้า"
+                    },
+                    "response": [
+                        {
+                            "name": "Tag Removed",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"ลบสำเร็จ\"\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูลที่ต้องการลบ\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "List Product Attachments",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/attachments",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "attachments"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                }
+                            ]
+                        },
+                        "description": "รายการไฟล์แนบของสินค้า"
+                    },
+                    "response": [
+                        {
+                            "name": "Attachments List",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [{\"id\": 1, \"filename\": \"datasheet.pdf\", \"file_url\": \"https://spaces.example.com/products/1/attachments/datasheet.pdf\", \"mime_type\": \"application/pdf\", \"size_bytes\": 102400, \"created_at\": \"2026-04-19T10:00:00\"}]\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูล\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Upload Product Attachment",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                                    "var json = pm.response.json();",
+                                    "if (json.data && json.data.id) pm.environment.set('last_created_id', String(json.data.id));"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "file",
+                                    "type": "file",
+                                    "src": "",
+                                    "description": "Allowed: pdf, doc, docx, xls, xlsx, jpg, png, webp"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/attachments",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "attachments"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                }
+                            ]
+                        },
+                        "description": "อัปโหลดไฟล์แนบสินค้า (multipart/form-data, field: file)\n\nAllowed types: pdf, doc, docx, xls, xlsx, jpg, png, webp"
+                    },
+                    "response": [
+                        {
+                            "name": "Attachment Uploaded",
+                            "status": "Created",
+                            "code": 201,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\"id\": 1, \"filename\": \"datasheet.pdf\", \"file_url\": \"https://spaces.example.com/products/1/attachments/datasheet.pdf\", \"mime_type\": \"application/pdf\", \"size_bytes\": 102400}\n}"
+                        },
+                        {
+                            "name": "Validation Error",
+                            "status": "Unprocessable Entity",
+                            "code": 422,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบ\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Delete Product Attachment",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/attachments/:aid",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "attachments",
+                                ":aid"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                },
+                                {
+                                    "key": "aid",
+                                    "value": "1",
+                                    "description": "Attachment ID"
+                                }
+                            ]
+                        },
+                        "description": "ลบไฟล์แนบสินค้า"
+                    },
+                    "response": [
+                        {
+                            "name": "Attachment Deleted",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"ลบสำเร็จ\"\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูลที่ต้องการลบ\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "List Product Variants",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/variants",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "variants"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                }
+                            ]
+                        },
+                        "description": "รายการ Variants (SKU) ของสินค้า"
+                    },
+                    "response": [
+                        {
+                            "name": "Variants List",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [{\"id\": 1, \"product_id\": 1, \"sku\": \"V-001\", \"name\": \"สีแดง ขนาด S\", \"cost_price\": 100.00, \"selling_price\": 150.00, \"attributes\": {\"1\": \"S\", \"2\": \"แดง\"}, \"is_active\": true, \"unit_id\": 1, \"unit\": {\"id\": 1, \"name\": \"ชิ้น\"}, \"min_stock\": 5, \"reorder_point\": 10, \"track_lot_expiry\": false, \"track_serial\": false, \"dimensions\": \"10x5x3 cm\", \"weight_kg\": 0.25, \"created_at\": \"2026-04-20T10:00:00\", \"updated_at\": \"2026-04-20T10:00:00\"}]\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูล\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Product Variant",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                                    "var json = pm.response.json();",
+                                    "if (json.data && json.data.id) pm.environment.set('last_created_id', String(json.data.id));"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"sku\": \"V-001\",\n    \"name\": \"สีแดง ขนาด S\",\n    \"cost_price\": 100.00,\n    \"selling_price\": 150.00,\n    \"attributes\": {\n        \"1\": \"S\",\n        \"2\": \"แดง\"\n    },\n    \"is_active\": true,\n    \"unit_id\": 1,\n    \"min_stock\": 5,\n    \"reorder_point\": 10,\n    \"track_lot_expiry\": false,\n    \"track_serial\": false,\n    \"dimensions\": \"10x5x3 cm\",\n    \"weight_kg\": 0.25\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/variants",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "variants"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                }
+                            ]
+                        },
+                        "description": "สร้าง Variant (SKU) ใหม่ให้สินค้า"
+                    },
+                    "response": [
+                        {
+                            "name": "Variant Created",
+                            "status": "Created",
+                            "code": 201,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\"id\": 1, \"product_id\": 1, \"sku\": \"V-001\", \"name\": \"สีแดง ขนาด S\", \"cost_price\": 100.00, \"selling_price\": 150.00, \"attributes\": {\"1\": \"S\", \"2\": \"แดง\"}, \"is_active\": true, \"unit_id\": 1, \"unit\": {\"id\": 1, \"name\": \"ชิ้น\"}, \"min_stock\": 5, \"reorder_point\": 10, \"track_lot_expiry\": false, \"track_serial\": false, \"dimensions\": \"10x5x3 cm\", \"weight_kg\": 0.25, \"created_at\": \"2026-04-20T10:00:00\", \"updated_at\": \"2026-04-20T10:00:00\"}\n}"
+                        },
+                        {
+                            "name": "Validation Error",
+                            "status": "Unprocessable Entity",
+                            "code": 422,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบ\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Update Product Variant",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"sku\": \"V-001\",\n    \"name\": \"สีแดง ขนาด S (แก้ไข)\",\n    \"cost_price\": 105.00,\n    \"selling_price\": 155.00,\n    \"attributes\": {\n        \"1\": \"S\",\n        \"2\": \"แดง\"\n    },\n    \"is_active\": true,\n    \"unit_id\": 1,\n    \"min_stock\": 5,\n    \"reorder_point\": 10,\n    \"track_lot_expiry\": false,\n    \"track_serial\": false,\n    \"dimensions\": \"10x5x3 cm\",\n    \"weight_kg\": 0.25\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/variants/:vid",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "variants",
+                                ":vid"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                },
+                                {
+                                    "key": "vid",
+                                    "value": "1",
+                                    "description": "Variant ID"
+                                }
+                            ]
+                        },
+                        "description": "แก้ไข Variant — ทุก field เป็น optional"
+                    },
+                    "response": [
+                        {
+                            "name": "Variant Updated",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"แก้ไขสำเร็จ\"\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูล\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Delete Product Variant",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/variants/:vid",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "variants",
+                                ":vid"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                },
+                                {
+                                    "key": "vid",
+                                    "value": "{{last_created_id}}",
+                                    "description": "Variant ID"
+                                }
+                            ]
+                        },
+                        "description": "ลบ Variant (soft delete)"
+                    },
+                    "response": [
+                        {
+                            "name": "Variant Deleted",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"ลบสำเร็จ\"\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูลที่ต้องการลบ\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "List Product Attribute Options",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept-Language",
+                                "value": "{{language}}"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/attribute-options",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "attribute-options"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                }
+                            ]
+                        },
+                        "description": "รายการตัวเลือก Attribute ต่อ axis สำหรับ dropdown ของ variants\n\naxis: 1=แบบที่ 1, 2=แบบที่ 2, 3=แบบที่ 3 (เช่น ขนาด/สี/วัสดุ)\nเรียงตาม axis → sort_order"
+                    },
+                    "response": [
+                        {
+                            "name": "Attribute Options List",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [\n    {\"id\": 1, \"product_id\": 1, \"axis\": 1, \"label\": \"ขนาด\", \"value\": \"S\", \"sort_order\": 0, \"created_at\": \"2026-04-20T10:00:00\"},\n    {\"id\": 2, \"product_id\": 1, \"axis\": 1, \"label\": \"ขนาด\", \"value\": \"M\", \"sort_order\": 1, \"created_at\": \"2026-04-20T10:00:00\"},\n    {\"id\": 3, \"product_id\": 1, \"axis\": 1, \"label\": \"ขนาด\", \"value\": \"L\", \"sort_order\": 2, \"created_at\": \"2026-04-20T10:00:00\"},\n    {\"id\": 4, \"product_id\": 1, \"axis\": 2, \"label\": \"สี\", \"value\": \"ขาว\", \"sort_order\": 0, \"created_at\": \"2026-04-20T10:00:00\"},\n    {\"id\": 5, \"product_id\": 1, \"axis\": 2, \"label\": \"สี\", \"value\": \"ดำ\", \"sort_order\": 1, \"created_at\": \"2026-04-20T10:00:00\"}\n  ]\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบสินค้า\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Product Attribute Option",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                                    "var json = pm.response.json();",
+                                    "if (json.data && json.data.id) pm.environment.set('last_created_id', String(json.data.id));"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Accept-Language",
+                                "value": "{{language}}"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"axis\": 1,\n    \"label\": \"ขนาด\",\n    \"value\": \"XL\",\n    \"sort_order\": 3\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/attribute-options",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "attribute-options"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                }
+                            ]
+                        },
+                        "description": "เพิ่มตัวเลือก Attribute สำหรับ dropdown ของ variants\n\nFields:\n- axis (required): 1, 2, หรือ 3\n- value (required): ค่าตัวเลือก เช่น S, M, L, ขาว (max 100 chars)\n- label (optional): ชื่อแกน เช่น ขนาด, สี (max 50 chars)\n- sort_order (optional): ลำดับ (default 0)"
+                    },
+                    "response": [
+                        {
+                            "name": "Option Created",
+                            "status": "Created",
+                            "code": 201,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\"id\": 6, \"product_id\": 1, \"axis\": 1, \"label\": \"ขนาด\", \"value\": \"XL\", \"sort_order\": 3, \"created_at\": \"2026-04-20T11:00:00\"}\n}"
+                        },
+                        {
+                            "name": "Duplicate Value",
+                            "status": "Unprocessable Entity",
+                            "code": 422,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ข้อมูลซ้ำในระบบ\"\n}"
+                        },
+                        {
+                            "name": "Axis Invalid",
+                            "status": "Unprocessable Entity",
+                            "code": 422,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"axis ต้องมีค่าระหว่าง 1-3\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Delete Product Attribute Option",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept-Language",
+                                "value": "{{language}}"
+                            },
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{auth_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/attribute-options/:oid",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                ":id",
+                                "attribute-options",
+                                ":oid"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "1",
+                                    "description": "Product ID"
+                                },
+                                {
+                                    "key": "oid",
+                                    "value": "{{last_created_id}}",
+                                    "description": "Attribute Option ID"
+                                }
+                            ]
+                        },
+                        "description": "ลบตัวเลือก Attribute Option (hard delete — ไม่มี soft delete)"
+                    },
+                    "response": [
+                        {
+                            "name": "Option Deleted",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"ลบสำเร็จ\"\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบตัวเลือก attribute สินค้า\"\n}"
                         }
                     ]
                 }

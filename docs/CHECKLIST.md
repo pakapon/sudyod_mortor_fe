@@ -98,31 +98,31 @@
 
 ---
 
-## Phase 5 — สินค้า (Products)
+## Phase 5 — สินค้า (Products) ✅ เสร็จแล้วทั้งหมด
 
 | # | งาน | ไฟล์ | สถานะ |
 |---|-----|------|--------|
-| 5.1 | Product types (Product, ProductImage, BOM, UnitConversion) | `src/types/product.ts` | ⬜ |
-| 5.2 | Product service (`GET/POST/PUT/DELETE /products`, images, pricing, BOM, unit-conversions) | `src/api/productService.ts` | ⬜ |
-| 5.3 | ProductListPage (ค้นหา + filter category/brand/unit + export) | `src/pages/products/ProductListPage.tsx` | ⬜ |
-| 5.4 | ProductFormPage (สร้าง/แก้ไข + อัปโหลดรูป) | `src/pages/products/ProductFormPage.tsx` | ⬜ |
-| 5.5 | ProductDetailPage (tab: ข้อมูล / รูป / ราคา / แปลงหน่วย / BOM) | `src/pages/products/ProductDetailPage.tsx` | ⬜ |
-| 5.6 | เพิ่ม route สินค้า | `src/routes/index.tsx` | ⬜ |
+| 5.1 | Product types (Product, ProductImage, BOM, UnitConversion) | `src/types/product.ts` | ✅ |
+| 5.2 | Product service (`GET/POST/PUT/DELETE /products`, images, pricing, BOM, unit-conversions) | `src/api/productService.ts` | ✅ |
+| 5.3 | ProductListPage (ค้นหา + filter category/brand/unit + export) | `src/pages/products/ProductListPage.tsx` | ✅ |
+| 5.4 | ProductFormPage (สร้าง/แก้ไข + อัปโหลดรูป) | `src/pages/products/ProductFormPage.tsx` | ✅ |
+| 5.5 | ProductDetailPage (tab: ข้อมูล / รูป / ราคา / แปลงหน่วย / BOM) | `src/pages/products/ProductDetailPage.tsx` | ✅ |
+| 5.6 | เพิ่ม route สินค้า | `src/routes/index.tsx` | ✅ |
 
 ---
 
-## Phase 6 — คลังสินค้า & สต็อก (Inventory)
+## Phase 6 — คลังสินค้า & สต็อก (Inventory) ✅ เสร็จแล้วเกือบทั้งหมด
 
 | # | งาน | ไฟล์ | สถานะ |
 |---|-----|------|--------|
-| 6.1 | Inventory/Warehouse types | `src/types/inventory.ts` | ⬜ |
-| 6.2 | Warehouse service | `src/api/warehouseService.ts` | ⬜ |
-| 6.3 | WarehouseListPage + WarehouseFormPage | `src/pages/inventory/Warehouse*.tsx` | ⬜ |
-| 6.4 | StockBalancePage (สินค้าคงเหลือ + filter + low-stock alert) | `src/pages/inventory/StockBalancePage.tsx` | ⬜ |
-| 6.5 | GoodsReceiptListPage + GoodsReceiptFormPage (ใบรับสินค้า) | `src/pages/inventory/GoodsReceipt*.tsx` | ⬜ |
-| 6.6 | StockTransferListPage + StockTransferFormPage (โอนย้ายสต็อก) | `src/pages/inventory/StockTransfer*.tsx` | ⬜ |
+| 6.1 | Inventory/Warehouse types | `src/types/inventory.ts` | ✅ |
+| 6.2 | Warehouse service | `src/api/warehouseService.ts` | ✅ |
+| 6.3 | WarehouseListPage + WarehouseFormPage + WarehouseDetailPage | `src/pages/inventory/Warehouse*.tsx` | ✅ |
+| 6.4 | StockBalancePage (สินค้าคงเหลือ + filter + low-stock alert) | `src/pages/inventory/StockBalancePage.tsx` | ✅ |
+| 6.5 | GoodsReceiptListPage + GoodsReceiptFormPage (ใบรับสินค้า) | `src/pages/inventory/GoodsReceipt*.tsx` | ✅ |
+| 6.6 | StockTransferListPage + StockTransferFormPage (โอนย้ายสต็อก) | `src/pages/inventory/StockTransfer*.tsx` | ✅ |
 | 6.7 | StockAdjustPage (ปรับสต็อก + cycle count) | `src/pages/inventory/StockAdjustPage.tsx` | ⬜ |
-| 6.8 | เพิ่ม route คลัง/สต็อก | `src/routes/index.tsx` | ⬜ |
+| 6.8 | เพิ่ม route คลัง/สต็อก | `src/routes/index.tsx` | ✅ |
 
 ---
 
@@ -196,14 +196,15 @@
 
 ---
 
-## Phase 10 — ใบสั่งซื้อ (Purchase Orders)
+## Phase 10 — ใบสั่งซื้อ (Purchase Orders) ✅ เสร็จแล้วทั้งหมด
 
 | # | งาน | ไฟล์ | สถานะ |
 |---|-----|------|--------|
-| 10.1 | Purchase Order types + service | `src/types/purchaseOrder.ts` | ⬜ |
-| 10.2 | PurchaseOrderListPage | `src/pages/purchasing/PurchaseOrderListPage.tsx` | ⬜ |
-| 10.3 | PurchaseOrderFormPage (draft → sent → received) | `src/pages/purchasing/PurchaseOrderFormPage.tsx` | ⬜ |
-| 10.4 | เพิ่ม route | `src/routes/index.tsx` | ⬜ |
+| 10.1 | Purchase Order types + service | `src/types/inventory.ts` + `src/api/purchaseOrderService.ts` | ✅ |
+| 10.2 | PurchaseOrderListPage | `src/pages/purchase-orders/PurchaseOrderListPage.tsx` | ✅ |
+| 10.3 | PurchaseOrderFormPage (draft → sent → received) | `src/pages/purchase-orders/PurchaseOrderFormPage.tsx` | ✅ |
+| 10.3a | PurchaseOrderDetailPage (header + items + action buttons) | `src/pages/purchase-orders/PurchaseOrderDetailPage.tsx` | ✅ |
+| 10.4 | เพิ่ม route | `src/routes/index.tsx` | ✅ |
 
 ---
 
@@ -227,15 +228,15 @@
 | Settings (Master Data) | 13 | 13 | 0 |
 | Shared Components | — | ActionIconButton, TimeSelect24h | — |
 | ลูกค้า (Customers) | 3 | 3 | 0 (4.5a pending Phase 7/8) |
-| สินค้า (Products) | 3 | 0 | 3 |
-| คลังสินค้า (Inventory) | 6 | 0 | 6 |
+| สินค้า (Products) | 3 | 3 | 0 |
+| คลังสินค้า (Inventory) | 6 | 6 | 1 (StockAdjustPage) |
 | ใบสั่งซ่อม (Service Orders) | 3+tabs | 0 | 3+tabs |
 | เอกสารการเงิน (Financial Docs) | 6+ | 0 | 6+ |
 | สินเชื่อ (Loans) | 4 | 0 | 4 |
-| ใบสั่งซื้อ (Purchase Orders) | 2 | 0 | 2 |
+| ใบสั่งซื้อ (Purchase Orders) | 3 | 3 | 0 |
 | แจ้งเตือน & Audit | 2 | 0 | 2 |
 
-**คืบหน้ารวม: ~50% (Phase 0–4 เสร็จแล้วทั้งหมด — รวม ApiErrorModal + Global Error Handling + Vite Proxy)**
+**คืบหน้ารวม: ~65% (Phase 0–6 + Phase 10 เสร็จแล้วทั้งหมด — รวม ApiErrorModal + Global Error Handling + Vite Proxy)**
 
 ---
 
