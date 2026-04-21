@@ -123,6 +123,7 @@ const menuItems: MenuItem[] = [
       { label: 'หน่วยนับ', path: '/settings/units' },
       { label: 'Supplier', path: '/settings/vendors' },
       { label: 'บริษัทไฟแนนซ์', path: '/settings/finance-companies' },
+      { label: 'ตัวเลือกแบบสินค้า', path: '/settings/product-attributes' },
     ],
   },
   { id: 'auditLog', label: 'Audit Log', icon: 'auditLog', path: '/audit-logs' },

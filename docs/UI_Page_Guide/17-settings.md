@@ -216,7 +216,46 @@
 
 ---
 
+## 17.8 ตัวเลือกแบบสินค้า (Product Attribute Options) ⭐
+
+**Route:** `/settings/product-attributes`
+**Permission:** `products.can_view` / `products.can_create` / `products.can_edit` / `products.can_delete`
+
+> ย้ายมาจากหน้าแก้ไขสินค้า — จัดการแบบ Global List แทนที่จะฝังใน Form สินค้าเป็นรายชิ้น
+
+หน้านี้จัดการ **ประเภทแบบสินค้าทั้งหมดในระบบ** แบบรวมศูนย์ เช่น สี, ไซต์, CC, ตัว, อัน, แท่ง
+ใช้ pattern เดียวกับ [หน่วยนับ (§ 17.5)](#175-master-data) — CRUD modal + searchable table
+
+**UI:**
+- Table columns: **#**, ชื่อแบบสินค้า (sortable), ตัวย่อ (sortable, monospace font), สถานะ, จัดการ
+- Search: กรองแบบ real-time จาก `name` และ `abbreviation`
+- Modal เพิ่ม/แก้ไข: fields `name` (required), `abbreviation` (required), `is_active` (toggle)
+- Empty state: แสดงปุ่ม "เพิ่มแบบสินค้าแรก" พร้อม icon เมื่อยังไม่มีข้อมูล
+- Footer: แสดงจำนวนรายการที่แสดงผล
+
+**Fields:**
+| Field | Required | หมายเหตุ |
+|-------|----------|---------|
+| `name` | ✅ | ชื่อแบบสินค้า เช่น สี, ไซต์, CC, ตัว, อัน, แท่ง |
+| `abbreviation` | ✅ | ตัวย่อ เช่น color, size, cc, pcs |
+| `is_active` | ✅ | สถานะการใช้งาน (default: true) |
+
+**APIs (ปัจจุบัน):**
+| Method | Endpoint | หมายเหตุ |
+|--------|----------|---------|
+| GET | `/product-units` | ดึงรายการทั้งหมด (query: `search`, `page`, `limit`) |
+| POST | `/product-units` | สร้างใหม่ |
+| PUT | `/product-units/{id}` | แก้ไข |
+| DELETE | `/product-units/{id}` | ลบ |
+
+> **หมายเหตุ Migration:** ปัจจุบัน frontend ใช้ endpoint `/product-units` ร่วมกับหน้า "หน่วยนับ" ไปก่อน
+> เมื่อ backend พร้อมจะ migrate ไปใช้ `/product-attribute-types` แยกต่างหาก
+
+**Sidebar:** แสดงใต้เมนู ตั้งค่า → "ตัวเลือกแบบสินค้า"
+
+---
+
 ## ดูเพิ่มเติม
 - [16-hr.md](./16-hr.md) — ใช้ Positions, Roles, Work Schedules
-- [12-products.md](./12-products.md) — ใช้ Brands, Categories, Units
+- [12-products.md](./12-products.md) — ใช้ Brands, Categories, Units, **Attribute Options**
 - [15-loans-finance.md](./15-loans-finance.md) — ใช้ Finance Companies

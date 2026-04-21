@@ -63,7 +63,8 @@ Sidebar Menu:
 │   ├── หมวดสินค้า
 │   ├── หน่วยนับ
 │   ├── Supplier
-│   └── บริษัทไฟแนนซ์
+│   ├── บริษัทไฟแนนซ์
+│   └── ตัวเลือกแบบสินค้า
 ├── 📋 Audit Log
 └── 🔔 แจ้งเตือน (badge จำนวน)
 ```
@@ -92,7 +93,11 @@ Sidebar Menu:
 | สินค้า & สต็อก › ใบสั่งซื้อ | [14-purchase-orders.md](./14-purchase-orders.md) | ทั้งหมด |
 | สินเชื่อ | [15-loans-finance.md](./15-loans-finance.md) | ทั้งหมด |
 | HR (พนักงาน / ลงเวลา / วันหยุด) | [16-hr.md](./16-hr.md) | ทั้งหมด |
-| ตั้งค่า | [17-settings.md](./17-settings.md) | ทั้งหมด |
+| ตั้งค่า › สาขา / ตำแหน่ง / บทบาท / ตารางเวลา | [17-settings.md](./17-settings.md) | 17.1–17.4 |
+| ตั้งค่า › ยี่ห้อ / หน่วยนับ / Supplier | [17-settings.md](./17-settings.md) | 17.5 |
+| ตั้งค่า › หมวดสินค้า | [17-settings.md](./17-settings.md) | 17.6 |
+| ตั้งค่า › บริษัทไฟแนนซ์ | [17-settings.md](./17-settings.md) | 17.7 |
+| ตั้งค่า › ตัวเลือกแบบสินค้า | [17-settings.md](./17-settings.md) | 17.8 |
 | แจ้งเตือน | [18-notifications.md](./18-notifications.md) | ทั้งหมด |
 | Audit Log | [19-audit-log.md](./19-audit-log.md) | ทั้งหมด |
 | Business Flows (ทุก Scenario) | [20-flows.md](./20-flows.md) | ทั้งหมด |

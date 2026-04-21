@@ -40,14 +40,23 @@ export interface ProductPayload {
   sku: string
   name: string
   type: ProductType
+  product_type?: string
   brand_id?: number
   category_id?: number
   unit_id?: number
+  base_unit_id?: number
   description?: string
   cost_price?: number
   selling_price?: number
   min_stock?: number
+  min_quantity?: number
   is_active?: boolean
+  vat_code?: string
+  vendor_id?: number
+  weight_grams?: number
+  height_cm?: number
+  width_cm?: number
+  length_cm?: number
 }
 
 export interface ProductListParams {

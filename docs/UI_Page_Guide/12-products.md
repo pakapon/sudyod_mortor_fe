@@ -257,12 +257,16 @@
 }
 ```
 
-**Tab Attribute Options:**
-- กำหนดตัวเลือก dropdown ต่อ axis (แบบสินค้า 1/2/3) สำหรับใช้สร้าง variant
-- API:
-  - `GET /products/{id}/attribute-options` — รายการตัวเลือกทั้งหมด
-  - `POST /products/{id}/attribute-options` — เพิ่มตัวเลือก
-  - `DELETE /products/{id}/attribute-options/{oid}` — ลบตัวเลือก
+**Tab Attribute Options (อ่านอย่างเดียวในหน้าแก้ไขสินค้า):**
+
+> ⚠️ **ย้ายไปที่ Settings แล้ว** — การเพิ่ม/ลบตัวเลือกแบบสินค้า ทำได้ที่
+> **ตั้งค่า → ตัวเลือกแบบสินค้า** (`/settings/product-attributes`)
+> ดูรายละเอียดที่ [17-settings.md § 17.8](./17-settings.md)
+
+- หน้าแก้ไขสินค้า (`/products/:id/edit`) แสดงตัวเลือกที่มีอยู่แล้วเป็น chip (read-only)
+- มีปุ่ม "จัดการตัวเลือกใน ตั้งค่า" (เปิด tab ใหม่) เพื่อไปจัดการที่หน้า Settings
+- หน้า Settings ใช้ API `/product-units` สำหรับ CRUD (ชื่อ + ตัวย่อ)
+
 
 **Request Body (POST /products/{id}/attribute-options):**
 ```json
@@ -301,4 +305,5 @@
 
 ## ดูเพิ่มเติม
 - [13-inventory.md](./13-inventory.md) — สต็อกสินค้าในคลัง
-- [17-settings.md](./17-settings.md) — จัดการยี่ห้อ (Brands), หมวดสินค้า (Categories), หน่วยนับ (Units)
+- [17-settings.md § 17.5](./17-settings.md) — จัดการยี่ห้อ (Brands), หมวดสินค้า (Categories), หน่วยนับ (Units)
+- [17-settings.md § 17.8](./17-settings.md) — จัดการตัวเลือกแบบสินค้า (Product Attribute Options)

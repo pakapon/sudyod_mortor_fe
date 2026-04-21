@@ -9,7 +9,8 @@ import type {
   ProductVariant,
   ProductVariantPayload,
   AttributeOption,
-  AttributeOptionPayload,
+  ProductPayload,
+  ProductType,
 } from '@/types/product'
 import { cn } from '@/lib/utils'
 
@@ -430,13 +431,6 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
   const [deletingOptId, setDeletingOptId] = useState<number | null>(null)
 
-  // Add attribute option form state
-  const [aoAxis, setAoAxis] = useState<'1' | '2' | '3'>('1')
-  const [aoLabel, setAoLabel] = useState('')
-  const [aoValue, setAoValue] = useState('')
-  const [aoSaving, setAoSaving] = useState(false)
-  const aoInputRef = useRef<HTMLInputElement>(null)
-
   const loadData = async () => {
     setLoading(true)
     try {
@@ -476,24 +470,6 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
       await productService.deleteProductAttributeOption(productId, optId)
       setAttrOptions((prev) => prev.filter((o) => o.id !== optId))
     } catch { } finally { setDeletingOptId(null) }
-  }
-
-  const handleAddAttrOption = async () => {
-    if (!aoValue.trim()) return
-    setAoSaving(true)
-    try {
-      const payload: AttributeOptionPayload = {
-        axis: Number(aoAxis) as 1 | 2 | 3,
-        value: aoValue.trim(),
-        label: aoLabel.trim() || undefined,
-      }
-      await productService.createProductAttributeOption(productId, payload)
-      setAoValue('')
-      productService.getProductAttributeOptions(productId)
-        .then((res) => setAttrOptions(Array.isArray(res.data.data) ? res.data.data : []))
-        .catch(() => {})
-      aoInputRef.current?.focus()
-    } catch { } finally { setAoSaving(false) }
   }
 
   // Build axis label map
@@ -553,39 +529,6 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
           })}
         </div>
       )}
-
-      {/* ── Add Attribute Option ── */}
-      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">เพิ่มตัวเลือกแบบสินค้า</p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">แกน</label>
-            <select value={aoAxis} onChange={(e) => setAoAxis(e.target.value as '1' | '2' | '3')}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]">
-              <option value="1">แบบสินค้า 1</option>
-              <option value="2">แบบสินค้า 2</option>
-              <option value="3">แบบสินค้า 3</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-gray-500">ชื่อแกน (เช่น ขนาด, สี)</label>
-            <input value={aoLabel} onChange={(e) => setAoLabel(e.target.value)}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
-              placeholder="เช่น ขนาด" />
-          </div>
-          <div className="flex-1 min-w-[140px]">
-            <label className="mb-1 block text-xs text-gray-500">ค่าตัวเลือก <span className="text-red-500">*</span></label>
-            <input ref={aoInputRef} value={aoValue} onChange={(e) => setAoValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddAttrOption()}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="เช่น S, M, L, ขาว" />
-          </div>
-          <button type="button" disabled={aoSaving} onClick={handleAddAttrOption}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60 whitespace-nowrap">
-            <PlusIcon size={13} /> เพิ่ม
-          </button>
-        </div>
-      </div>
 
       <div className="border-t border-gray-100" />
 
@@ -842,9 +785,10 @@ export function ProductFormPage() {
     if (Object.keys(e).length > 0) { setErrors(e); return }
     setIsSubmitting(true)
     try {
-      const payload: Record<string, any> = {
+      const payload: ProductPayload = {
         sku: form.sku,
         name: form.name,
+        type: form.product_type as ProductType,
         product_type: form.product_type,
         brand_id: form.brand_id ? Number(form.brand_id) : undefined,
         category_id: form.category_id ? Number(form.category_id) : undefined,

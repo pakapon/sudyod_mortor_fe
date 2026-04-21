@@ -53,7 +53,7 @@ export const MENU_PERMISSION_MAP: Record<string, ModuleKey | ModuleKey[]> = {
   product: ['products', 'warehouses', 'goods_receipts', 'stock_transfers', 'purchase_orders'],
   credit: ['loan_applications', 'store_loans'],
   team: ['employees', 'attendance', 'holidays'],
-  settings: ['branches', 'positions', 'work_schedules', 'brands', 'product_categories', 'product_units', 'vendors'],
+  settings: ['branches', 'positions', 'work_schedules', 'brands', 'product_categories', 'product_units', 'vendors', 'products'],
   auditLog: 'branches', // audit_logs ไม่อยู่ใน 22 modules, fallback
   notification: 'branches', // notifications ไม่ต้อง permission
 }
@@ -79,6 +79,7 @@ export const ROUTE_PERMISSION_MAP: Record<string, ModuleKey> = {
   '/hr/attendance': 'attendance',
   '/hr/holidays': 'holidays',
   '/hr/work-schedules': 'work_schedules',
+  '/settings/branches': 'branches',
   '/settings/work-schedules': 'work_schedules',
   '/settings/positions': 'positions',
   '/settings/roles': 'positions', // roles permission ใช้ roles.can_view แต่ไม่มีใน 22 modules
@@ -87,4 +88,7 @@ export const ROUTE_PERMISSION_MAP: Record<string, ModuleKey> = {
   '/settings/units': 'product_units',
   '/settings/vendors': 'vendors',
   '/settings/finance-companies': 'vendors', // finance_companies ไม่อยู่ใน 22 modules
+  // /settings/product-attributes → ไม่ map ใน ROUTE_PERMISSION_MAP เพราะ parent 'settings' ดูแล permission แล้ว
+  // (ถ้าใส่ 'products' จะทำให้ซ่อนเมื่อ products permission ไม่อยู่ใน role แม้เข้าถึง settings ได้)
 }
+
