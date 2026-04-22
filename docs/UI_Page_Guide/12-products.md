@@ -31,7 +31,8 @@
 | `vendor_id` | Select | ❌ | `vendor_id` | ผู้จัดจำหน่าย (integer FK) — `GET /vendors` |
 | `vat_code` | Select | ❌ | `vat_code` | รหัส VAT (เช่น `VAT 7%`, `vat0`, `exempt`) |
 | `description` | Textarea | ❌ | `description` | |
-| `selling_price` | Number | ❌ | — | ราคาขาย (เก็บที่ variants หรือ pricing tiers) |
+| `selling_price` | Number | ❌ | — | ราคาขาย — บันทึกไปที่ pricing tier `ปลีก` โดยอัตโนมัติ; เมื่อ GET จะดึงจาก `pricing_tiers[0].selling_price` |
+| `tags` | Array\<string\> | ❌ | — | `["of-genuine", "Honda"]` — sync ทั้งหมด (สร้าง tag ใหม่อัตโนมัติถ้ายังไม่มี) |
 | `min_stock` | Number | ❌ | `min_quantity` | สำหรับ low stock alert |
 | `is_active` | Boolean | ❌ | `is_active` | default true |
 | `weight` | Number | ❌ | `weight_grams` | น้ำหนัก (กรัม) |
@@ -40,6 +41,34 @@
 | `length` | Number | ❌ | `length_cm` | ความยาว (ซม.) |
 
 > **หมายเหตุ:** `main_supplier` (text) ไม่รองรับ — ต้องส่งเป็น `vendor_id` (integer) แทน
+
+**Response (GET /products/{id}):**
+```json
+{
+  "success": true,
+  "message": "สำเร็จ",
+  "data": {
+    "id": 1,
+    "sku": "PRD-001",
+    "name": "กรองอากาศ Honda Wave",
+    "product_type": "standard",
+    "brand": { "id": 1, "name": "Honda" },
+    "category": { "id": 2, "name": "กรองอากาศ" },
+    "base_unit": { "id": 1, "name": "ชิ้น" },
+    "vendor": { "id": 3, "name": "TTB Parts Co., Ltd." },
+    "vendor_id": 3,
+    "vat_code": "VAT 7%",
+    "description": "รายละเอียดสินค้า",
+    "is_active": true,
+    "images": [],
+    "tags": [],
+    "created_at": "2026-04-20T10:00:00",
+    "updated_at": "2026-04-20T10:00:00"
+  }
+}
+```
+
+> **หมายเหตุ:** `vendor` เป็น object `{ id, name }` — หน้าบ้านใช้ `data.vendor.name` แสดงชื่อผู้จำหน่าย
 
 **Request Body ตัวอย่าง (PUT /products/{id}):**
 ```json
@@ -53,6 +82,8 @@
   "vendor_id": 3,
   "vat_code": "VAT 7%",
   "description": "รายละเอียดสินค้า",
+  "selling_price": 55900,
+  "tags": ["ของแท้", "Honda", "มอเตอร์ไซค์"],
   "min_stock": 5,
   "is_active": true,
   "weight": 100,
@@ -152,10 +183,18 @@
   "success": true,
   "message": "สำเร็จ",
   "data": [
-    { "id": 1, "name": "ของแท้", "product_id": 1 }
+    {
+      "id": 3,
+      "name": "ของแท้",
+      "created_at": "2026-04-22T16:53:26.000000Z",
+      "updated_at": "2026-04-22T16:53:26.000000Z",
+      "pivot": { "product_id": 12, "tag_id": 3 }
+    }
   ]
 }
 ```
+
+> **หมายเหตุ:** `tags` ใน `GET /products/{id}` ส่งกลับเป็น object array (ไม่ใช่ string[]) — frontend normalize เป็น string โดยดึง `.name` ก่อน render / load เข้า form
 
 **Tab ไฟล์แนบ (Attachments):**
 - เอกสารประกอบ เช่น datasheet, คู่มือ, ใบรับประกัน
@@ -198,14 +237,20 @@
 | `name` | Text | ✅ (POST) | |
 | `cost_price` | Decimal | ❌ | |
 | `selling_price` | Decimal | ❌ | |
-| `attributes` | Object | ❌ | `{"1": "S", "2": "ขาว"}` — axis → value |
+| `description` | Text | ❌ | คุณลักษณะสินค้า (rich text / plain text) |
+| `barcode` | Text | ❌ | บาร์โค้ดหลัก (EAN-13, UPC หรืออื่นๆ) — **ถ้าไม่ส่ง server จะ auto-gen 13 หลักให้** |
+| `barcode_secondary` | Text | ❌ | บาร์โค้ดรอง (OEM code, รหัสสำรอง) — **ถ้าไม่ส่ง server จะ auto-gen 13 หลักให้** |
+| `attributes` | Object | ❌ | `{"1": "S", "2": "ขาว"}` — axis → value; ส่ง `{}` เมื่อไม่มี attribute (ไม่ใช่ `null`) |
 | `is_active` | Boolean | ❌ | default true |
 | `unit_id` | Integer | ❌ | dropdown — `GET /product-units` |
+| `unit_quantity` | Decimal | ❌ | จำนวนต่อหน่วย เช่น 1, 600, 3 |
 | `min_stock` | Integer | ❌ | จำนวนสต็อกขั้นต่ำ (alert) |
 | `reorder_point` | Integer | ❌ | จุด reorder |
 | `track_lot_expiry` | Boolean | ❌ | ติดตาม lot/วันหมดอายุ |
 | `track_serial` | Boolean | ❌ | ติดตาม serial number |
-| `dimensions` | Text | ❌ | เช่น `10x5x3 cm` (max 50 chars) |
+| `dimension_width` | Decimal | ❌ | ความกว้าง (ซม.) |
+| `dimension_height` | Decimal | ❌ | ความสูง (ซม.) |
+| `dimension_length` | Decimal | ❌ | ความยาว (ซม.) |
 | `weight_kg` | Decimal | ❌ | น้ำหนัก (กิโลกรัม) |
 
 **Request Body (POST /products/{id}/variants):**
@@ -215,14 +260,20 @@
   "name": "สีแดง ขนาด S",
   "cost_price": 100.00,
   "selling_price": 150.00,
+  "description": "คุณลักษณะสินค้า...",
+  "barcode": "8851234567890",
+  "barcode_secondary": "OEM-001",
   "attributes": { "1": "S", "2": "แดง" },
   "is_active": true,
   "unit_id": 1,
+  "unit_quantity": 1,
   "min_stock": 5,
   "reorder_point": 10,
   "track_lot_expiry": false,
   "track_serial": false,
-  "dimensions": "10x5x3 cm",
+  "dimension_width": 10,
+  "dimension_height": 5,
+  "dimension_length": 3,
   "weight_kg": 0.25
 }
 ```
@@ -240,15 +291,21 @@
       "name": "สีแดง ขนาด S",
       "cost_price": 100.00,
       "selling_price": 150.00,
+      "description": "คุณลักษณะสินค้า...",
+      "barcode": "8851234567890",
+      "barcode_secondary": "OEM-001",
       "attributes": { "1": "S", "2": "แดง" },
       "is_active": true,
       "unit_id": 1,
       "unit": { "id": 1, "name": "ชิ้น" },
+      "unit_quantity": 1,
       "min_stock": 5,
       "reorder_point": 10,
       "track_lot_expiry": false,
       "track_serial": false,
-      "dimensions": "10x5x3 cm",
+      "dimension_width": 10,
+      "dimension_height": 5,
+      "dimension_length": 3,
       "weight_kg": 0.25,
       "created_at": "2026-04-20T10:00:00",
       "updated_at": "2026-04-20T10:00:00"

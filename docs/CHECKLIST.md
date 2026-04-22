@@ -1,6 +1,6 @@
 # Checklist ระบบ — Sudyod Motor Frontend
 
-> อัปเดตล่าสุด: 19 เมษายน 2026  
+> อัปเดตล่าสุด: 23 เมษายน 2026  
 > Legend: ✅ เสร็จแล้ว | 🔧 กำลังทำ | ⬜ ยังไม่ทำ | 🔶 PlaceholderPage (มี route แล้ว ยังไม่มีหน้าจริง)
 
 ---
@@ -108,6 +108,12 @@
 | 5.4 | ProductFormPage (สร้าง/แก้ไข + อัปโหลดรูป) | `src/pages/products/ProductFormPage.tsx` | ✅ |
 | 5.5 | ProductDetailPage (tab: ข้อมูล / รูป / ราคา / แปลงหน่วย / BOM) | `src/pages/products/ProductDetailPage.tsx` | ✅ |
 | 5.6 | เพิ่ม route สินค้า | `src/routes/index.tsx` | ✅ |
+
+**Bug fixes (23 เม.ย. 2026):**
+- `tags` API ส่งกลับเป็น object `{id, name, ...}` แทน string — normalize ใน Detail + Form แล้ว
+- `selling_price` ไม่มีที่ root — fallback ไปดึงจาก `pricing_tiers[0].selling_price` ทั้ง 2 หน้า
+- หน้า Create ซ่อน bottom tabs section + ซ่อน image upload zone (ต้องบันทึกก่อนจึงอัปโหลดรูปได้)
+- `RichTextToolbar` ลบปุ่ม "แนบไฟล์" และ "แทรกรูป" ออก (ยังไม่ implement จริง)
 
 ---
 

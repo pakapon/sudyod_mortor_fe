@@ -171,7 +171,9 @@ function SkuTabView({ productId, product }: { productId: number; product: Produc
                     </td>
                     <td className="px-4 py-3 text-gray-900">{v.name}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{formatAttributes(v.attributes)}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs font-mono">—</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs font-mono">
+                      {[v.barcode, v.barcode_secondary].filter(Boolean).join(' / ') || '—'}
+                    </td>
                     <td className="px-4 py-3 text-gray-700">{v.unit?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-center">
                       {v.track_lot_expiry
@@ -190,7 +192,9 @@ function SkuTabView({ productId, product }: { productId: number; product: Produc
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">
                       {[
-                        v.dimensions,
+                        (v.dimension_width != null || v.dimension_height != null || v.dimension_length != null)
+                          ? `${v.dimension_width ?? 0}×${v.dimension_height ?? 0}×${v.dimension_length ?? 0} ซม.`
+                          : (v.dimensions ?? null),
                         v.weight_kg != null ? `${v.weight_kg}kg` : null,
                       ].filter(Boolean).join(' · ') || '—'}
                     </td>
@@ -205,13 +209,13 @@ function SkuTabView({ productId, product }: { productId: number; product: Produc
       {/* ── Info Panels ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <InfoPanel title="หน่วย & บรรจุภัณฑ์">
-          <InfoRow label="หน่วยหลัก" value={(product as any).base_unit?.name ?? product.unit?.name} />
-          <InfoRow label="น้ำหนัก" value={(product as any).weight_grams != null ? `${(product as any).weight_grams} กรัม` : undefined} />
+          <InfoRow label="หน่วยหลัก" value={product.base_unit?.name ?? product.unit?.name} />
+          <InfoRow label="น้ำหนัก" value={product.weight_grams != null ? `${product.weight_grams} กรัม` : undefined} />
           <InfoRow
             label="ขนาดสินค้า"
             value={
-              (product as any).width_cm && (product as any).height_cm && (product as any).length_cm
-                ? `${(product as any).width_cm} × ${(product as any).height_cm} × ${(product as any).length_cm} ซม.`
+              product.width_cm && product.height_cm && product.length_cm
+                ? `${product.width_cm} × ${product.height_cm} × ${product.length_cm} ซม.`
                 : undefined
             }
           />
@@ -343,11 +347,11 @@ export function ProductDetailPage() {
     )
   }
 
-  const tags = Array.isArray(product.tags) ? product.tags : []
+  const tags = Array.isArray(product.tags) ? product.tags.map((t) => (typeof t === 'string' ? t : t.name)) : []
   const mainImage = images[0]
   const galleryImages = images.slice(1, 7)
-  const sellingPrice = product.selling_price ?? product.pricing?.selling_price
-  const costPrice = product.cost_price ?? product.pricing?.cost_price
+  const sellingPrice = product.selling_price ?? product.pricing?.selling_price ?? product.pricing_tiers?.[0]?.selling_price
+  const costPrice = product.cost_price ?? product.pricing?.cost_price ?? product.pricing_tiers?.[0]?.cost_price
 
   return (
     <div className="space-y-6">
@@ -397,7 +401,7 @@ export function ProductDetailPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-4">
-            <Field label="ผู้จำหน่าย (หลัก)" value={(product as any).vendor?.name ?? (product as any).vendor_name ?? undefined} />
+            <Field label="ผู้จำหน่าย (หลัก)" value={product.vendor?.name} />
             <Field label="นโยบายภาษี (VAT Code)" value={product.vat_code} />
           </div>
 
@@ -434,10 +438,10 @@ export function ProductDetailPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-4 gap-4">
-            <Field label="น้ำหนัก (กรัม)" value={(product as any).weight_grams != null ? String((product as any).weight_grams) : undefined} />
-            <Field label="ความสูง (ซม.)" value={(product as any).height_cm != null ? String((product as any).height_cm) : undefined} />
-            <Field label="ความกว้าง (ซม.)" value={(product as any).width_cm != null ? String((product as any).width_cm) : undefined} />
-            <Field label="ความยาว (ซม.)" value={(product as any).length_cm != null ? String((product as any).length_cm) : undefined} />
+            <Field label="น้ำหนัก (กรัม)" value={product.weight_grams != null ? String(product.weight_grams) : undefined} />
+            <Field label="ความสูง (ซม.)" value={product.height_cm != null ? String(product.height_cm) : undefined} />
+            <Field label="ความกว้าง (ซม.)" value={product.width_cm != null ? String(product.width_cm) : undefined} />
+            <Field label="ความยาว (ซม.)" value={product.length_cm != null ? String(product.length_cm) : undefined} />
           </div>
 
           <div className="mt-4">
@@ -559,20 +563,20 @@ export function ProductDetailPage() {
                     <tbody className="divide-y divide-gray-100">
                       {pricing.map((p) => (
                         <tr key={p.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-900">{p.price_type}</td>
+                          <td className="px-4 py-3 font-medium text-gray-900">{p.tier_name ?? '—'}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-gray-900">
-                            {(p.price ?? p.selling_price) != null
-                              ? Number(p.price ?? p.selling_price).toLocaleString('th-TH', { minimumFractionDigits: 2 })
+                            {p.selling_price != null
+                              ? Number(p.selling_price).toLocaleString('th-TH', { minimumFractionDigits: 2 })
                               : '—'}
                           </td>
-                          <td className="px-4 py-3 text-gray-600">{p.unit ?? product.unit?.name ?? '—'}</td>
+                          <td className="px-4 py-3 text-gray-600">{product.base_unit?.name ?? product.unit?.name ?? '—'}</td>
                           <td className="px-4 py-3 text-gray-600">{p.currency ?? 'THB'}</td>
                           <td className="px-4 py-3 text-center">
-                            {p.tax_included === true ? <span className="font-semibold text-green-600">✓</span>
-                              : p.tax_included === false ? <span className="text-gray-400">✗</span>
+                            {p.include_tax === true ? <span className="font-semibold text-green-600">✓</span>
+                              : p.include_tax === false ? <span className="text-gray-400">✗</span>
                                 : <span className="text-gray-300">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-right text-gray-600">{p.max_discount != null ? `${p.max_discount}%` : '—'}</td>
+                          <td className="px-4 py-3 text-right text-gray-600">{p.max_discount_pct != null ? `${p.max_discount_pct}%` : '—'}</td>
                         </tr>
                       ))}
                     </tbody>

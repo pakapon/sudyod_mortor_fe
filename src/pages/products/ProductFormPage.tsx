@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { productService } from '@/api/productService'
 import { hrService } from '@/api/hrService'
 import { apiClient } from '@/api/client'
+import { RichTextToolbar } from '@/components/RichTextToolbar'
 import type {
   Product,
   ProductImage,
@@ -31,6 +32,7 @@ interface FormValues {
   height_cm: string
   width_cm: string
   length_cm: string
+  selling_price: string
 }
 
 type BottomTabKey = 'sku' | 'pricing' | 'bundle' | 'spare'
@@ -40,12 +42,6 @@ const BOTTOM_TABS: { key: BottomTabKey; label: string }[] = [
   { key: 'bundle', label: 'ชุดโอละ' },
   { key: 'spare', label: 'อะไหล่' },
 ]
-
-const AXIS_COLORS: Record<number, string> = {
-  1: 'bg-blue-50 text-blue-700 border-blue-200',
-  2: 'bg-violet-50 text-violet-700 border-violet-200',
-  3: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-}
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 function ChevronLeftIcon() {
@@ -121,118 +117,6 @@ function SortIcon() {
 const fieldCls = 'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
 const labelCls = 'mb-1.5 block text-sm font-medium text-gray-700'
 
-// ─── Searchable + Creatable Attribute Dropdown ────────────────────────────────
-interface AttrOptionDropdownProps {
-  productId: number
-  axis: 1 | 2 | 3
-  axisLabel: string
-  options: AttributeOption[]
-  value: string
-  onChange: (val: string) => void
-  onCreated: (opt: AttributeOption) => void
-}
-function AttrOptionDropdown({ productId, axis, axisLabel, options, value, onChange, onCreated }: AttrOptionDropdownProps) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const [creating, setCreating] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50)
-  }, [open])
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const filtered = options.filter((o) => o.value.toLowerCase().includes(search.toLowerCase()))
-  const exactMatch = options.some((o) => o.value.toLowerCase() === search.trim().toLowerCase())
-  const canCreate = search.trim().length > 0 && !exactMatch
-
-  const handleCreate = async () => {
-    if (!canCreate) return
-    setCreating(true)
-    try {
-      const res = await productService.createProductAttributeOption(productId, {
-        axis,
-        value: search.trim(),
-        label: axisLabel || undefined,
-      })
-      const newOpt: AttributeOption = res.data?.data ?? { id: Date.now(), axis, value: search.trim(), label: axisLabel } as AttributeOption
-      onCreated(newOpt)
-      onChange(newOpt.value)
-      setSearch('')
-      setOpen(false)
-    } catch { } finally { setCreating(false) }
-  }
-
-  return (
-    <div ref={wrapRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((p) => !p)}
-        className={cn(fieldCls, 'flex items-center justify-between text-left', !value && 'text-gray-400')}
-      >
-        <span className="truncate">{value || '— เลือก —'}</span>
-        <svg className="ml-2 shrink-0 text-gray-400" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
-      </button>
-      {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden">
-          <div className="p-2 border-b border-gray-100">
-            <input
-              ref={inputRef}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  if (canCreate) { handleCreate() }
-                  else if (filtered[0]) { onChange(filtered[0].value); setOpen(false) }
-                }
-              }}
-              placeholder="ค้นหา หรือพิมพ์เพื่อสร้างใหม่..."
-              className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-          <div className="max-h-44 overflow-y-auto">
-            {value && (
-              <button type="button" onClick={() => { onChange(''); setOpen(false) }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:bg-gray-50">
-                <XIcon size={12} /> ล้างค่า
-              </button>
-            )}
-            {filtered.map((o) => (
-              <button key={o.id} type="button"
-                onClick={() => { onChange(o.value); setSearch(''); setOpen(false) }}
-                className={cn(
-                  'flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-blue-50',
-                  o.value === value ? 'bg-blue-50 font-medium text-blue-700' : 'text-gray-700',
-                )}>
-                {o.value}
-                {o.value === value && <CheckIcon />}
-              </button>
-            ))}
-            {canCreate && (
-              <button type="button" onClick={handleCreate} disabled={creating}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 border-t border-gray-100 disabled:opacity-50">
-                <PlusIcon size={12} />
-                {creating ? 'กำลังสร้าง...' : `สร้าง "${search.trim()}"`}
-              </button>
-            )}
-            {filtered.length === 0 && !canCreate && (
-              <p className="px-3 py-4 text-center text-xs text-gray-400">ไม่พบรายการ</p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── Variant Form Modal ───────────────────────────────────────────────────────
 interface VariantFormModalProps {
   productId: number
@@ -241,35 +125,31 @@ interface VariantFormModalProps {
   attributeOptions: AttributeOption[]
   onClose: () => void
   onSaved: () => void
-  onAttrOptionCreated: (opt: AttributeOption) => void
+  onAttrOptionCreated?: (opt: AttributeOption) => void
 }
-function VariantFormModal({ productId, variant, units, attributeOptions, onClose, onSaved, onAttrOptionCreated }: VariantFormModalProps) {
+function VariantFormModal({ productId, variant, units, onClose, onSaved }: VariantFormModalProps) {
   const isEdit = Boolean(variant)
   const [sku, setSku] = useState(variant?.sku ?? '')
   const [name, setName] = useState(variant?.name ?? '')
   const [costPrice, setCostPrice] = useState(variant?.cost_price != null ? String(variant.cost_price) : '')
   const [sellingPrice, setSellingPrice] = useState(variant?.selling_price != null ? String(variant.selling_price) : '')
   const [unitId, setUnitId] = useState(variant?.unit_id != null ? String(variant.unit_id) : '')
+  const [unitQuantity, setUnitQuantity] = useState(variant?.unit_quantity != null ? String(variant.unit_quantity) : '1')
   const [minStock, setMinStock] = useState(variant?.min_stock != null ? String(variant.min_stock) : '0')
   const [reorderPoint, setReorderPoint] = useState(variant?.reorder_point != null ? String(variant.reorder_point) : '0')
   const [trackLot, setTrackLot] = useState(variant?.track_lot_expiry ?? false)
   const [trackSerial, setTrackSerial] = useState(variant?.track_serial ?? false)
   const [isActive, setIsActive] = useState(variant?.is_active ?? true)
-  const [dimensions, setDimensions] = useState(variant?.dimensions ?? '')
+  const [dimensionWidth, setDimensionWidth] = useState(variant?.dimension_width != null ? String(variant.dimension_width) : '')
+  const [dimensionHeight, setDimensionHeight] = useState(variant?.dimension_height != null ? String(variant.dimension_height) : '')
+  const [dimensionLength, setDimensionLength] = useState(variant?.dimension_length != null ? String(variant.dimension_length) : '')
   const [weightKg, setWeightKg] = useState(variant?.weight_kg != null ? String(variant.weight_kg) : '')
-  const [attributes, setAttributes] = useState<Record<string, string>>(variant?.attributes ?? {})
+  const [attributes] = useState<Record<string, string>>(variant?.attributes ?? {})
+  const [variantDesc, setVariantDesc] = useState(variant?.description ?? '')
+  const [barcode, setBarcode] = useState(variant?.barcode ?? '')
+  const [barcodeSecondary, setBarcodeSecondary] = useState(variant?.barcode_secondary ?? '')
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-
-  const axisGroups = [1, 2, 3] as const
-  const getAxisOptions = (axis: number) => attributeOptions.filter((o) => o.axis === axis)
-
-  const handleAttrChange = (axis: number, val: string) => {
-    setAttributes((prev) => {
-      if (!val) { const next = { ...prev }; delete next[String(axis)]; return next }
-      return { ...prev, [String(axis)]: val }
-    })
-  }
 
   const handleSave = async () => {
     const e: Record<string, string> = {}
@@ -283,13 +163,19 @@ function VariantFormModal({ productId, variant, units, attributeOptions, onClose
         cost_price: costPrice ? Number(costPrice) : undefined,
         selling_price: sellingPrice ? Number(sellingPrice) : undefined,
         unit_id: unitId ? Number(unitId) : undefined,
+        unit_quantity: unitQuantity ? Number(unitQuantity) : undefined,
         min_stock: minStock ? Number(minStock) : undefined,
         reorder_point: reorderPoint ? Number(reorderPoint) : undefined,
         track_lot_expiry: trackLot,
         track_serial: trackSerial,
         is_active: isActive,
-        dimensions: dimensions || undefined,
+        dimension_width: dimensionWidth ? Number(dimensionWidth) : undefined,
+        dimension_height: dimensionHeight ? Number(dimensionHeight) : undefined,
+        dimension_length: dimensionLength ? Number(dimensionLength) : undefined,
         weight_kg: weightKg ? Number(weightKg) : undefined,
+        description: variantDesc.trim() || undefined,
+        barcode: barcode.trim() || undefined,
+        barcode_secondary: barcodeSecondary.trim() || undefined,
         attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
       }
       if (isEdit && variant) {
@@ -324,33 +210,20 @@ function VariantFormModal({ productId, variant, units, attributeOptions, onClose
             </div>
           </div>
 
-          {/* Attribute selectors — searchable + creatable */}
-          {axisGroups.some((a) => getAxisOptions(a).length > 0) && (
-            <div>
-              <label className={labelCls}>คุณลักษณะสินค้า</label>
-              <div className="grid grid-cols-3 gap-3">
-                {axisGroups.map((axis) => {
-                  const opts = getAxisOptions(axis)
-                  if (opts.length === 0) return null
-                  const axisLabel = opts[0]?.label ?? `แบบสินค้า ${axis}`
-                  return (
-                    <div key={axis}>
-                      <label className="mb-1 block text-xs text-gray-500">{axisLabel}</label>
-                      <AttrOptionDropdown
-                        productId={productId}
-                        axis={axis}
-                        axisLabel={axisLabel}
-                        options={opts}
-                        value={attributes[String(axis)] ?? ''}
-                        onChange={(val) => handleAttrChange(axis, val)}
-                        onCreated={onAttrOptionCreated}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
+          {/* Attribute inputs — plain text */}
+          <div>
+            <label className={labelCls}>คุณลักษณะสินค้า</label>
+            <div className="overflow-hidden rounded-lg border border-gray-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+              <RichTextToolbar />
+              <textarea 
+                rows={5}
+                value={variantDesc}
+                onChange={(e) => setVariantDesc(e.target.value)}
+                className="w-full border-0 px-3 py-2.5 text-sm text-gray-700 focus:outline-none resize-y bg-white"
+                placeholder="รายละเอียดสินค้า..."
+              />
             </div>
-          )}
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -366,10 +239,21 @@ function VariantFormModal({ productId, variant, units, attributeOptions, onClose
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className={labelCls}>หน่วยนับ</label>
-              <select value={unitId} onChange={(e) => setUnitId(e.target.value)} className={fieldCls}>
-                <option value="">— เลือกหน่วย —</option>
-                {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+              <div className="flex gap-1.5">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={unitQuantity}
+                  onChange={(e) => setUnitQuantity(e.target.value)}
+                  className={cn(fieldCls, 'w-20 shrink-0 text-center')}
+                  placeholder="1"
+                />
+                <select value={unitId} onChange={(e) => setUnitId(e.target.value)} title="หน่วยนับ" className={cn(fieldCls, 'min-w-0 flex-1')}>
+                  <option value="">— เลือกหน่วย —</option>
+                  {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
             </div>
             <div>
               <label className={labelCls}>สต็อกขั้นต่ำ</label>
@@ -381,14 +265,33 @@ function VariantFormModal({ productId, variant, units, attributeOptions, onClose
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-4 gap-3">
             <div>
-              <label className={labelCls}>มิติ (เช่น 10x5x3 cm)</label>
-              <input value={dimensions} onChange={(e) => setDimensions(e.target.value)} className={fieldCls} placeholder="10x5x3 cm" />
+              <label className={labelCls}>กว้าง (ซม.)</label>
+              <input type="number" step="0.1" min="0" value={dimensionWidth} onChange={(e) => setDimensionWidth(e.target.value)} className={fieldCls} placeholder="0" />
+            </div>
+            <div>
+              <label className={labelCls}>สูง (ซม.)</label>
+              <input type="number" step="0.1" min="0" value={dimensionHeight} onChange={(e) => setDimensionHeight(e.target.value)} className={fieldCls} placeholder="0" />
+            </div>
+            <div>
+              <label className={labelCls}>ยาว (ซม.)</label>
+              <input type="number" step="0.1" min="0" value={dimensionLength} onChange={(e) => setDimensionLength(e.target.value)} className={fieldCls} placeholder="0" />
             </div>
             <div>
               <label className={labelCls}>น้ำหนัก (กก.)</label>
               <input type="number" step="0.001" min="0" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} className={fieldCls} placeholder="0.000" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>บาร์โค้ดหลัก</label>
+              <input value={barcode} onChange={(e) => setBarcode(e.target.value)} className={fieldCls} placeholder="เช่น 8851234567890" />
+            </div>
+            <div>
+              <label className={labelCls}>บาร์โค้ดรอง</label>
+              <input value={barcodeSecondary} onChange={(e) => setBarcodeSecondary(e.target.value)} className={fieldCls} placeholder="เช่น OEM code" />
             </div>
           </div>
 
@@ -429,7 +332,6 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
   const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
-  const [deletingOptId, setDeletingOptId] = useState<number | null>(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -464,14 +366,6 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
     } catch { } finally { setDeletingId(null) }
   }
 
-  const handleDeleteAttrOption = async (optId: number) => {
-    setDeletingOptId(optId)
-    try {
-      await productService.deleteProductAttributeOption(productId, optId)
-      setAttrOptions((prev) => prev.filter((o) => o.id !== optId))
-    } catch { } finally { setDeletingOptId(null) }
-  }
-
   // Build axis label map
   const axisLabels: Record<number, string> = {}
   for (const o of attrOptions) {
@@ -504,34 +398,6 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
 
   return (
     <div className="space-y-5">
-      {/* ── Attribute Options (chips) ── */}
-      {([1, 2, 3] as const).some((a) => (axisGroups[a]?.length ?? 0) > 0) && (
-        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-2">
-          {([1, 2, 3] as const).map((axis) => {
-            const opts = axisGroups[axis] ?? []
-            if (opts.length === 0) return null
-            const label = opts[0]?.label ?? `แบบสินค้า ${axis}`
-            return (
-              <div key={axis} className="flex flex-wrap items-center gap-2">
-                <span className="w-20 shrink-0 text-xs font-medium text-gray-500">{label}:</span>
-                {opts.map((opt) => (
-                  <span key={opt.id} className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium', AXIS_COLORS[axis])}>
-                    {opt.value}
-                    <button type="button" disabled={deletingOptId === opt.id}
-                      onClick={() => handleDeleteAttrOption(opt.id)}
-                      className="ml-0.5 opacity-50 hover:opacity-100 disabled:opacity-30">
-                      <XIcon size={9} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      <div className="border-t border-gray-100" />
-
       {/* ── Variants Table ── */}
       <div>
         <div className="mb-3 flex items-center justify-between">
@@ -584,7 +450,12 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
                       {v.min_stock != null || v.reorder_point != null ? `${v.min_stock ?? 0} / ${v.reorder_point ?? 0}` : '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">
-                      {[v.dimensions, v.weight_kg != null ? `${v.weight_kg}kg` : null].filter(Boolean).join(' · ') || '—'}
+                      {[
+                        (v.dimension_width != null || v.dimension_height != null || v.dimension_length != null)
+                          ? `${v.dimension_width ?? 0}×${v.dimension_height ?? 0}×${v.dimension_length ?? 0} ซม.`
+                          : (v.dimensions ?? null),
+                        v.weight_kg != null ? `${v.weight_kg}kg` : null,
+                      ].filter(Boolean).join(' · ') || '—'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="relative inline-block">
@@ -629,13 +500,13 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
           <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-500">หน่วย & บรรจุภัณฑ์</p>
           <div className="space-y-1.5 text-sm text-gray-700">
-            <div className="flex gap-1.5"><span className="text-gray-500 shrink-0">หน่วยหลัก:</span><span className="font-medium">{(product as any).base_unit?.name ?? (product as any).unit?.name ?? '—'}</span></div>
-            <div className="flex gap-1.5"><span className="text-gray-500 shrink-0">น้ำหนัก:</span><span className="font-medium">{(product as any).weight_grams != null ? `${(product as any).weight_grams} กรัม` : '—'}</span></div>
+            <div className="flex gap-1.5"><span className="text-gray-500 shrink-0">หน่วยหลัก:</span><span className="font-medium">{product.base_unit?.name ?? product.unit?.name ?? '—'}</span></div>
+            <div className="flex gap-1.5"><span className="text-gray-500 shrink-0">น้ำหนัก:</span><span className="font-medium">{product.weight_grams != null ? `${product.weight_grams} กรัม` : '—'}</span></div>
             <div className="flex gap-1.5">
               <span className="text-gray-500 shrink-0">ขนาดสินค้า:</span>
               <span className="font-medium">
-                {(product as any).width_cm && (product as any).height_cm && (product as any).length_cm
-                  ? `${(product as any).width_cm} × ${(product as any).height_cm} × ${(product as any).length_cm} ซม.`
+                {product.width_cm && product.height_cm && product.length_cm
+                  ? `${product.width_cm} × ${product.height_cm} × ${product.length_cm} ซม.`
                   : '—'}
               </span>
             </div>
@@ -666,7 +537,6 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
           attributeOptions={attrOptions}
           onClose={() => { setShowModal(false); setEditingVariant(null) }}
           onSaved={() => { setShowModal(false); setEditingVariant(null); loadData() }}
-          onAttrOptionCreated={(opt) => setAttrOptions((prev) => [...prev, opt])}
         />
       )}
     </div>
@@ -698,9 +568,11 @@ export function ProductFormPage() {
   const [form, setForm] = useState<FormValues>({
     sku: '', name: '', product_type: 'standard', brand_id: '', category_id: '', base_unit_id: '',
     description: '', min_quantity: '0', is_active: true, vat_code: '', vendor_id: '',
-    weight_grams: '', height_cm: '', width_cm: '', length_cm: '',
+    weight_grams: '', height_cm: '', width_cm: '', length_cm: '', selling_price: '',
   })
-  const [errors, setErrors] = useState<Partial<Record<keyof FormValues, string>>>({})
+  const [errors, setErrors] = useState<Partial<Record<keyof FormValues, string>>>({})  
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
 
   useEffect(() => {
     apiClient.get('/brands').then((r) => setBrands(r.data?.data || [])).catch(() => {})
@@ -728,7 +600,9 @@ export function ProductFormPage() {
           height_cm: p.height_cm != null ? String(p.height_cm) : '',
           width_cm: p.width_cm != null ? String(p.width_cm) : '',
           length_cm: p.length_cm != null ? String(p.length_cm) : '',
+          selling_price: p.selling_price != null ? String(p.selling_price) : (p.pricing_tiers?.[0]?.selling_price != null ? String(p.pricing_tiers[0].selling_price) : ''),
         })
+        setTags(Array.isArray(p.tags) ? p.tags.map((t: any) => (typeof t === 'string' ? t : t.name)) : [])
         // Set images from product.images if available
         if (Array.isArray(p.images) && p.images.length > 0) {
           setImages(p.images)
@@ -802,6 +676,8 @@ export function ProductFormPage() {
         height_cm: form.height_cm ? Number(form.height_cm) : undefined,
         width_cm: form.width_cm ? Number(form.width_cm) : undefined,
         length_cm: form.length_cm ? Number(form.length_cm) : undefined,
+        selling_price: form.selling_price ? Number(form.selling_price) : undefined,
+        tags: (() => { const all = [...tags, ...(tagInput.trim() ? [tagInput.trim()] : [])]; return all.length > 0 ? all : undefined })(),
       }
       if (isEditing && id) {
         await productService.updateProduct(productId, payload)
@@ -826,7 +702,7 @@ export function ProductFormPage() {
       </div>
 
       {/* 2-column layout */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
+      <div className={cn('grid grid-cols-1 gap-6', isEditing && 'lg:grid-cols-[1fr_320px]')}>
 
         {/* ====== LEFT: Edit Form ====== */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
@@ -912,7 +788,44 @@ export function ProductFormPage() {
             </div>
           </div>
 
-          {/* Row 5: ขนาด / น้ำหนัก */}
+          {/* Row 5: ราคา + แท็ก */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>ราคา</label>
+              <input type="number" step="0.01" min="0" value={form.selling_price} onChange={(e) => patchForm('selling_price', e.target.value)} className={fieldCls} placeholder="0.00" />
+            </div>
+            <div>
+              <label className={labelCls}>แท็ก / คำค้นหา</label>
+              <div className="min-h-[38px] rounded-lg border border-gray-200 px-2.5 py-1.5 flex flex-wrap gap-1.5 items-center focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 bg-white">
+                {tags.map((tag) => (
+                  <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                    {tag}
+                    <button type="button" onClick={() => setTags((prev) => prev.filter((t) => t !== tag))} className="text-blue-400 hover:text-blue-700"><XIcon size={10} /></button>
+                  </span>
+                ))}
+                <input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+                      e.preventDefault()
+                      const t = tagInput.trim()
+                      if (!tags.includes(t)) setTags((prev) => [...prev, t])
+                      setTagInput('')
+                    }
+                  }}
+                  onBlur={() => {
+                    const t = tagInput.trim()
+                    if (t) { if (!tags.includes(t)) setTags((prev) => [...prev, t]); setTagInput('') }
+                  }}
+                  placeholder={tags.length === 0 ? 'พิมพ์แล้วกด Enter' : ''}
+                  className="flex-1 min-w-[80px] bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Row 6: ขนาด / น้ำหนัก */}
           <div className="grid grid-cols-4 gap-4">
             <div>
               <label className={labelCls}>น้ำหนัก (กรัม)</label>
@@ -932,20 +845,24 @@ export function ProductFormPage() {
             </div>
           </div>
 
-          {/* Row 6: คำอธิบาย */}
+          {/* Row 7: คำอธิบาย */}
           <div>
             <label className={labelCls}>คำอธิบาย/คุณสมบัติของสินค้า</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => patchForm('description', e.target.value)}
-              rows={4}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
-              placeholder="รายละเอียดสินค้า..."
-            />
+            <div className="overflow-hidden rounded-lg border border-gray-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+              <RichTextToolbar />
+              <textarea
+                value={form.description}
+                onChange={(e) => patchForm('description', e.target.value)}
+                rows={5}
+                className="w-full border-0 px-3 py-2.5 text-sm text-gray-700 focus:outline-none resize-y bg-white"
+                placeholder="รายละเอียดสินค้า..."
+              />
+            </div>
           </div>
         </div>
 
-        {/* ====== RIGHT: Images Card ====== */}
+        {/* ====== RIGHT: Images Card (edit only) ====== */}
+        {isEditing && (
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm flex flex-col gap-4">
           <h2 className="text-base font-semibold text-gray-900">รูปภาพ</h2>
 
@@ -1006,9 +923,11 @@ export function ProductFormPage() {
             <p className="text-center text-xs text-gray-400">ยังไม่มีรูปภาพ</p>
           )}
         </div>
+        )}
       </div>
 
-      {/* ====== Bottom Tabs Section ====== */}
+      {/* ====== Bottom Tabs Section (edit only) ====== */}
+      {isEditing && (
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex px-4">
@@ -1048,6 +967,7 @@ export function ProductFormPage() {
           )}
         </div>
       </div>
+      )}
 
       {/* ====== Action Bar ====== */}
       <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-4 shadow-sm">
