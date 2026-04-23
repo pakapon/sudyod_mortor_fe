@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { productService } from '@/api/productService'
 import { hrService } from '@/api/hrService'
@@ -12,6 +12,7 @@ import type {
   AttributeOption,
   ProductPayload,
   ProductType,
+  BOMItem,
 } from '@/types/product'
 import { cn } from '@/lib/utils'
 
@@ -35,11 +36,10 @@ interface FormValues {
   selling_price: string
 }
 
-type BottomTabKey = 'sku' | 'pricing' | 'bundle' | 'spare'
+type BottomTabKey = 'sku' | 'bundle' | 'spare'
 const BOTTOM_TABS: { key: BottomTabKey; label: string }[] = [
   { key: 'sku', label: 'รหัสสินค้า/แบบสินค้า' },
-  { key: 'pricing', label: 'ต้นทุน & ราคาขาย' },
-  { key: 'bundle', label: 'ชุดโอละ' },
+  { key: 'bundle', label: 'ชุดอะไหล่' },
   { key: 'spare', label: 'อะไหล่' },
 ]
 
@@ -116,6 +116,407 @@ function SortIcon() {
 // ─── Form field styles ────────────────────────────────────────────────────────
 const fieldCls = 'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
 const labelCls = 'mb-1.5 block text-sm font-medium text-gray-700'
+
+// ─── BOM Types ───────────────────────────────────────────────────────────────
+interface BomComponentRow {
+  sku: string
+  quantity: number
+}
+
+// ─── SKU Dropdown Search ──────────────────────────────────────────────────────
+function SkuSearchInput({ value, onChange, excludeProductId }: {
+  value: string
+  onChange: (sku: string) => void
+  excludeProductId?: number
+}) {
+  const [query, setQuery] = useState(value)
+  const [options, setOptions] = useState<{ sku: string; name: string }[]>([])
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { setQuery(value) }, [value])
+
+  const doSearch = (term: string) => {
+    if (!term.trim()) { setOptions([]); setOpen(false); return }
+    setLoading(true)
+    productService.searchVariants({ search: term, exclude_product_id: excludeProductId, limit: 20 })
+      .then((res) => {
+        const items: { sku: string; name: string }[] = res.data?.data ?? []
+        setOptions(items)
+        setOpen(true)
+      })
+      .catch(() => setOptions([]))
+      .finally(() => setLoading(false))
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setQuery(val)
+    onChange(val)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => doSearch(val), 300)
+  }
+
+  const handleSelect = (sku: string) => {
+    setQuery(sku)
+    onChange(sku)
+    setOpen(false)
+    setOptions([])
+  }
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        value={query}
+        onChange={handleChange}
+        onFocus={() => { if (query && options.length > 0) setOpen(true) }}
+        className={fieldCls}
+        placeholder="พิมพ์เพื่อค้นหา SKU"
+        autoComplete="off"
+      />
+      {loading && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+      )}
+      {open && options.length > 0 && (
+        <ul className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white py-1 shadow-lg max-h-48 overflow-y-auto">
+          {options.map((opt) => (
+            <li
+              key={opt.sku}
+              onMouseDown={() => handleSelect(opt.sku)}
+              className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-blue-50"
+            >
+              <span className="font-mono text-xs font-semibold text-gray-800">{opt.sku}</span>
+              <span className="truncate text-xs text-gray-500">{opt.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && !loading && options.length === 0 && query.trim() && (
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-400 shadow-lg">
+          ไม่พบ SKU ที่ตรงกัน
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── BOM Modal (Add/Edit per parent_sku — replace-all) ───────────────────────
+function BomModal({ productId, variants, initial, onClose, onSaved }: {
+  productId: number
+  variants: ProductVariant[]
+  initial?: { parentSku: string; components: BomComponentRow[]; stockPolicy: 'auto' | 'manual' } | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const isEdit = Boolean(initial)
+  const [parentSku, setParentSku] = useState(initial?.parentSku ?? '')
+  const [components, setComponents] = useState<BomComponentRow[]>(
+    initial?.components.length ? initial.components : [{ sku: '', quantity: 1 }]
+  )
+  const [stockPolicy, setStockPolicy] = useState<'auto' | 'manual'>(initial?.stockPolicy ?? 'auto')
+  const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<string[]>([])
+
+  const addRow = () => setComponents((prev) => [...prev, { sku: '', quantity: 1 }])
+  const removeRow = (i: number) => setComponents((prev) => prev.filter((_, idx) => idx !== i))
+  const updateRow = (i: number, field: keyof BomComponentRow, val: string | number) =>
+    setComponents((prev) => prev.map((row, idx) => idx === i ? { ...row, [field]: val } : row))
+
+  const handleSave = async () => {
+    const errs: string[] = []
+    if (!parentSku.trim()) errs.push('กรุณาเลือก Parent SKU')
+    const valid = components.filter((r) => r.sku.trim())
+    if (valid.length === 0) errs.push('กรุณากรอก SKU ชิ้นส่วนอย่างน้อย 1 รายการ')
+    if (errs.length) { setErrors(errs); return }
+    setSaving(true)
+    setErrors([])
+    try {
+      await productService.createBOMSet(productId, {
+        parent_sku: parentSku.trim(),
+        components: valid.map((r) => ({ sku: r.sku.trim(), quantity: r.quantity })),
+        bom_stock_policy: stockPolicy,
+      })
+      onSaved()
+    } catch {
+      setErrors(['เกิดข้อผิดพลาด กรุณาตรวจสอบ SKU แล้วลองใหม่'])
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-5 space-y-4 max-h-[80vh] overflow-y-auto">
+          <h3 className="text-base font-semibold text-gray-900">{isEdit ? 'แก้ไขชุดอะไหล่' : 'เพิ่มชุดอะไหล่'}</h3>
+
+          <div>
+            <label className={labelCls}>Parent SKU (สินค้าชุด)</label>
+            <select
+              value={parentSku}
+              onChange={(e) => { setParentSku(e.target.value); setErrors([]) }}
+              className={cn(fieldCls, !parentSku && errors.length > 0 && 'border-red-400')}
+              disabled={isEdit}
+            >
+              <option value="">— เลือก SKU —</option>
+              {variants.map((v) => (
+                <option key={v.id} value={v.sku}>{v.sku} – {v.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div className="mb-2 grid grid-cols-[1fr_6rem_1.75rem] gap-2 items-end">
+              <label className={cn(labelCls, 'mb-0')}>ชิ้นส่วน (Component SKU)</label>
+              <label className={cn(labelCls, 'mb-0 text-center')}>จำนวน</label>
+              <div />
+            </div>
+            <div className="space-y-2">
+              {components.map((row, i) => (
+                <div key={i} className="grid grid-cols-[1fr_6rem_1.75rem] gap-2 items-center">
+                  <SkuSearchInput
+                    value={row.sku}
+                    onChange={(val) => updateRow(i, 'sku', val)}
+                    excludeProductId={productId}
+                  />
+                  <input
+                    type="number"
+                    min="0.001"
+                    step="any"
+                    value={row.quantity}
+                    onChange={(e) => updateRow(i, 'quantity', Number(e.target.value))}
+                    className={cn(fieldCls, 'text-center')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeRow(i)}
+                    className="flex items-center justify-center text-red-400 hover:text-red-600"
+                  >
+                    <TrashIcon size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addRow}
+              className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
+            >
+              <PlusIcon size={11} /> +เพิ่มชิ้นส่วน
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className={cn(labelCls, 'mb-0 shrink-0 w-36')}>นโยบายการตัดสต็อก</label>
+            <select
+              value={stockPolicy}
+              onChange={(e) => setStockPolicy(e.target.value as 'auto' | 'manual')}
+              className={cn(fieldCls, 'flex-1')}
+            >
+              <option value="auto">ตัดสต็อกอัตโนมัติ</option>
+              <option value="manual">ไม่ตัดสต็อก</option>
+            </select>
+          </div>
+
+          {errors.length > 0 && (
+            <div className="rounded-lg bg-red-50 px-4 py-2">
+              {errors.map((e, i) => <p key={i} className="text-xs text-red-600">{e}</p>)}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-100">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleSave}
+            className="flex-1 rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60"
+          >
+            {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            ยกเลิก
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── BOM Tab (Edit) ───────────────────────────────────────────────────────────
+function BomTabEdit({ productId }: { productId: number }) {
+  const [bom, setBom] = useState<BOMItem[]>([])
+  const [variants, setVariants] = useState<ProductVariant[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [editingGroup, setEditingGroup] = useState<{ parentSku: string; components: BomComponentRow[]; stockPolicy: 'auto' | 'manual' } | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+
+  const loadBom = async () => {
+    setLoading(true)
+    try {
+      const [bomRes, varRes] = await Promise.all([
+        productService.getProductBOM(productId),
+        productService.getProductVariants(productId),
+      ])
+      setBom(Array.isArray(bomRes.data.data) ? bomRes.data.data : [])
+      setVariants(Array.isArray(varRes.data.data) ? varRes.data.data : [])
+    } catch { } finally { setLoading(false) }
+  }
+
+  useEffect(() => { loadBom() }, [productId])
+
+  useEffect(() => {
+    const close = () => setOpenMenuId(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [])
+
+  const handleEdit = (item: BOMItem) => {
+    const parentSku = item.parent_variant?.sku ?? ''
+    const groupItems = bom.filter((b) => b.parent_variant_id === item.parent_variant_id)
+    setEditingGroup({
+      parentSku,
+      components: groupItems.map((b) => ({ sku: b.child_variant?.sku ?? '', quantity: Number(b.quantity) })),
+      stockPolicy: (item.parent_variant?.bom_stock_policy as 'auto' | 'manual') ?? 'auto',
+    })
+    setOpenMenuId(null)
+  }
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('ยืนยันการลบรายการชิ้นส่วนนี้?')) return
+    setDeletingId(id)
+    try {
+      await productService.deleteBOMItem(productId, id)
+      setBom((prev) => prev.filter((item) => item.id !== id))
+    } catch { } finally { setDeletingId(null) }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-2 animate-pulse">
+        <div className="h-8 w-32 rounded bg-gray-100" />
+        <div className="h-32 rounded-xl bg-gray-100" />
+      </div>
+    )
+  }
+
+  const POLICY_LABELS: Record<string, string> = { auto: 'ตัดสต็อกอัตโนมัติ', manual: 'ไม่ตัดสต็อก' }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-800">ชุดอะไหล่ (BOM)</h3>
+        <button
+          type="button"
+          onClick={() => setShowAddModal(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+        >
+          <PlusIcon size={13} /> + เพิ่มชุด
+        </button>
+      </div>
+
+      {bom.length === 0 ? (
+        <div className="rounded-xl border-2 border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+          ยังไม่มีชุดอะไหล่ — กด "+ เพิ่มชุด" เพื่อเริ่มต้น
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="w-full text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Parent SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Component SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ชื่อชิ้นส่วน</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">หน่วย</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">นโยบาย</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {bom.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 font-mono text-xs font-medium text-gray-800">{item.parent_variant?.sku ?? '—'}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.child_variant?.sku ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-900">{item.child_variant?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">{Number(item.quantity).toLocaleString('th-TH')}</td>
+                  <td className="px-4 py-3 text-gray-600">{item.child_variant?.unit?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{POLICY_LABELS[item.parent_variant?.bom_stock_policy ?? ''] ?? '—'}</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="relative inline-block">
+                      <button
+                        type="button"
+                        disabled={deletingId === item.id}
+                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.id ? null : item.id) }}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40"
+                      >
+                        <DotsIcon />
+                      </button>
+                      {openMenuId === item.id && (
+                        <div className="absolute right-0 z-20 mt-1 w-36 rounded-xl border border-gray-200 bg-white shadow-lg py-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            onClick={() => handleEdit(item)}
+                          >
+                            <EditPenIcon size={13} /> แก้ไขชุดนี้
+                          </button>
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                            onClick={() => { setOpenMenuId(null); handleDelete(item.id) }}
+                          >
+                            <TrashIcon size={13} /> ลบชิ้นส่วน
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showAddModal && (
+        <BomModal
+          productId={productId}
+          variants={variants}
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => { setShowAddModal(false); loadBom() }}
+        />
+      )}
+      {editingGroup && (
+        <BomModal
+          productId={productId}
+          variants={variants}
+          initial={editingGroup}
+          onClose={() => setEditingGroup(null)}
+          onSaved={() => { setEditingGroup(null); loadBom() }}
+        />
+      )}
+    </div>
+  )
+}
 
 // ─── Variant Form Modal ───────────────────────────────────────────────────────
 interface VariantFormModalProps {
@@ -377,16 +778,6 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
     axisGroups[o.axis].push(o)
   }
 
-  const formatAttributes = (attrs?: Record<string, string>) => {
-    if (!attrs || Object.keys(attrs).length === 0) return '—'
-    return Object.entries(attrs)
-      .map(([axis, val]) => {
-        const label = axisLabels[Number(axis)]
-        return label ? `${label}=${val}` : val
-      })
-      .join(' / ')
-  }
-
   if (loading) {
     return (
       <div className="space-y-4 animate-pulse">
@@ -437,8 +828,10 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
                       <span className="font-mono text-xs font-medium text-gray-800">{v.sku}</span>
                     </td>
                     <td className="px-4 py-3 text-gray-900">{v.name}</td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{formatAttributes(v.attributes)}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs font-mono">—</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{v.description || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs font-mono">
+                      {[v.barcode, v.barcode_secondary].filter(Boolean).join(' / ') || '—'}
+                    </td>
                     <td className="px-4 py-3 text-gray-700">{v.unit?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-center">
                       {v.track_lot_expiry ? <span className="text-blue-600"><CheckIcon /></span> : <span className="text-gray-300">–</span>}
@@ -956,11 +1349,11 @@ export function ProductFormPage() {
           {activeTab === 'sku' && !isEditing && (
             <div className="py-8 text-center text-sm text-gray-400">กรุณาบันทึกสินค้าก่อน เพื่อจัดการรหัสสินค้า/แบบสินค้า</div>
           )}
-          {activeTab === 'pricing' && (
-            <div className="py-8 text-center text-sm text-gray-400">จัดการราคาได้ในหน้าดูรายละเอียดสินค้า</div>
+          {activeTab === 'bundle' && isEditing && product && (
+            <BomTabEdit productId={productId} />
           )}
-          {activeTab === 'bundle' && (
-            <div className="py-8 text-center text-sm text-gray-400">ยังไม่มีข้อมูลชุดโอละ</div>
+          {activeTab === 'bundle' && !isEditing && (
+            <div className="py-8 text-center text-sm text-gray-400">กรุณาบันทึกสินค้าก่อน เพื่อจัดการชุดอะไหล่</div>
           )}
           {activeTab === 'spare' && (
             <div className="py-8 text-center text-sm text-gray-400">ยังไม่มีรายการอะไหล่</div>

@@ -4,7 +4,6 @@ import { productService } from '@/api/productService'
 import type {
   Product,
   ProductImage,
-  ProductPricing,
   BOMItem,
   ProductVariant,
   AttributeOption,
@@ -13,12 +12,11 @@ import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 
-type BottomTabKey = 'sku' | 'pricing' | 'bundle' | 'spare'
+type BottomTabKey = 'sku' | 'bundle' | 'spare'
 
 const BOTTOM_TABS: { key: BottomTabKey; label: string }[] = [
   { key: 'sku', label: 'รหัสสินค้า/แบบสินค้า' },
-  { key: 'pricing', label: 'ต้นทุน & ราคาขาย' },
-  { key: 'bundle', label: 'ชุดโอละ' },
+  { key: 'bundle', label: 'ชุดอะไหล่' },
   { key: 'spare', label: 'อะไหล่' },
 ]
 
@@ -118,15 +116,6 @@ function SkuTabView({ productId, product }: { productId: number; product: Produc
   }
 
   // Format attributes string: "Size=S / สี=ขาว"
-  const formatAttributes = (attrs?: Record<string, string>) => {
-    if (!attrs || Object.keys(attrs).length === 0) return '—'
-    return Object.entries(attrs)
-      .map(([axis, val]) => {
-        const label = axisLabels[Number(axis)]
-        return label ? `${label}=${val}` : val
-      })
-      .join(' / ')
-  }
 
   if (loading) {
     return (
@@ -170,7 +159,7 @@ function SkuTabView({ productId, product }: { productId: number; product: Produc
                       <span className="font-mono text-xs font-medium text-gray-800">{v.sku}</span>
                     </td>
                     <td className="px-4 py-3 text-gray-900">{v.name}</td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{formatAttributes(v.attributes)}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{v.description || '—'}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs font-mono">
                       {[v.barcode, v.barcode_secondary].filter(Boolean).join(' / ') || '—'}
                     </td>
@@ -268,7 +257,6 @@ export function ProductDetailPage() {
   const [activeTab, setActiveTab] = useState<BottomTabKey>('sku')
   const [product, setProduct] = useState<Product | null>(null)
   const [images, setImages] = useState<ProductImage[]>([])
-  const [pricing, setPricing] = useState<ProductPricing[]>([])
   const [bom, setBom] = useState<BOMItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -294,14 +282,7 @@ export function ProductDetailPage() {
 
   useEffect(() => {
     if (!productId) return
-    if (activeTab === 'pricing') {
-      productService.getProductPricing(productId)
-        .then((res) => {
-          const d = res.data.data
-          setPricing(Array.isArray(d) ? d : d ? [d as unknown as ProductPricing] : [])
-        })
-        .catch(() => {})
-    } else if (activeTab === 'spare') {
+    if (activeTab === 'bundle') {
       productService.getProductBOM(productId)
         .then((res) => setBom(Array.isArray(res.data.data) ? res.data.data : []))
         .catch(() => {})
@@ -351,7 +332,6 @@ export function ProductDetailPage() {
   const mainImage = images[0]
   const galleryImages = images.slice(1, 7)
   const sellingPrice = product.selling_price ?? product.pricing?.selling_price ?? product.pricing_tiers?.[0]?.selling_price
-  const costPrice = product.cost_price ?? product.pricing?.cost_price ?? product.pricing_tiers?.[0]?.cost_price
 
   return (
     <div className="space-y-6">
@@ -517,108 +497,48 @@ export function ProductDetailPage() {
             <SkuTabView productId={productId} product={product} />
           )}
 
-          {/* Tab: ต้นทุน & ราคาขาย */}
-          {activeTab === 'pricing' && (
-            <div>
-              <h3 className="mb-4 text-sm font-semibold text-gray-800">รายการราคา</h3>
-
-              {(costPrice != null || sellingPrice != null || product.pricing?.min_price != null) && (
-                <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
-                  {costPrice != null && (
-                    <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-                      <p className="text-xs text-gray-500">ราคาทุน</p>
-                      <p className="mt-0.5 text-sm font-semibold text-gray-900">฿{Number(costPrice).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
-                    </div>
-                  )}
-                  {sellingPrice != null && (
-                    <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-                      <p className="text-xs text-gray-500">ราคาขาย</p>
-                      <p className="mt-0.5 text-sm font-semibold text-gray-900">฿{Number(sellingPrice).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
-                    </div>
-                  )}
-                  {product.pricing?.min_price != null && (
-                    <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-                      <p className="text-xs text-gray-500">ราคาต่ำสุด</p>
-                      <p className="mt-0.5 text-sm font-semibold text-gray-900">฿{Number(product.pricing.min_price).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {pricing.length === 0 ? (
-                <div className="rounded-lg border border-gray-100 py-8 text-center text-sm text-gray-400">ยังไม่มีข้อมูลระดับราคา</div>
-              ) : (
-                <div className="overflow-x-auto rounded-xl border border-gray-200">
-                  <table className="w-full text-sm">
-                    <thead className="border-b border-gray-200 bg-gray-50">
-                      <tr>
-                        <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">ระดับราคา</th>
-                        <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-semibold text-gray-500">ราคา</th>
-                        <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">หน่วย</th>
-                        <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-gray-500">สกุลเงิน</th>
-                        <th className="whitespace-nowrap px-4 py-3 text-center text-xs font-semibold text-gray-500">รวมภาษี</th>
-                        <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-semibold text-gray-500">ส่วนลดสูงสุด</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {pricing.map((p) => (
-                        <tr key={p.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-900">{p.tier_name ?? '—'}</td>
-                          <td className="px-4 py-3 text-right tabular-nums text-gray-900">
-                            {p.selling_price != null
-                              ? Number(p.selling_price).toLocaleString('th-TH', { minimumFractionDigits: 2 })
-                              : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">{product.base_unit?.name ?? product.unit?.name ?? '—'}</td>
-                          <td className="px-4 py-3 text-gray-600">{p.currency ?? 'THB'}</td>
-                          <td className="px-4 py-3 text-center">
-                            {p.include_tax === true ? <span className="font-semibold text-green-600">✓</span>
-                              : p.include_tax === false ? <span className="text-gray-400">✗</span>
-                                : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-right text-gray-600">{p.max_discount_pct != null ? `${p.max_discount_pct}%` : '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Tab: ชุดโอละ */}
+          {/* Tab: ชุดอะไหล่ (BOM) */}
           {activeTab === 'bundle' && (
-            <div className="py-8 text-center text-sm text-gray-400">ยังไม่มีข้อมูลชุดโอละ</div>
-          )}
-
-          {/* Tab: อะไหล่ (BOM) */}
-          {activeTab === 'spare' && (
             bom.length === 0 ? (
-              <div className="py-8 text-center text-sm text-gray-400">ยังไม่มีรายการอะไหล่</div>
+              <div className="rounded-xl border-2 border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+                ยังไม่มีชุดอะไหล่
+              </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-gray-200">
                 <table className="w-full text-sm">
                   <thead className="border-b border-gray-200 bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ชิ้นส่วน</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">SKU</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Parent SKU</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Component SKU</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">ชื่อชิ้นส่วน</th>
                       <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">จำนวน</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">หน่วย</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">นโยบาย</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {bom.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-900">{item.component?.name ?? '—'}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.component?.sku ?? '—'}</td>
-                        <td className="px-4 py-3 text-right text-gray-900">{item.qty}</td>
-                        <td className="px-4 py-3 text-gray-600">{item.unit?.name ?? '—'}</td>
+                        <td className="px-4 py-3 font-mono text-xs font-medium text-gray-800">{item.parent_variant?.sku ?? '—'}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.child_variant?.sku ?? '—'}</td>
+                        <td className="px-4 py-3 text-gray-900">{item.child_variant?.name ?? '—'}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-gray-700">{Number(item.quantity).toLocaleString('th-TH')}</td>
+                        <td className="px-4 py-3 text-gray-600">{item.child_variant?.unit?.name ?? '—'}</td>
+                        <td className="px-4 py-3 text-xs text-gray-600">
+                          {item.parent_variant?.bom_stock_policy === 'auto' ? 'ตัดสต็อกอัตโนมัติ'
+                            : item.parent_variant?.bom_stock_policy === 'manual' ? 'ไม่ตัดสต็อก' : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )
+          )}
+
+          {/* Tab: อะไหล่ */}
+          {activeTab === 'spare' && (
+            <div className="py-8 text-center text-sm text-gray-400">อยู่ระหว่างพัฒนา</div>
           )}
         </div>
       </div>

@@ -10,7 +10,7 @@ import type {
   ProductUnitConversion,
   ProductUnitConversionPayload,
   BOMItem,
-  BOMItemPayload,
+  BOMSetPayload,
   ProductVariant,
   ProductVariantPayload,
   AttributeOption,
@@ -86,20 +86,21 @@ export const productService = {
   },
 
   // BOM
-  getProductBOM(id: number) {
-    return apiClient.get<ApiResponse<BOMItem[]>>(`/products/${id}/bom`)
+  getProductBOM(id: number, parentSku?: string) {
+    return apiClient.get<ApiResponse<BOMItem[]>>(`/products/${id}/bom`, { params: parentSku ? { parent_sku: parentSku } : undefined })
   },
 
-  createBOMItem(id: number, payload: BOMItemPayload) {
-    return apiClient.post<ApiResponse<BOMItem>>(`/products/${id}/bom`, payload)
-  },
-
-  updateBOMItem(productId: number, bomId: number, payload: Partial<BOMItemPayload>) {
-    return apiClient.put<ApiResponse<BOMItem>>(`/products/${productId}/bom/${bomId}`, payload)
+  createBOMSet(id: number, payload: BOMSetPayload) {
+    return apiClient.post<ApiResponse<BOMItem[]>>(`/products/${id}/bom`, payload)
   },
 
   deleteBOMItem(productId: number, bomId: number) {
     return apiClient.delete<ApiResponse<null>>(`/products/${productId}/bom/${bomId}`)
+  },
+
+  // Global variant search (for BOM component picker)
+  searchVariants(params: { search: string; exclude_product_id?: number; limit?: number }) {
+    return apiClient.get<ApiResponse<ProductVariant[]>>('/product-variants', { params })
   },
 
   // Variants

@@ -6023,10 +6023,16 @@
                                     "key": "is_active",
                                     "value": "",
                                     "disabled": true
+                                },
+                                {
+                                    "key": "variant_sku",
+                                    "value": "",
+                                    "disabled": true,
+                                    "description": "กรองสินค้าที่มี variant SKU นี้"
                                 }
                             ]
                         },
-                        "description": "รายการสินค้า (filter: search, brand_id, category_id, product_type, is_active)"
+                        "description": "รายการสินค้า (filter: search, brand_id, category_id, product_type, is_active, variant_sku)"
                     },
                     "response": [
                         {
@@ -7001,7 +7007,7 @@
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{base_url}}/products/:id/bom",
+                            "raw": "{{base_url}}/products/:id/bom?parent_sku=SET-A",
                             "host": [
                                 "{{base_url}}"
                             ],
@@ -7009,6 +7015,13 @@
                                 "products",
                                 ":id",
                                 "bom"
+                            ],
+                            "query": [
+                                {
+                                    "key": "parent_sku",
+                                    "value": "SET-A",
+                                    "description": "กรอง BOM ของ parent variant SKU นี้ (optional)"
+                                }
                             ],
                             "variable": [
                                 {
@@ -7018,7 +7031,7 @@
                                 }
                             ]
                         },
-                        "description": "รายการชิ้นส่วน BOM"
+                        "description": "รายการชิ้นส่วน BOM — กรองด้วย ?parent_sku=SET-A เพื่อดู BOM ของ variant นั้น"
                     },
                     "response": [
                         {
@@ -7032,7 +7045,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [{\"id\": 1, \"child_product\": {\"id\": 5, \"name\": \"ท่อไอเสีย\"}, \"quantity\": 1, \"unit\": {\"id\": 1, \"name\": \"ชิ้น\"}}]\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [{\n    \"id\": 1,\n    \"parent_product_id\": 10,\n    \"parent_variant_id\": 2,\n    \"child_variant_id\": 5,\n    \"child_product_id\": 3,\n    \"unit_id\": 1,\n    \"quantity\": \"1.0000\",\n    \"parent_variant\": {\"id\": 2, \"sku\": \"SET-A\", \"name\": \"ชุดเปลี่ยนถ่าย A\", \"bom_stock_policy\": \"auto\"},\n    \"child_variant\": {\"id\": 5, \"sku\": \"OIL-4L\", \"name\": \"น้ำมันเครื่อง 4L\", \"unit\": {\"id\": 1, \"name\": \"ขวด\"}},\n    \"child_product\": {\"id\": 3, \"name\": \"น้ำมันเครื่อง\"}\n  }]\n}"
                         },
                         {
                             "name": "Not Found",
@@ -7050,7 +7063,7 @@
                     ]
                 },
                 {
-                    "name": "Add BOM Component",
+                    "name": "Set BOM Components (Replace All)",
                     "request": {
                         "method": "POST",
                         "header": [
@@ -7061,7 +7074,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"child_product_id\": 5,\n    \"quantity\": 1,\n    \"unit_id\": 1\n}",
+                            "raw": "{\n    \"parent_sku\": \"SET-A\",\n    \"components\": [\n        { \"sku\": \"OIL-4L\", \"quantity\": 1 },\n        { \"sku\": \"FLT-001\", \"quantity\": 1 }\n    ],\n    \"bom_stock_policy\": \"auto\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -7082,89 +7095,15 @@
                                 {
                                     "key": "id",
                                     "value": "1",
-                                    "description": "Product ID (BOM)"
+                                    "description": "Product ID (BOM type)"
                                 }
                             ]
                         },
-                        "description": "เพิ่มชิ้นส่วน BOM"
+                        "description": "กำหนด BOM สำหรับ parent_sku — Replace All: ลบทั้งหมดของ parent_sku แล้ว insert ใหม่\nbom_stock_policy อัปเดตบน parent variant\nError: 404 ถ้า parent_sku หรือ component SKU ไม่พบ, 422 ถ้า SKU ซ้ำใน components หรือ self-reference"
                     },
                     "response": [
                         {
-                            "name": "BOM Added",
-                            "status": "Created",
-                            "code": 201,
-                            "_postman_previewlanguage": "json",
-                            "header": [
-                                {
-                                    "key": "Content-Type",
-                                    "value": "application/json"
-                                }
-                            ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\"id\": 1, \"child_product_id\": 5, \"quantity\": 1, \"unit_id\": 1}\n}"
-                        },
-                        {
-                            "name": "Validation Error",
-                            "status": "Unprocessable Entity",
-                            "code": 422,
-                            "_postman_previewlanguage": "json",
-                            "header": [
-                                {
-                                    "key": "Content-Type",
-                                    "value": "application/json"
-                                }
-                            ],
-                            "body": "{\n    \"success\": false,\n    \"message\": \"ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบ\"\n}"
-                        }
-                    ]
-                },
-                {
-                    "name": "Update BOM Component",
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n    \"quantity\": 2\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{base_url}}/products/:id/bom/:cid",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "products",
-                                ":id",
-                                "bom",
-                                ":cid"
-                            ],
-                            "variable": [
-                                {
-                                    "key": "id",
-                                    "value": "1",
-                                    "description": "Product ID"
-                                },
-                                {
-                                    "key": "cid",
-                                    "value": "1",
-                                    "description": "BOM Component ID"
-                                }
-                            ]
-                        },
-                        "description": "แก้ไข BOM"
-                    },
-                    "response": [
-                        {
-                            "name": "BOM Updated",
+                            "name": "BOM Set",
                             "status": "OK",
                             "code": 200,
                             "_postman_previewlanguage": "json",
@@ -7174,7 +7113,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"แก้ไขสำเร็จ\"\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"แก้ไขสำเร็จ\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"parent_product_id\": 10,\n      \"parent_variant_id\": 2,\n      \"child_variant_id\": 5,\n      \"child_product_id\": 3,\n      \"unit_id\": 1,\n      \"quantity\": \"1.0000\",\n      \"parent_variant\": {\"id\": 2, \"sku\": \"SET-A\", \"name\": \"ชุดเปลี่ยนถ่าย A\", \"bom_stock_policy\": \"auto\"},\n      \"child_variant\": {\"id\": 5, \"sku\": \"OIL-4L\", \"name\": \"น้ำมันเครื่อง 4L\", \"unit\": {\"id\": 1, \"name\": \"ขวด\"}},\n      \"child_product\": {\"id\": 3, \"name\": \"น้ำมันเครื่อง\"}\n    }\n  ]\n}"
                         },
                         {
                             "name": "Validation Error",
@@ -7257,7 +7196,7 @@
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{base_url}}/products/:id/bom/availability",
+                            "raw": "{{base_url}}/products/:id/bom/availability?parent_sku=SET-A",
                             "host": [
                                 "{{base_url}}"
                             ],
@@ -7267,6 +7206,13 @@
                                 "bom",
                                 "availability"
                             ],
+                            "query": [
+                                {
+                                    "key": "parent_sku",
+                                    "value": "SET-A",
+                                    "description": "กรองสต็อกของ parent variant SKU นี้ (optional)"
+                                }
+                            ],
                             "variable": [
                                 {
                                     "key": "id",
@@ -7275,7 +7221,7 @@
                                 }
                             ]
                         },
-                        "description": "ตรวจสอบสต็อกชิ้นส่วน BOM ทั้งหมด"
+                        "description": "ตรวจสอบสต็อกชิ้นส่วน BOM — กรองด้วย ?parent_sku=SET-A เพื่อเช็คเฉพาะ variant นั้น"
                     },
                     "response": [
                         {
@@ -7289,7 +7235,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": {\"available\": true, \"components\": [{\"product_id\": 5, \"name\": \"ท่อไอเสีย\", \"required\": 1, \"in_stock\": 10, \"sufficient\": true}]}\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": {\n    \"available\": true,\n    \"components\": [\n      {\n        \"child_variant_id\": 2,\n        \"child_variant_sku\": \"V-001\",\n        \"child_product_id\": 12,\n        \"required_quantity\": 1,\n        \"available_stock\": 10,\n        \"sufficient\": true,\n        \"bom_stock_policy\": \"auto\"\n      }\n    ]\n  }\n}"
                         },
                         {
                             "name": "Not Found",
@@ -7730,7 +7676,7 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [{\"id\": 1, \"product_id\": 1, \"sku\": \"V-001\", \"name\": \"สีแดง ขนาด S\", \"cost_price\": 100.00, \"selling_price\": 150.00, \"description\": \"คุณลักษณะสินค้า...\", \"attributes\": {\"1\": \"S\", \"2\": \"แดง\"}, \"is_active\": true, \"unit_id\": 1, \"unit\": {\"id\": 1, \"name\": \"ชิ้น\"}, \"unit_quantity\": 1, \"min_stock\": 5, \"reorder_point\": 10, \"track_lot_expiry\": false, \"track_serial\": false, \"dimension_width\": 10.00, \"dimension_height\": 5.00, \"dimension_length\": 3.00, \"weight_kg\": 0.250, \"barcode\": \"8851234567890\", \"barcode_secondary\": \"OEM-V-001\", \"created_at\": \"2026-04-20T10:00:00\", \"updated_at\": \"2026-04-20T10:00:00\"}]\n}"
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [{\"id\": 1, \"product_id\": 1, \"sku\": \"V-001\", \"name\": \"สีแดง ขนาด S\", \"cost_price\": 100.00, \"selling_price\": 150.00, \"description\": \"คุณลักษณะสินค้า...\", \"attributes\": {\"1\": \"S\", \"2\": \"แดง\"}, \"is_active\": true, \"unit_id\": 1, \"unit\": {\"id\": 1, \"name\": \"ชิ้น\"}, \"unit_quantity\": 1, \"min_stock\": 5, \"reorder_point\": 10, \"track_lot_expiry\": false, \"track_serial\": false, \"bom_stock_policy\": \"auto\", \"dimension_width\": 10.00, \"dimension_height\": 5.00, \"dimension_length\": 3.00, \"weight_kg\": 0.250, \"barcode\": \"8851234567890\", \"barcode_secondary\": \"OEM-V-001\", \"created_at\": \"2026-04-20T10:00:00\", \"updated_at\": \"2026-04-20T10:00:00\"}]\n}"
                         },
                         {
                             "name": "Not Found",
@@ -7772,7 +7718,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"sku\": \"V-001\",\n    \"name\": \"สีแดง ขนาด S\",\n    \"cost_price\": 100.00,\n    \"selling_price\": 150.00,\n    \"attributes\": {\n        \"1\": \"S\",\n        \"2\": \"แดง\"\n    },\n    \"is_active\": true,\n    \"unit_id\": 1,\n    \"min_stock\": 5,\n    \"reorder_point\": 10,\n    \"track_lot_expiry\": false,\n    \"track_serial\": false,\n    \"dimensions\": \"10x5x3 cm\",\n    \"weight_kg\": 0.25,\n    \"barcode\": \"8851234567890\",\n    \"barcode_secondary\": \"OEM-V-001\"\n}",
+                            "raw": "{\n    \"sku\": \"V-001\",\n    \"name\": \"สีแดง ขนาด S\",\n    \"cost_price\": 100.00,\n    \"selling_price\": 150.00,\n    \"attributes\": {\n        \"1\": \"S\",\n        \"2\": \"แดง\"\n    },\n    \"is_active\": true,\n    \"unit_id\": 1,\n    \"min_stock\": 5,\n    \"reorder_point\": 10,\n    \"track_lot_expiry\": false,\n    \"track_serial\": false,\n    \"bom_stock_policy\": \"auto\",\n    \"dimensions\": \"10x5x3 cm\",\n    \"weight_kg\": 0.25,\n    \"barcode\": \"8851234567890\",\n    \"barcode_secondary\": \"OEM-V-001\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -7840,7 +7786,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"sku\": \"V-001\",\n    \"name\": \"สีแดง ขนาด S (แก้ไข)\",\n    \"cost_price\": 105.00,\n    \"selling_price\": 155.00,\n    \"attributes\": {\n        \"1\": \"S\",\n        \"2\": \"แดง\"\n    },\n    \"is_active\": true,\n    \"unit_id\": 1,\n    \"min_stock\": 5,\n    \"reorder_point\": 10,\n    \"track_lot_expiry\": false,\n    \"track_serial\": false,\n    \"dimensions\": \"10x5x3 cm\",\n    \"weight_kg\": 0.25,\n    \"barcode\": \"8851234567890\",\n    \"barcode_secondary\": \"OEM-V-001\"\n}",
+                            "raw": "{\n    \"sku\": \"V-001\",\n    \"name\": \"สีแดง ขนาด S (แก้ไข)\",\n    \"cost_price\": 105.00,\n    \"selling_price\": 155.00,\n    \"attributes\": {\n        \"1\": \"S\",\n        \"2\": \"แดง\"\n    },\n    \"is_active\": true,\n    \"unit_id\": 1,\n    \"min_stock\": 5,\n    \"reorder_point\": 10,\n    \"track_lot_expiry\": false,\n    \"track_serial\": false,\n    \"bom_stock_policy\": \"manual\",\n    \"dimensions\": \"10x5x3 cm\",\n    \"weight_kg\": 0.25,\n    \"barcode\": \"8851234567890\",\n    \"barcode_secondary\": \"OEM-V-001\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -8098,6 +8044,46 @@
                             "_postman_previewlanguage": "json",
                             "header": [{ "key": "Content-Type", "value": "application/json" }],
                             "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบตัวเลือก attribute สินค้า\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Search BOM Component Variants",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/product-variants?search=OIL&exclude_product_id=5&limit=20",
+                            "host": ["{{base_url}}"],
+                            "path": ["product-variants"],
+                            "query": [
+                                {
+                                    "key": "search",
+                                    "value": "OIL",
+                                    "description": "ค้นด้วย SKU หรือชื่อ variant (LIKE) — ใช้สำหรับ BOM component dropdown"
+                                },
+                                {
+                                    "key": "exclude_product_id",
+                                    "value": "5",
+                                    "description": "id ของ product BOM ที่กำลังแก้ไข (กัน self-reference)"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "20",
+                                    "description": "จำนวนสูงสุด (default 20, max 100)"
+                                }
+                            ]
+                        },
+                        "description": "ค้นหา variant SKU สำหรับ BOM component dropdown — search ข้ามทุก product ด้วย SKU หรือชื่อ"
+                    },
+                    "response": [
+                        {
+                            "name": "Success",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n    \"success\": true,\n    \"message\": \"ดึงรายการสำเร็จ\",\n    \"data\": [\n        {\n            \"id\": 5,\n            \"sku\": \"OIL-4L\",\n            \"name\": \"น้ำมันเครื่อง 4L\",\n            \"product_id\": 3,\n            \"product_name\": \"น้ำมันเครื่อง\",\n            \"unit_id\": 1,\n            \"unit_name\": \"ขวด\"\n        }\n    ]\n}"
                         }
                     ]
                 }

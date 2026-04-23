@@ -125,18 +125,21 @@ export interface ProductUnitConversionPayload {
 
 export interface BOMItem {
   id: number
-  product_id: number
-  component_id: number
-  component?: { id: number; sku: string; name: string }
-  qty: number
+  parent_product_id: number
+  parent_variant_id: number
+  child_variant_id: number
+  child_product_id: number
   unit_id: number
-  unit?: { id: number; name: string }
+  quantity: string
+  parent_variant?: { id: number; sku: string; name: string; bom_stock_policy?: string }
+  child_variant?: { id: number; sku: string; name: string; unit?: { id: number; name: string } }
+  child_product?: { id: number; name: string }
 }
 
-export interface BOMItemPayload {
-  component_id: number
-  qty: number
-  unit_id: number
+export interface BOMSetPayload {
+  parent_sku: string
+  components: { sku: string; quantity: number }[]
+  bom_stock_policy?: 'auto' | 'manual'
 }
 
 export interface ProductVariant {
