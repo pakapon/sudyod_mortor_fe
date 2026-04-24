@@ -4,6 +4,7 @@ import { productService } from '@/api/productService'
 import { hrService } from '@/api/hrService'
 import { apiClient } from '@/api/client'
 import { RichTextToolbar } from '@/components/RichTextToolbar'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import type {
   Product,
   ProductImage,
@@ -13,6 +14,8 @@ import type {
   ProductPayload,
   ProductType,
   BOMItem,
+  ProductCompatibility,
+  ProductCompatibilityPayload,
 } from '@/types/product'
 import { cn } from '@/lib/utils'
 
@@ -73,13 +76,6 @@ function PlusIcon({ size = 14 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  )
-}
-function DotsIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
     </svg>
   )
 }
@@ -212,6 +208,240 @@ function SkuSearchInput({ value, onChange, excludeProductId }: {
   )
 }
 
+// ─── Compatibility Modal ──────────────────────────────────────────────────────
+function CompatibilityModal({ productId, initial, onClose, onSaved }: {
+  productId: number
+  initial?: ProductCompatibility | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const isEdit = Boolean(initial)
+  const [form, setForm] = useState<ProductCompatibilityPayload>({
+    vehicle_code: initial?.vehicle_code ?? '',
+    vehicle_name: initial?.vehicle_name ?? '',
+    model: initial?.model ?? '',
+    year_start: initial?.year_start ?? undefined,
+    year_end: initial?.year_end ?? undefined,
+    note: initial?.note ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<string[]>([])
+
+  const set = (k: keyof ProductCompatibilityPayload, v: string | number | undefined) =>
+    setForm((prev) => ({ ...prev, [k]: v }))
+
+  const handleSave = async () => {
+    const errs: string[] = []
+    if (!form.vehicle_code.trim()) errs.push('กรุณากรอกรหัสรถ')
+    if (!form.vehicle_name.trim()) errs.push('กรุณากรอกชื่อยานพาหนะ')
+    if (errs.length) { setErrors(errs); return }
+    setSaving(true)
+    setErrors([])
+    const payload: ProductCompatibilityPayload = {
+      vehicle_code: form.vehicle_code.trim(),
+      vehicle_name: form.vehicle_name.trim(),
+      ...(form.model?.trim() && { model: form.model.trim() }),
+      ...(form.year_start && { year_start: Number(form.year_start) }),
+      ...(form.year_end && { year_end: Number(form.year_end) }),
+      ...(form.note?.trim() && { note: form.note.trim() }),
+    }
+    try {
+      if (isEdit && initial) {
+        await productService.updateProductCompatibility(productId, initial.id, payload)
+      } else {
+        await productService.createProductCompatibility(productId, payload)
+      }
+      onSaved()
+    } catch {
+      setErrors(['เกิดข้อผิดพลาด กรุณาตรวจสอบข้อมูลแล้วลองใหม่'])
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-5 space-y-4 max-h-[80vh] overflow-y-auto">
+          <h3 className="text-base font-semibold text-gray-900">{isEdit ? 'แก้ไขรุ่นรถที่รองรับ' : 'เพิ่มรุ่นรถที่รองรับ'}</h3>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>รหัสรถ <span className="text-red-500">*</span></label>
+              <input value={form.vehicle_code} onChange={(e) => set('vehicle_code', e.target.value)}
+                className={cn(fieldCls, !form.vehicle_code && errors.length > 0 && 'border-red-400')}
+                placeholder="เช่น CAR-001" autoComplete="off" />
+            </div>
+            <div>
+              <label className={labelCls}>ชื่อยานพาหนะ <span className="text-red-500">*</span></label>
+              <input value={form.vehicle_name} onChange={(e) => set('vehicle_name', e.target.value)}
+                className={cn(fieldCls, !form.vehicle_name && errors.length > 0 && 'border-red-400')}
+                placeholder="เช่น Honda City 1.5 RS" autoComplete="off" />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>รุ่น (MODEL)</label>
+            <input value={form.model ?? ''} onChange={(e) => set('model', e.target.value)}
+              className={fieldCls} placeholder="เช่น City, Civic" autoComplete="off" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>ปีเริ่มผลิต</label>
+              <input type="number" min="1900" max="2100" value={form.year_start ?? ''}
+                onChange={(e) => set('year_start', e.target.value ? Number(e.target.value) : undefined)}
+                className={fieldCls} placeholder="เช่น 2010" />
+            </div>
+            <div>
+              <label className={labelCls}>ปีสิ้นสุด</label>
+              <input type="number" min="1900" max="2100" value={form.year_end ?? ''}
+                onChange={(e) => set('year_end', e.target.value ? Number(e.target.value) : undefined)}
+                className={fieldCls} placeholder="เช่น 2022" />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>เงื่อนไข</label>
+            <input value={form.note ?? ''} onChange={(e) => set('note', e.target.value)}
+              className={fieldCls} placeholder="เช่น เฉพาะเครื่องยนต์ 2.0" autoComplete="off" />
+          </div>
+
+          {errors.length > 0 && (
+            <div className="rounded-lg bg-red-50 px-4 py-2">
+              {errors.map((e, i) => <p key={i} className="text-xs text-red-600">{e}</p>)}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-100">
+          <button type="button" disabled={saving} onClick={handleSave}
+            className="flex-1 rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60">
+            {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+          </button>
+          <button type="button" onClick={onClose}
+            className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+            ยกเลิก
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Compatibility Tab (Edit) ─────────────────────────────────────────────────
+function CompatibilityTabEdit({ productId, productSku }: { productId: number; productSku: string }) {
+  const [items, setItems] = useState<ProductCompatibility[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [editing, setEditing] = useState<ProductCompatibility | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ProductCompatibility | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const load = () => {
+    setLoading(true)
+    productService.getProductCompatibility(productId)
+      .then((res) => setItems(Array.isArray(res.data.data) ? res.data.data : []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [productId])
+
+  const handleSaved = () => { setShowModal(false); setEditing(null); load() }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await productService.deleteProductCompatibility(productId, deleteTarget.id)
+      setDeleteTarget(null)
+      load()
+    } catch { /* interceptor handles */ }
+    finally { setDeleting(false) }
+  }
+
+  if (loading) return <div className="py-8 text-center text-sm text-gray-400">กำลังโหลด...</div>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-gray-800">สามารถใช้กับ (Compatibility)</h4>
+        <button type="button"
+          onClick={() => { setEditing(null); setShowModal(true) }}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors">
+          <PlusIcon size={13} /> เพิ่ม
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-xl border-2 border-dashed border-gray-200 py-10 text-center">
+          <p className="text-sm text-gray-400">ยังไม่มีข้อมูลรุ่นรถที่รองรับ</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                {['รหัสสินค้า', 'รหัสรถ', 'ชื่อยานพาหนะ', 'รุ่น (MODEL)', 'ปีเริ่มผลิต', 'ปีสิ้นสุด', 'เงื่อนไข', ''].map((h) => (
+                  <th key={h} className="px-3 py-2.5 text-left text-xs font-medium text-gray-500">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {items.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2.5 font-mono text-xs text-blue-600">{productSku}</td>
+                  <td className="px-3 py-2.5 font-mono text-xs font-medium text-gray-800">{item.vehicle_code}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-700">{item.vehicle_name}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500">{item.model ?? '-'}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500">{item.year_start ?? '-'}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500">{item.year_end ?? '-'}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500 max-w-[180px] truncate">{item.note ?? '-'}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-1">
+                      <button type="button" title="แก้ไข"
+                        onClick={() => { setEditing(item); setShowModal(true) }}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+                        <EditPenIcon size={14} />
+                      </button>
+                      <button type="button" title="ลบ"
+                        onClick={() => setDeleteTarget(item)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-100 hover:text-red-600">
+                        <TrashIcon size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showModal && (
+        <CompatibilityModal
+          productId={productId}
+          initial={editing}
+          onClose={() => { setShowModal(false); setEditing(null) }}
+          onSaved={handleSaved}
+        />
+      )}
+
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title="ลบรุ่นรถที่รองรับ"
+        message={`ยืนยันลบ "${deleteTarget?.vehicle_code} — ${deleteTarget?.vehicle_name}"? ไม่สามารถเรียกคืนได้`}
+        confirmLabel="ลบ"
+        variant="danger"
+        isLoading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </div>
+  )
+}
+
 // ─── BOM Modal (Add/Edit per parent_sku — replace-all) ───────────────────────
 function BomModal({ productId, variants, initial, onClose, onSaved }: {
   productId: number
@@ -314,7 +544,7 @@ function BomModal({ productId, variants, initial, onClose, onSaved }: {
               onClick={addRow}
               className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800"
             >
-              <PlusIcon size={11} /> +เพิ่มชิ้นส่วน
+              <PlusIcon size={11} /> เพิ่มชิ้นส่วน
             </button>
           </div>
 
@@ -367,7 +597,6 @@ function BomTabEdit({ productId }: { productId: number }) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingGroup, setEditingGroup] = useState<{ parentSku: string; components: BomComponentRow[]; stockPolicy: 'auto' | 'manual' } | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
 
   const loadBom = async () => {
     setLoading(true)
@@ -383,12 +612,6 @@ function BomTabEdit({ productId }: { productId: number }) {
 
   useEffect(() => { loadBom() }, [productId])
 
-  useEffect(() => {
-    const close = () => setOpenMenuId(null)
-    document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
-  }, [])
-
   const handleEdit = (item: BOMItem) => {
     const parentSku = item.parent_variant?.sku ?? ''
     const groupItems = bom.filter((b) => b.parent_variant_id === item.parent_variant_id)
@@ -397,7 +620,6 @@ function BomTabEdit({ productId }: { productId: number }) {
       components: groupItems.map((b) => ({ sku: b.child_variant?.sku ?? '', quantity: Number(b.quantity) })),
       stockPolicy: (item.parent_variant?.bom_stock_policy as 'auto' | 'manual') ?? 'auto',
     })
-    setOpenMenuId(null)
   }
 
   const handleDelete = async (id: number) => {
@@ -429,7 +651,7 @@ function BomTabEdit({ productId }: { productId: number }) {
           onClick={() => setShowAddModal(true)}
           className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
         >
-          <PlusIcon size={13} /> + เพิ่มชุด
+          <PlusIcon size={13} /> เพิ่มชุด
         </button>
       </div>
 
@@ -461,33 +683,19 @@ function BomTabEdit({ productId }: { productId: number }) {
                   <td className="px-4 py-3 text-gray-600">{item.child_variant?.unit?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-600 text-xs">{POLICY_LABELS[item.parent_variant?.bom_stock_policy ?? ''] ?? '—'}</td>
                   <td className="px-4 py-3 text-center">
-                    <div className="relative inline-block">
-                      <button
-                        type="button"
+                    <div className="flex items-center justify-center gap-1">
+                      <button type="button" title="แก้ไขชุดนี้"
                         disabled={deletingId === item.id}
-                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === item.id ? null : item.id) }}
-                        className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40"
-                      >
-                        <DotsIcon />
+                        onClick={() => handleEdit(item)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40">
+                        <EditPenIcon size={14} />
                       </button>
-                      {openMenuId === item.id && (
-                        <div className="absolute right-0 z-20 mt-1 w-36 rounded-xl border border-gray-200 bg-white shadow-lg py-1" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                            onClick={() => handleEdit(item)}
-                          >
-                            <EditPenIcon size={13} /> แก้ไขชุดนี้
-                          </button>
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                            onClick={() => { setOpenMenuId(null); handleDelete(item.id) }}
-                          >
-                            <TrashIcon size={13} /> ลบชิ้นส่วน
-                          </button>
-                        </div>
-                      )}
+                      <button type="button" title="ลบชิ้นส่วน"
+                        disabled={deletingId === item.id}
+                        onClick={() => handleDelete(item.id)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-100 hover:text-red-600 disabled:opacity-40">
+                        <TrashIcon size={14} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -732,7 +940,6 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
   const [showModal, setShowModal] = useState(false)
   const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -750,13 +957,6 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
     apiClient.get('/product-units').then((r) => setUnits(r.data?.data || [])).catch(() => {})
     loadData()
   }, [productId])
-
-  // Close menu on outside click
-  useEffect(() => {
-    const close = () => setOpenMenuId(null)
-    document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
-  }, [])
 
   const handleDeleteVariant = async (id: number) => {
     if (!window.confirm('ยืนยันการลบรหัสสินค้านี้?')) return
@@ -851,33 +1051,19 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
                       ].filter(Boolean).join(' · ') || '—'}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <div className="relative inline-block">
-                        <button
-                          type="button"
+                      <div className="flex items-center justify-center gap-1">
+                        <button type="button" title="แก้ไข"
                           disabled={deletingId === v.id}
-                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === v.id ? null : v.id) }}
-                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40"
-                        >
-                          <DotsIcon />
+                          onClick={() => { setEditingVariant(v); setShowModal(true) }}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40">
+                          <EditPenIcon size={14} />
                         </button>
-                        {openMenuId === v.id && (
-                          <div className="absolute right-0 z-20 mt-1 w-32 rounded-xl border border-gray-200 bg-white shadow-lg py-1" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                              onClick={() => { setEditingVariant(v); setShowModal(true); setOpenMenuId(null) }}
-                            >
-                              <EditPenIcon size={13} /> แก้ไข
-                            </button>
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                              onClick={() => { setOpenMenuId(null); handleDeleteVariant(v.id) }}
-                            >
-                              <TrashIcon size={13} /> ลบ
-                            </button>
-                          </div>
-                        )}
+                        <button type="button" title="ลบ"
+                          disabled={deletingId === v.id}
+                          onClick={() => handleDeleteVariant(v.id)}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-red-100 hover:text-red-600 disabled:opacity-40">
+                          <TrashIcon size={14} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1355,8 +1541,11 @@ export function ProductFormPage() {
           {activeTab === 'bundle' && !isEditing && (
             <div className="py-8 text-center text-sm text-gray-400">กรุณาบันทึกสินค้าก่อน เพื่อจัดการชุดอะไหล่</div>
           )}
-          {activeTab === 'spare' && (
-            <div className="py-8 text-center text-sm text-gray-400">ยังไม่มีรายการอะไหล่</div>
+          {activeTab === 'spare' && isEditing && product && (
+            <CompatibilityTabEdit productId={productId} productSku={form.sku} />
+          )}
+          {activeTab === 'spare' && !isEditing && (
+            <div className="py-8 text-center text-sm text-gray-400">กรุณาบันทึกสินค้าก่อน เพื่อจัดการรุ่นที่รองรับ</div>
           )}
         </div>
       </div>

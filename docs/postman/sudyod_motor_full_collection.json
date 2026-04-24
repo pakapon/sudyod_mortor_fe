@@ -8086,6 +8086,181 @@
                             "body": "{\n    \"success\": true,\n    \"message\": \"ดึงรายการสำเร็จ\",\n    \"data\": [\n        {\n            \"id\": 5,\n            \"sku\": \"OIL-4L\",\n            \"name\": \"น้ำมันเครื่อง 4L\",\n            \"product_id\": 3,\n            \"product_name\": \"น้ำมันเครื่อง\",\n            \"unit_id\": 1,\n            \"unit_name\": \"ขวด\"\n        }\n    ]\n}"
                         }
                     ]
+                },
+                {
+                    "name": "List Product Compatibility (รุ่นที่รองรับ)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Accept-Language", "value": "{{language}}" },
+                            { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/compatibility",
+                            "host": ["{{base_url}}"],
+                            "path": ["products", ":id", "compatibility"],
+                            "variable": [
+                                { "key": "id", "value": "1", "description": "Product ID" }
+                            ]
+                        },
+                        "description": "ดึงรายการรุ่นรถที่รองรับสินค้านี้"
+                    },
+                    "response": [
+                        {
+                            "name": "Success",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สำเร็จ\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"product_id\": 1,\n      \"vehicle_code\": \"CAR-001\",\n      \"vehicle_name\": \"Honda City 1.5 RS\",\n      \"model\": \"City\",\n      \"year_start\": 2010,\n      \"year_end\": 2022,\n      \"note\": \"เฉพาะเครื่องยนต์ 2.0\",\n      \"created_at\": \"2026-04-24T10:00:00\",\n      \"updated_at\": \"2026-04-24T10:00:00\"\n    }\n  ]\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบสินค้า\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Product Compatibility",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                                    "var json = pm.response.json();",
+                                    "if (json.data && json.data.id) pm.environment.set('compatibility_id', String(json.data.id));"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Accept-Language", "value": "{{language}}" },
+                            { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"vehicle_code\": \"CAR-001\",\n    \"vehicle_name\": \"Honda City 1.5 RS\",\n    \"model\": \"City\",\n    \"year_start\": 2010,\n    \"year_end\": 2022,\n    \"note\": \"เฉพาะเครื่องยนต์ 2.0\"\n}",
+                            "options": { "raw": { "language": "json" } }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/compatibility",
+                            "host": ["{{base_url}}"],
+                            "path": ["products", ":id", "compatibility"],
+                            "variable": [
+                                { "key": "id", "value": "1", "description": "Product ID" }
+                            ]
+                        },
+                        "description": "เพิ่มรุ่นรถที่รองรับสินค้านี้\n\nRequired: vehicle_code, vehicle_name\nOptional: model, year_start, year_end, note"
+                    },
+                    "response": [
+                        {
+                            "name": "Created",
+                            "status": "Created",
+                            "code": 201,
+                            "_postman_previewlanguage": "json",
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"สร้างสำเร็จ\",\n  \"data\": {\n    \"id\": 1,\n    \"product_id\": 1,\n    \"vehicle_code\": \"CAR-001\",\n    \"vehicle_name\": \"Honda City 1.5 RS\",\n    \"model\": \"City\",\n    \"year_start\": 2010,\n    \"year_end\": 2022,\n    \"note\": \"เฉพาะเครื่องยนต์ 2.0\",\n    \"created_at\": \"2026-04-24T10:00:00\",\n    \"updated_at\": \"2026-04-24T10:00:00\"\n  }\n}"
+                        },
+                        {
+                            "name": "Duplicate vehicle_code",
+                            "status": "Unprocessable Entity",
+                            "code": 422,
+                            "_postman_previewlanguage": "json",
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"รหัสรถนี้มีอยู่แล้วในสินค้านี้\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Update Product Compatibility",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            { "key": "Content-Type", "value": "application/json" },
+                            { "key": "Accept-Language", "value": "{{language}}" },
+                            { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"vehicle_code\": \"CAR-001\",\n    \"vehicle_name\": \"Honda City 1.5 RS\",\n    \"model\": \"City\",\n    \"year_start\": 2010,\n    \"year_end\": 2023,\n    \"note\": \"เฉพาะเครื่องยนต์ 2.0 และ 1.5\"\n}",
+                            "options": { "raw": { "language": "json" } }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/compatibility/:cid",
+                            "host": ["{{base_url}}"],
+                            "path": ["products", ":id", "compatibility", ":cid"],
+                            "variable": [
+                                { "key": "id", "value": "1", "description": "Product ID" },
+                                { "key": "cid", "value": "{{compatibility_id}}", "description": "Compatibility ID" }
+                            ]
+                        },
+                        "description": "แก้ไขข้อมูลรุ่นรถที่รองรับ — ทุก field optional"
+                    },
+                    "response": [
+                        {
+                            "name": "Updated",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"อัปเดตสำเร็จ\",\n  \"data\": {\n    \"id\": 1,\n    \"product_id\": 1,\n    \"vehicle_code\": \"CAR-001\",\n    \"vehicle_name\": \"Honda City 1.5 RS\",\n    \"model\": \"City\",\n    \"year_start\": 2010,\n    \"year_end\": 2023,\n    \"note\": \"เฉพาะเครื่องยนต์ 2.0 และ 1.5\",\n    \"created_at\": \"2026-04-24T10:00:00\",\n    \"updated_at\": \"2026-04-24T10:05:00\"\n  }\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูลรุ่นที่รองรับ\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Delete Product Compatibility",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            { "key": "Accept-Language", "value": "{{language}}" },
+                            { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/products/:id/compatibility/:cid",
+                            "host": ["{{base_url}}"],
+                            "path": ["products", ":id", "compatibility", ":cid"],
+                            "variable": [
+                                { "key": "id", "value": "1", "description": "Product ID" },
+                                { "key": "cid", "value": "{{compatibility_id}}", "description": "Compatibility ID" }
+                            ]
+                        },
+                        "description": "ลบรุ่นรถที่รองรับ (hard delete)"
+                    },
+                    "response": [
+                        {
+                            "name": "Deleted",
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"ลบสำเร็จ\",\n  \"data\": null\n}"
+                        },
+                        {
+                            "name": "Not Found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "_postman_previewlanguage": "json",
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n    \"success\": false,\n    \"message\": \"ไม่พบข้อมูลรุ่นที่รองรับ\"\n}"
+                        }
+                    ]
                 }
             ]
         },

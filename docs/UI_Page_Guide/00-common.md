@@ -203,6 +203,33 @@ import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButt
 </div>
 ```
 
+### ❌ ห้ามใช้ Dots Dropdown Menu ใน table ที่มี overflow-x-auto
+
+**ปัญหา:** `position: absolute` dropdown ถูก clip โดย `overflow-x-auto` / `overflow-hidden` ของ container — ทำให้เมนูหลบออกไปนอกหน้าจอ โดยเฉพาะเมื่อมีข้อมูลน้อย (1-2 row)
+
+**กฎ:**
+- ❌ ห้ามใช้ dots menu (`⋮`) + absolute-positioned dropdown สำหรับ action แก้ไข/ลบใน table
+- ✅ ใช้ inline icon buttons เคียงกันใน `<td>` โดยตรง
+- ✅ ถ้าต้องการ dropdown (เช่น เลือกประเภทเอกสาร 3 รายการ) ให้ใช้ Flowbite `<Dropdown>` ซึ่งรองรับ portal rendering
+
+**Pattern มาตรฐาน (inline — ใช้ในทุก sub-table ใน FormPage):**
+```tsx
+<td className="px-3 py-2.5">
+  <div className="flex items-center gap-1">
+    <button type="button" title="แก้ไข"
+      onClick={() => { setEditing(item); setShowModal(true) }}
+      className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+      <EditPenIcon size={14} />
+    </button>
+    <button type="button" title="ลบ"
+      onClick={() => setDeleteTarget(item)}
+      className="rounded-lg p-1.5 text-gray-400 hover:bg-red-100 hover:text-red-600">
+      <TrashIcon size={14} />
+    </button>
+  </div>
+</td>
+```
+
 ---
 
 ## 2c. Filter Panel Conventions

@@ -15,6 +15,8 @@ import type {
   ProductVariantPayload,
   AttributeOption,
   AttributeOptionPayload,
+  ProductCompatibility,
+  ProductCompatibilityPayload,
 } from '@/types/product'
 
 export const productService = {
@@ -131,5 +133,22 @@ export const productService = {
 
   deleteProductAttributeOption(productId: number, optionId: number) {
     return apiClient.delete<ApiResponse<null>>(`/products/${productId}/attribute-options/${optionId}`)
+  },
+
+  // Compatibility (รุ่นที่รองรับ)
+  getProductCompatibility(id: number) {
+    return apiClient.get<ApiResponse<ProductCompatibility[]>>(`/products/${id}/compatibility`)
+  },
+
+  createProductCompatibility(id: number, payload: ProductCompatibilityPayload) {
+    return apiClient.post<ApiResponse<ProductCompatibility>>(`/products/${id}/compatibility`, payload)
+  },
+
+  updateProductCompatibility(productId: number, cid: number, payload: Partial<ProductCompatibilityPayload>) {
+    return apiClient.put<ApiResponse<ProductCompatibility>>(`/products/${productId}/compatibility/${cid}`, payload)
+  },
+
+  deleteProductCompatibility(productId: number, cid: number) {
+    return apiClient.delete<ApiResponse<null>>(`/products/${productId}/compatibility/${cid}`)
   },
 }

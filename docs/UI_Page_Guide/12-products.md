@@ -137,7 +137,7 @@
 | สินค้า (ผลิตภัณฑ์) | form หลัก + variant table |
 | รูปภาพ/แบบสินค้า | gallery + reorder |
 | ราคา & ราคาตาม tier | pricing tiers |
-| BOM | สูตรส่วนประกอบ (เฉพาะ product_type=bom) |
+| BOM | สูตรส่วนประกอบ |
 | Tags | แท็ก/ป้ายกำกับ |
 | ไฟล์แนบ | attachments |
 | แปลงหน่วย | unit conversions |
@@ -208,7 +208,7 @@
 - API: CRUD `/products/{id}/unit-conversions`
 
 **Tab BOM (Bill of Materials):**
-- สำหรับ `product_type = bom` ("ชุด") — แสดงส่วนประกอบระดับ Variant SKU
+- แสดงส่วนประกอบระดับ Variant SKU — ใช้ได้กับทุก product
 - **1 product มีหลาย variant (SKU) และแต่ละ parent SKU มี BOM ของตัวเอง**
 - เช่น "ชุดเปลี่ยนถ่าย SET-A" = OIL-4L × 1 + FLT-001 × 1; "ชุดเปลี่ยนถ่าย SET-B" = OIL-4L-SYN × 1 + FLT-001 × 1
 - API: `POST /products/{id}/bom` (replace all สำหรับ parent_sku นั้น), `GET /products/{id}/bom?parent_sku=SET-A`, `DELETE /products/{id}/bom/{cid}`
@@ -290,7 +290,6 @@
 **Error Codes:**
 | Code | HTTP | เมื่อไหร่ |
 |------|------|----------|
-| `product_not_bom_type` | 422 | product_type ≠ bom |
 | `product_variant_not_found` | 404 | parent_sku หรือ component sku ไม่มีในระบบ |
 | `bom_self_reference` | 422 | component sku เป็น variant ของ product นี้เอง |
 | `duplicate_entry` | 422 | มี sku ซ้ำกันใน components array ที่ส่งมา |
@@ -539,6 +538,68 @@
   ]
 }
 ```
+
+---
+
+## Tab รุ่นที่รองรับ (Compatibility)
+
+- รายการรุ่นรถที่ใช้สินค้านี้ได้ (เช่น Honda City 2010-2022)
+- API:
+  - `GET /products/{id}/compatibility` — รายการรุ่นที่รองรับ
+  - `POST /products/{id}/compatibility` — เพิ่มรุ่น
+  - `PUT /products/{id}/compatibility/{cid}` — แก้ไขรุ่น (ทุก field optional)
+  - `DELETE /products/{id}/compatibility/{cid}` — ลบรุ่น (hard delete)
+
+**Fields (POST /products/{id}/compatibility):**
+| Field | Type | Required | หมายเหตุ |
+|-------|------|----------|---------|
+| `vehicle_code` | Text | ✅ | รหัสรถ เช่น CAR-001 (unique ต่อสินค้านี้) |
+| `vehicle_name` | Text | ✅ | ชื่อรถ เช่น Honda City 1.5 RS |
+| `model` | Text | ❌ | รุ่นย่อย เช่น City, Civic |
+| `year_start` | Integer | ❌ | ปีเริ่มผลิต (ค.ศ.) |
+| `year_end` | Integer | ❌ | ปีสิ้นสุด (ค.ศ.) |
+| `note` | Text | ❌ | เงื่อนไขพิเศษ เช่น เฉพาะเครื่องยนต์ 2.0 |
+
+**Request Body (POST /products/{id}/compatibility):**
+```json
+{
+  "vehicle_code": "CAR-001",
+  "vehicle_name": "Honda City 1.5 RS",
+  "model": "City",
+  "year_start": 2010,
+  "year_end": 2022,
+  "note": "เฉพาะเครื่องยนต์ 2.0"
+}
+```
+
+**Response (GET /products/{id}/compatibility):**
+```json
+{
+  "success": true,
+  "message": "สำเร็จ",
+  "data": [
+    {
+      "id": 1,
+      "product_id": 10,
+      "vehicle_code": "CAR-001",
+      "vehicle_name": "Honda City 1.5 RS",
+      "model": "City",
+      "year_start": 2010,
+      "year_end": 2022,
+      "note": "เฉพาะเครื่องยนต์ 2.0",
+      "created_at": "2026-04-24T10:00:00",
+      "updated_at": "2026-04-24T10:00:00"
+    }
+  ]
+}
+```
+
+**Error Codes:**
+| Code | HTTP | เมื่อไหร่ |
+|------|------|----------|
+| `product_not_found` | 404 | ไม่พบสินค้า |
+| `compatibility_not_found` | 404 | ไม่พบ compatibility record |
+| `duplicate_vehicle_code` | 422 | vehicle_code ซ้ำในสินค้านี้ |
 
 ---
 

@@ -207,3 +207,25 @@ export interface AttributeOptionPayload {
   value: string
   sort_order?: number
 }
+
+export interface ProductCompatibility {
+  id: number
+  product_id: number
+  vehicle_code: string
+  vehicle_name: string
+  model?: string
+  year_start?: number
+  year_end?: number
+  note?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ProductCompatibilityPayload {
+  vehicle_code: string
+  vehicle_name: string
+  model?: string
+  year_start?: number
+  year_end?: number
+  note?: string
+}
