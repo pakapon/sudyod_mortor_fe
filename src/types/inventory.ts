@@ -52,10 +52,12 @@ export interface InventoryItem {
   product?: { id: number; sku: string; name: string; unit?: { id: number; name: string } }
   warehouse_id: number
   warehouse?: { id: number; name: string }
+  branch?: { id: number; name: string }
   location_id?: number
   location?: { id: number; name: string }
-  qty: number
-  min_stock?: number
+  quantity: number
+  reserved_quantity?: number
+  min_quantity?: number
   updated_at?: string
 }
 
@@ -74,14 +76,15 @@ export interface InventoryTransaction {
   product?: { id: number; sku: string; name: string }
   warehouse_id: number
   warehouse?: { id: number; name: string }
-  type: 'in' | 'out' | 'adjust' | 'transfer'
-  qty: number
-  balance: number
+  transaction_type: string
+  quantity_change: number
+  quantity_before: number
+  quantity_after: number
   reference_type?: string
   reference_id?: number
-  note?: string
+  notes?: string
   created_at?: string
-  created_by?: { id: number; first_name: string; last_name: string }
+  employee?: { id: number; first_name: string; last_name: string }
 }
 
 export interface InventoryTransactionListParams {
@@ -178,32 +181,40 @@ export interface GoodsReceiptListParams {
 
 // ---- Stock Transfer ----
 
-export type StockTransferStatus = 'draft' | 'pending' | 'approved' | 'rejected'
+export type StockTransferStatus = 'draft' | 'approved' | 'completed' | 'cancelled'
 
 export interface StockTransferItem {
   id: number
   product_id: number
   product?: { id: number; sku: string; name: string; unit?: { id: number; name: string } }
-  qty: number
+  quantity: number
+  notes?: string | null
 }
 
 export interface StockTransferItemPayload {
   product_id: number
-  qty: number
+  quantity: number
+  notes?: string
 }
 
 export interface StockTransfer {
   id: number
-  code: string
+  transfer_no: string
+  branch_id?: number
+  branch?: { id: number; name: string }
   from_warehouse_id: number
   from_warehouse?: { id: number; name: string }
   to_warehouse_id: number
   to_warehouse?: { id: number; name: string }
-  note?: string
+  reason?: string | null
   status: StockTransferStatus
-  items: StockTransferItem[]
-  approved_at?: string
+  total_items?: number
+  items?: StockTransferItem[]
+  approved_at?: string | null
   approved_by?: { id: number; first_name: string; last_name: string }
+  completed_at?: string | null
+  completed_by?: { id: number; first_name: string; last_name: string }
+  cancelled_at?: string | null
   created_at?: string
   created_by?: { id: number; first_name: string; last_name: string }
 }
@@ -211,11 +222,12 @@ export interface StockTransfer {
 export interface StockTransferPayload {
   from_warehouse_id: number
   to_warehouse_id: number
-  note?: string
+  reason?: string
   items: StockTransferItemPayload[]
 }
 
 export interface StockTransferListParams {
+  branch_id?: number
   from_warehouse_id?: number
   to_warehouse_id?: number
   status?: StockTransferStatus

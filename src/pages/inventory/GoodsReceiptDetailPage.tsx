@@ -5,6 +5,7 @@ import type { GoodsReceipt, GoodsReceiptDocument, GoodsReceiptDocumentType, Good
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 const STATUS_CONFIG: Record<GoodsReceiptStatus, { label: string; className: string }> = {
   draft: { label: 'ร่าง', className: 'bg-gray-100 text-gray-700' },
@@ -81,9 +82,12 @@ export function GoodsReceiptDetailPage() {
   const [isApproving, setIsApproving] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
 
+  const [approveOpen, setApproveOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+
   const canEdit = hasPermission(permissions, 'goods_receipts', 'can_edit')
   const canApprove = hasPermission(permissions, 'goods_receipts', 'can_approve')
-  const canCancel = hasPermission(permissions, 'goods_receipts', 'can_cancel')
+  const canCancel = hasPermission(permissions, 'goods_receipts', 'can_approve')
 
   const reload = useRef<() => void>(() => {})
 
@@ -104,7 +108,6 @@ export function GoodsReceiptDetailPage() {
   }, [id, navigate])
 
   const handleApprove = async () => {
-    if (!id || !window.confirm('ยืนยันการอนุมัติใบรับสินค้านี้?')) return
     setIsApproving(true)
     try {
       await goodsReceiptService.approveGoodsReceipt(Number(id))
@@ -113,21 +116,20 @@ export function GoodsReceiptDetailPage() {
       // interceptor handles display
     } finally {
       setIsApproving(false)
+      setApproveOpen(false)
     }
   }
 
   const handleCancel = async () => {
-    if (!id) return
-    const note = window.prompt('เหตุผลในการยกเลิก (ไม่บังคับ)') ?? undefined
-    if (note === null) return
     setIsCancelling(true)
     try {
-      await goodsReceiptService.cancelGoodsReceipt(Number(id), note || undefined)
+      await goodsReceiptService.cancelGoodsReceipt(Number(id))
       reload.current()
     } catch {
       // interceptor handles display
     } finally {
       setIsCancelling(false)
+      setCancelOpen(false)
     }
   }
 
@@ -181,21 +183,19 @@ export function GoodsReceiptDetailPage() {
           {isDraft && canApprove && (
             <button
               type="button"
-              onClick={handleApprove}
-              disabled={isApproving}
+              onClick={() => setApproveOpen(true)}
               className="rounded-lg bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
             >
-              {isApproving ? 'กำลังอนุมัติ...' : 'อนุมัติ'}
+              อนุมัติ
             </button>
           )}
           {isDraft && canCancel && (
             <button
               type="button"
-              onClick={handleCancel}
-              disabled={isCancelling}
+              onClick={() => setCancelOpen(true)}
               className="rounded-lg border border-red-200 px-4 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
             >
-              {isCancelling ? 'กำลังยกเลิก...' : 'ยกเลิก'}
+              ยกเลิก
             </button>
           )}
         </div>
@@ -341,6 +341,28 @@ export function GoodsReceiptDetailPage() {
           )}
         </dl>
       </div>
+
+      <ConfirmModal
+        isOpen={approveOpen}
+        title="ยืนยันการอนุมัติ"
+        message="คุณต้องการอนุมัติใบรับสินค้านี้ใช่หรือไม่?"
+        confirmLabel="อนุมัติ"
+        variant="info"
+        isLoading={isApproving}
+        onConfirm={handleApprove}
+        onCancel={() => setApproveOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={cancelOpen}
+        title="ยืนยันการยกเลิก"
+        message="คุณต้องการยกเลิกใบรับสินค้านี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้"
+        confirmLabel="ยกเลิกใบรับสินค้า"
+        variant="danger"
+        isLoading={isCancelling}
+        onConfirm={handleCancel}
+        onCancel={() => setCancelOpen(false)}
+      />
     </div>
   )
 }

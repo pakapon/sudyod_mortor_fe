@@ -5,6 +5,7 @@ import type { PurchaseOrder, PurchaseOrderStatus } from '@/types/inventory'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 function ChevronLeftIcon() {
   return (
@@ -29,6 +30,9 @@ export function PurchaseOrderDetailPage() {
   const [order, setOrder] = useState<PurchaseOrder | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isActioning, setIsActioning] = useState(false)
+  const [sendOpen, setSendOpen] = useState(false)
+  const [receiveOpen, setReceiveOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
 
   const canEdit = hasPermission(permissions, 'purchase_orders', 'can_edit')
 
@@ -42,8 +46,9 @@ export function PurchaseOrderDetailPage() {
   }, [id, navigate])
 
   const handleSend = async () => {
-    if (!order || !window.confirm('ยืนยันการส่ง PO?')) return
+    if (!order) return
     setIsActioning(true)
+    setSendOpen(false)
     try {
       await purchaseOrderService.sendPurchaseOrder(order.id)
       setOrder((prev) => prev ? { ...prev, status: 'sent' } : null)
@@ -55,8 +60,9 @@ export function PurchaseOrderDetailPage() {
   }
 
   const handleReceive = async () => {
-    if (!order || !window.confirm('ยืนยันการรับสินค้า?')) return
+    if (!order) return
     setIsActioning(true)
+    setReceiveOpen(false)
     try {
       await purchaseOrderService.receivePurchaseOrder(order.id)
       setOrder((prev) => prev ? { ...prev, status: 'received' } : null)
@@ -68,8 +74,9 @@ export function PurchaseOrderDetailPage() {
   }
 
   const handleCancel = async () => {
-    if (!order || !window.confirm('ยืนยันการยกเลิก PO?')) return
+    if (!order) return
     setIsActioning(true)
+    setCancelOpen(false)
     try {
       await purchaseOrderService.cancelPurchaseOrder(order.id)
       navigate('/purchase-orders')
@@ -117,7 +124,7 @@ export function PurchaseOrderDetailPage() {
           <div className="flex gap-2">
             {order.status === 'draft' && (
               <button
-                onClick={handleSend}
+                onClick={() => setSendOpen(true)}
                 disabled={isActioning}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
               >
@@ -126,7 +133,7 @@ export function PurchaseOrderDetailPage() {
             )}
             {order.status === 'sent' && (
               <button
-                onClick={handleReceive}
+                onClick={() => setReceiveOpen(true)}
                 disabled={isActioning}
                 className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
               >
@@ -135,7 +142,7 @@ export function PurchaseOrderDetailPage() {
             )}
             {(order.status === 'draft' || order.status === 'sent') && (
               <button
-                onClick={handleCancel}
+                onClick={() => setCancelOpen(true)}
                 disabled={isActioning}
                 className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
               >
@@ -224,6 +231,37 @@ export function PurchaseOrderDetailPage() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={sendOpen}
+        title="ยืนยันการส่งใบสั่งซื้อ"
+        message="ยืนยันการส่งใบสั่งซื้อนี้ใช่หรือไม่?"
+        confirmLabel="ส่ง PO"
+        variant="info"
+        isLoading={isActioning}
+        onConfirm={handleSend}
+        onCancel={() => setSendOpen(false)}
+      />
+      <ConfirmModal
+        isOpen={receiveOpen}
+        title="ยืนยันการรับสินค้า"
+        message="ยืนยันการรับสินค้าตามใบสั่งซื้อนี้ใช่หรือไม่?"
+        confirmLabel="ยืนยันรับสินค้า"
+        variant="info"
+        isLoading={isActioning}
+        onConfirm={handleReceive}
+        onCancel={() => setReceiveOpen(false)}
+      />
+      <ConfirmModal
+        isOpen={cancelOpen}
+        title="ยืนยันการยกเลิกใบสั่งซื้อ"
+        message="คุณต้องการยกเลิกใบสั่งซื้อนี้ใช่หรือไม่?"
+        confirmLabel="ยกเลิก PO"
+        variant="danger"
+        isLoading={isActioning}
+        onConfirm={handleCancel}
+        onCancel={() => setCancelOpen(false)}
+      />
     </div>
   )
 }

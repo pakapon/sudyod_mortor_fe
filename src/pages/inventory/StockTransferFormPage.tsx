@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
+import { inventoryService } from '@/api/inventoryService'
 import { stockTransferService } from '@/api/stockTransferService'
 import { warehouseService } from '@/api/warehouseService'
 import type { StockTransfer, StockTransferPayload } from '@/types/inventory'
@@ -36,20 +37,14 @@ function TrashIcon() {
 
 interface ItemRow {
   product_id: string
-  qty: string
+  quantity: string
+  notes: string
 }
 
 interface FormValues {
   from_warehouse_id: string
   to_warehouse_id: string
-  note: string
-}
-
-const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  draft: { label: 'ร่าง', className: 'bg-gray-100 text-gray-600' },
-  pending: { label: 'รอดำเนินการ', className: 'bg-yellow-100 text-yellow-700' },
-  approved: { label: 'อนุมัติแล้ว', className: 'bg-green-100 text-green-700' },
-  rejected: { label: 'ปฏิเสธ', className: 'bg-red-100 text-red-600' },
+  reason: string
 }
 
 export function StockTransferFormPage() {
@@ -61,17 +56,36 @@ export function StockTransferFormPage() {
   const [transfer, setTransfer] = useState<StockTransfer | null>(null)
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([])
   const [products, setProducts] = useState<{ id: number; sku: string; name: string }[]>([])
-  const [items, setItems] = useState<ItemRow[]>([{ product_id: '', qty: '' }])
+  const [items, setItems] = useState<ItemRow[]>([{ product_id: '', quantity: '', notes: '' }])
   const [isLoading, setIsLoading] = useState(isEdit)
   const [isSaving, setIsSaving] = useState(false)
-  const [isActioning, setIsActioning] = useState(false)
+  const [stockMap, setStockMap] = useState<Record<number, number>>({})
 
   const canCreate = hasPermission(permissions, 'stock_transfers', 'can_create')
   const canEdit = hasPermission(permissions, 'stock_transfers', 'can_edit')
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
-    defaultValues: { from_warehouse_id: '', to_warehouse_id: '', note: '' },
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormValues>({
+    defaultValues: { from_warehouse_id: '', to_warehouse_id: '', reason: '' },
   })
+
+  const fromWarehouseId = watch('from_warehouse_id')
+
+  const loadStock = useCallback((warehouseId: string) => {
+    if (!warehouseId) { setStockMap({}); return }
+    inventoryService.getInventory({ warehouse_id: Number(warehouseId), limit: 500 })
+      .then((res) => {
+        const map: Record<number, number> = {}
+        for (const item of res.data.data ?? []) {
+          map[item.product_id] = item.quantity
+        }
+        setStockMap(map)
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    loadStock(fromWarehouseId)
+  }, [fromWarehouseId, loadStock])
 
   useEffect(() => {
     warehouseService.getWarehouses({ limit: 200 })
@@ -88,24 +102,29 @@ export function StockTransferFormPage() {
     stockTransferService.getStockTransfer(Number(id))
       .then((res) => {
         const data = res.data.data
+        if (data.status !== 'draft') {
+          navigate(`/stock-transfers/${data.id}`, { replace: true })
+          return
+        }
         setTransfer(data)
         reset({
-          from_warehouse_id: String(data.from_warehouse_id),
-          to_warehouse_id: String(data.to_warehouse_id),
-          note: data.note ?? '',
+          from_warehouse_id: String(data.from_warehouse_id ?? ''),
+          to_warehouse_id: String(data.to_warehouse_id ?? ''),
+          reason: data.reason ?? '',
         })
         if (data.items?.length) {
           setItems(data.items.map((it) => ({
-            product_id: String(it.product_id),
-            qty: String(it.qty),
+            product_id: String(it.product_id ?? ''),
+            quantity: String(it.quantity ?? ''),
+            notes: it.notes ?? '',
           })))
         }
       })
       .catch(() => {})
       .finally(() => setIsLoading(false))
-  }, [id, reset])
+  }, [id, reset, navigate])
 
-  const addItem = () => setItems((prev) => [...prev, { product_id: '', qty: '' }])
+  const addItem = () => setItems((prev) => [...prev, { product_id: '', quantity: '', notes: '' }])
   const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx))
   const updateItem = (idx: number, key: keyof ItemRow, value: string) =>
     setItems((prev) => prev.map((row, i) => i === idx ? { ...row, [key]: value } : row))
@@ -113,10 +132,11 @@ export function StockTransferFormPage() {
   const buildPayload = (values: FormValues): StockTransferPayload => ({
     from_warehouse_id: Number(values.from_warehouse_id),
     to_warehouse_id: Number(values.to_warehouse_id),
-    note: values.note || undefined,
-    items: items.filter((it) => it.product_id && it.qty).map((it) => ({
+    reason: values.reason || undefined,
+    items: items.filter((it) => it.product_id && it.quantity).map((it) => ({
       product_id: Number(it.product_id),
-      qty: Number(it.qty),
+      quantity: Number(it.quantity),
+      ...(it.notes ? { notes: it.notes } : {}),
     })),
   })
 
@@ -137,47 +157,6 @@ export function StockTransferFormPage() {
     }
   }
 
-  const handleApprove = async () => {
-    if (!transfer || !window.confirm('ยืนยันการอนุมัติโอนย้ายสต็อก?')) return
-    setIsActioning(true)
-    try {
-      await stockTransferService.approveStockTransfer(transfer.id)
-      window.location.reload()
-    } catch {
-      // interceptor handles display
-    } finally {
-      setIsActioning(false)
-    }
-  }
-
-  const handleReject = async () => {
-    if (!transfer || !window.confirm('ยืนยันการปฏิเสธ?')) return
-    setIsActioning(true)
-    try {
-      await stockTransferService.rejectStockTransfer(transfer.id)
-      window.location.reload()
-    } catch {
-      // interceptor handles display
-    } finally {
-      setIsActioning(false)
-    }
-  }
-
-  const handleComplete = async () => {
-    if (!transfer || !window.confirm('ยืนยันการดำเนินการโอนย้ายเสร็จสิ้น?')) return
-    setIsActioning(true)
-    try {
-      await stockTransferService.completeStockTransfer(transfer.id)
-      navigate('/stock-transfers')
-    } catch {
-      // interceptor handles display
-    } finally {
-      setIsActioning(false)
-    }
-  }
-
-  const isReadonly = transfer !== null && transfer.status !== 'draft'
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -194,52 +173,16 @@ export function StockTransferFormPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link to="/stock-transfers" className="text-gray-400 hover:text-gray-600"><ChevronLeftIcon /></Link>
+          <Link to={isEdit && transfer ? `/stock-transfers/${transfer.id}` : '/stock-transfers'} className="text-gray-400 hover:text-gray-600">
+            <ChevronLeftIcon />
+          </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {isEdit ? (transfer ? `โอนย้ายสต็อก: ${transfer.code}` : 'แก้ไขโอนย้ายสต็อก') : 'สร้างใบโอนย้าย'}
+              {isEdit ? 'แก้ไขใบโอนย้ายสต็อก' : 'สร้างใบโอนย้ายสต็อก'}
             </h1>
-            {transfer && (
-              <span className={cn('mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium', STATUS_LABELS[transfer.status]?.className)}>
-                {STATUS_LABELS[transfer.status]?.label}
-              </span>
-            )}
+            {transfer && <p className="font-mono text-xs text-gray-500">{transfer.transfer_no}</p>}
           </div>
         </div>
-        {transfer && canEdit && (
-          <div className="flex gap-2">
-            {transfer.status === 'draft' || transfer.status === 'pending' ? (
-              <button
-                type="button"
-                onClick={handleApprove}
-                disabled={isActioning}
-                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
-              >
-                อนุมัติ
-              </button>
-            ) : null}
-            {(transfer.status === 'draft' || transfer.status === 'pending') && (
-              <button
-                type="button"
-                onClick={handleReject}
-                disabled={isActioning}
-                className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
-              >
-                ปฏิเสธ
-              </button>
-            )}
-            {transfer.status === 'approved' && (
-              <button
-                type="button"
-                onClick={handleComplete}
-                disabled={isActioning}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-              >
-                ดำเนินการเสร็จสิ้น
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -251,7 +194,6 @@ export function StockTransferFormPage() {
               <select
                 {...register('from_warehouse_id', { required: 'กรุณาเลือกคลังต้นทาง' })}
                 className={cn(field, errors.from_warehouse_id && 'border-red-400')}
-                disabled={isReadonly}
               >
                 <option value="">— เลือกคลังต้นทาง —</option>
                 {warehouses.map((w) => (<option key={w.id} value={w.id}>{w.name}</option>))}
@@ -263,7 +205,6 @@ export function StockTransferFormPage() {
               <select
                 {...register('to_warehouse_id', { required: 'กรุณาเลือกคลังปลายทาง' })}
                 className={cn(field, errors.to_warehouse_id && 'border-red-400')}
-                disabled={isReadonly}
               >
                 <option value="">— เลือกคลังปลายทาง —</option>
                 {warehouses.map((w) => (<option key={w.id} value={w.id}>{w.name}</option>))}
@@ -271,8 +212,8 @@ export function StockTransferFormPage() {
               {errors.to_warehouse_id && <p className="mt-1 text-xs text-red-500">{errors.to_warehouse_id.message}</p>}
             </div>
             <div className="sm:col-span-2">
-              <label className={lbl}>หมายเหตุ</label>
-              <input {...register('note')} className={field} placeholder="หมายเหตุ" disabled={isReadonly} />
+              <label className={lbl}>เหตุผล / หมายเหตุ</label>
+              <textarea {...register('reason')} className={field} placeholder="เหตุผลในการโอนย้าย" rows={2} />
             </div>
           </div>
         </div>
@@ -281,63 +222,75 @@ export function StockTransferFormPage() {
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">รายการสินค้า</h2>
-            {!isReadonly && (
-              <button
-                type="button"
-                onClick={addItem}
-                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                <PlusIcon /> เพิ่มรายการ
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={addItem}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <PlusIcon /> เพิ่มรายการ
+            </button>
           </div>
           <div className="space-y-3">
             {items.map((row, idx) => (
-              <div key={idx} className="grid grid-cols-[1fr_140px_36px] gap-2 items-end">
+              <div key={idx} className="grid grid-cols-[1fr_120px_1fr_36px] gap-2 items-end">
                 <div>
                   {idx === 0 && <label className={lbl}>สินค้า <span className="text-red-500">*</span></label>}
                   <select
                     value={row.product_id}
                     onChange={(e) => updateItem(idx, 'product_id', e.target.value)}
                     className={field}
-                    disabled={isReadonly}
                     required
                   >
                     <option value="">— เลือกสินค้า —</option>
-                    {products.map((p) => (<option key={p.id} value={p.id}>{p.sku} — {p.name}</option>))}
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.sku} — {p.name}{fromWarehouseId ? ` (${(stockMap[p.id] ?? 0).toLocaleString('th-TH')} ชิ้น)` : ''}
+                      </option>
+                    ))}
                   </select>
+
                 </div>
                 <div>
                   {idx === 0 && <label className={lbl}>จำนวน <span className="text-red-500">*</span></label>}
                   <input
                     type="number"
                     min="1"
-                    value={row.qty}
-                    onChange={(e) => updateItem(idx, 'qty', e.target.value)}
+                    value={row.quantity}
+                    onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
                     className={field}
                     placeholder="จำนวน"
                     required
-                    disabled={isReadonly}
                   />
                 </div>
-                {!isReadonly && (
-                  <button
-                    type="button"
-                    onClick={() => removeItem(idx)}
-                    disabled={items.length === 1}
-                    className={cn('flex items-center justify-center h-9 w-9 rounded-lg border border-red-200 text-red-400 hover:bg-red-50', items.length === 1 && 'opacity-30 cursor-not-allowed')}
-                  >
-                    <TrashIcon />
-                  </button>
-                )}
+                <div>
+                  {idx === 0 && <label className={lbl}>หมายเหตุ</label>}
+                  <input
+                    type="text"
+                    value={row.notes}
+                    onChange={(e) => updateItem(idx, 'notes', e.target.value)}
+                    className={field}
+                    placeholder="หมายเหตุ (ถ้ามี)"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeItem(idx)}
+                  disabled={items.length === 1}
+                  className={cn('flex items-center justify-center h-9 w-9 rounded-lg border border-red-200 text-red-400 hover:bg-red-50', items.length === 1 && 'opacity-30 cursor-not-allowed')}
+                >
+                  <TrashIcon />
+                </button>
               </div>
             ))}
           </div>
         </div>
 
-        {!isReadonly && (canCreate || canEdit) && (
+        {(canCreate || canEdit) && (
           <div className="flex items-center justify-end gap-3">
-            <Link to="/stock-transfers" className="rounded-lg border border-gray-200 px-5 py-2 text-sm text-gray-600 hover:bg-gray-50">
+            <Link
+              to={isEdit && transfer ? `/stock-transfers/${transfer.id}` : '/stock-transfers'}
+              className="rounded-lg border border-gray-200 px-5 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            >
               ยกเลิก
             </Link>
             <button

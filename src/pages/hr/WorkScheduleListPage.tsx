@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { WorkSchedule } from '@/types/hr'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { sortRows } from '@/lib/utils'
 import { SortableHeader } from '@/components/ui/SortableHeader'
 // Replaced with raw implementations for now
@@ -10,8 +11,8 @@ import { SortableHeader } from '@/components/ui/SortableHeader'
 export function WorkScheduleListPage() {
   const [schedules, setSchedules] = useState<WorkSchedule[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [, setIsDeleting] = useState(false)
-  const [, setScheduleToDelete] = useState<WorkSchedule | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [confirmDeleteSchedule, setConfirmDeleteSchedule] = useState<WorkSchedule | null>(null)
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -43,7 +44,6 @@ export function WorkScheduleListPage() {
     try {
       await hrService.deleteWorkSchedule(targetRow.id)
       setSchedules(prev => prev.filter(s => s.id !== targetRow.id))
-      setScheduleToDelete(null)
     } catch (e) {
       console.error("Error deleting work schedule", e)
     } finally {
@@ -109,13 +109,7 @@ export function WorkScheduleListPage() {
                       <ActionIconLink variant="edit" to={`/settings/work-schedules/edit/${row.id}`} />
                       <ActionIconButton
                         variant="delete"
-                        onClick={() => {
-                          if(window.confirm(`ต้องการลบตารางเวลา "${row.name}" ใช่หรือไม่?`)) {
-                            setScheduleToDelete(row)
-                            // The real delete would fire here, let's just cheat the state for this mock component since useEffect won't trigger delete automatically without the ConfirmModal
-                            handleDeleteMock(row)
-                          }
-                        }}
+                        onClick={() => setConfirmDeleteSchedule(row)}
                       />
                     </div>
                   </td>
@@ -125,6 +119,17 @@ export function WorkScheduleListPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmDeleteSchedule !== null}
+        title="ยืนยันการลบตารางเวลา"
+        message={`ต้องการลบตารางเวลา "${confirmDeleteSchedule?.name ?? ''}" ใช่หรือไม่?`}
+        confirmLabel="ลบ"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={() => { if (confirmDeleteSchedule) { handleDeleteMock(confirmDeleteSchedule); setConfirmDeleteSchedule(null) } }}
+        onCancel={() => setConfirmDeleteSchedule(null)}
+      />
     </div>
   )
 }

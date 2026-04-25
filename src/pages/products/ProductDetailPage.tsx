@@ -12,6 +12,7 @@ import type {
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 type BottomTabKey = 'sku' | 'bundle' | 'spare'
 
@@ -261,6 +262,8 @@ export function ProductDetailPage() {
   const [bom, setBom] = useState<BOMItem[]>([])
   const [compatibility, setCompatibility] = useState<ProductCompatibility[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const productId = Number(id)
   const canEdit = hasPermission(permissions, 'products', 'can_edit')
@@ -297,11 +300,12 @@ export function ProductDetailPage() {
   }, [activeTab, productId])
 
   const handleDelete = async () => {
-    if (!window.confirm('ยืนยันการลบสินค้านี้?')) return
+    setIsDeleting(true)
     try {
       await productService.deleteProduct(productId)
       navigate('/products')
     } catch { /* interceptor handles */ }
+    finally { setIsDeleting(false); setDeleteConfirmOpen(false) }
   }
 
   // Loading skeleton
@@ -360,7 +364,7 @@ export function ProductDetailPage() {
           {canDelete && (
             <button
               type="button"
-              onClick={handleDelete}
+              onClick={() => setDeleteConfirmOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-red-600 hover:bg-red-50"
             >
               <TrashIcon size={14} /> ลบ
@@ -578,6 +582,17 @@ export function ProductDetailPage() {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        title="ยืนยันการลบสินค้า"
+        message="คุณต้องการลบสินค้านี้ออกจากระบบใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้"
+        confirmLabel="ลบสินค้า"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
     </div>
   )
 }

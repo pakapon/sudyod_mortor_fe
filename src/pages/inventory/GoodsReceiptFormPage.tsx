@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 import { apiClient } from '@/api/client'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { RichTextToolbar } from '@/components/RichTextToolbar'
 
 const field = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
@@ -81,6 +82,7 @@ export function GoodsReceiptFormPage() {
   const [documents, setDocuments] = useState<GoodsReceiptDocument[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [deletingDocId, setDeletingDocId] = useState<number | null>(null)
+  const [confirmDeleteDocId, setConfirmDeleteDocId] = useState<number | null>(null)
   const [uploadFileType, setUploadFileType] = useState<GoodsReceiptDocumentType>('invoice')
   const [uploadNote, setUploadNote] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -160,8 +162,12 @@ export function GoodsReceiptFormPage() {
     }
   }
 
-  const handleDeleteDocument = async (docId: number) => {
-    if (!id || !window.confirm('ยืนยันลบไฟล์นี้?')) return
+  const handleDeleteDocument = (docId: number) => { setConfirmDeleteDocId(docId) }
+
+  const handleConfirmDeleteDocument = async () => {
+    if (!id || !confirmDeleteDocId) return
+    const docId = confirmDeleteDocId
+    setConfirmDeleteDocId(null)
     setDeletingDocId(docId)
     try {
       await goodsReceiptService.deleteDocument(Number(id), docId)
@@ -491,6 +497,17 @@ export function GoodsReceiptFormPage() {
           </div>
         )}
       </form>
+
+      <ConfirmModal
+        isOpen={confirmDeleteDocId !== null}
+        title="ยืนยันการลบไฟล์"
+        message="คุณต้องการลบไฟล์แนบนี้ออกใช่หรือไม่?"
+        confirmLabel="ลบไฟล์"
+        variant="danger"
+        isLoading={deletingDocId !== null}
+        onConfirm={handleConfirmDeleteDocument}
+        onCancel={() => setConfirmDeleteDocId(null)}
+      />
     </div>
   )
 }

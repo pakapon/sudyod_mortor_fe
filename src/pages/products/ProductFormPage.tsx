@@ -597,6 +597,7 @@ function BomTabEdit({ productId }: { productId: number }) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingGroup, setEditingGroup] = useState<{ parentSku: string; components: BomComponentRow[]; stockPolicy: 'auto' | 'manual' } | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
   const loadBom = async () => {
     setLoading(true)
@@ -622,8 +623,14 @@ function BomTabEdit({ productId }: { productId: number }) {
     })
   }
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ยืนยันการลบรายการชิ้นส่วนนี้?')) return
+  const handleDelete = (id: number) => {
+    setConfirmDeleteId(id)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return
+    const id = confirmDeleteId
+    setConfirmDeleteId(null)
     setDeletingId(id)
     try {
       await productService.deleteBOMItem(productId, id)
@@ -722,6 +729,17 @@ function BomTabEdit({ productId }: { productId: number }) {
           onSaved={() => { setEditingGroup(null); loadBom() }}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmDeleteId !== null}
+        title="ยืนยันการลบชิ้นส่วน"
+        message="คุณต้องการลบรายการชิ้นส่วนนี้ใช่หรือไม่?"
+        confirmLabel="ลบ"
+        variant="danger"
+        isLoading={deletingId !== null}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }
@@ -940,6 +958,7 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
   const [showModal, setShowModal] = useState(false)
   const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [confirmDeleteVariantId, setConfirmDeleteVariantId] = useState<number | null>(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -958,8 +977,14 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
     loadData()
   }, [productId])
 
-  const handleDeleteVariant = async (id: number) => {
-    if (!window.confirm('ยืนยันการลบรหัสสินค้านี้?')) return
+  const handleDeleteVariant = (id: number) => {
+    setConfirmDeleteVariantId(id)
+  }
+
+  const handleConfirmDeleteVariant = async () => {
+    if (!confirmDeleteVariantId) return
+    const id = confirmDeleteVariantId
+    setConfirmDeleteVariantId(null)
     setDeletingId(id)
     try {
       await productService.deleteProductVariant(productId, id)
@@ -1118,6 +1143,17 @@ function SkuTabEdit({ productId, product }: { productId: number; product: Produc
           onSaved={() => { setShowModal(false); setEditingVariant(null); loadData() }}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmDeleteVariantId !== null}
+        title="ยืนยันการลบรหัสสินค้า"
+        message="คุณต้องการลบรหัสสินค้านี้ใช่หรือไม่?"
+        confirmLabel="ลบ"
+        variant="danger"
+        isLoading={deletingId !== null}
+        onConfirm={handleConfirmDeleteVariant}
+        onCancel={() => setConfirmDeleteVariantId(null)}
+      />
     </div>
   )
 }
@@ -1138,6 +1174,7 @@ export function ProductFormPage() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null)
+  const [confirmDeleteImageId, setConfirmDeleteImageId] = useState<number | null>(null)
 
   const [brands, setBrands] = useState<{ id: number; name: string }[]>([])
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([])
@@ -1217,8 +1254,14 @@ export function ProductFormPage() {
     } catch { } finally { setUploadingImage(false) }
   }
 
-  const handleDeleteImage = async (imageId: number) => {
-    if (!window.confirm('ยืนยันการลบรูปภาพนี้?')) return
+  const handleDeleteImage = (imageId: number) => {
+    setConfirmDeleteImageId(imageId)
+  }
+
+  const handleConfirmDeleteImage = async () => {
+    if (!confirmDeleteImageId) return
+    const imageId = confirmDeleteImageId
+    setConfirmDeleteImageId(null)
     setDeletingImageId(imageId)
     try {
       await productService.deleteProductImage(productId, imageId)
@@ -1568,6 +1611,17 @@ export function ProductFormPage() {
           {isSubmitting ? 'กำลังบันทึก...' : 'บันทึก'}
         </button>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmDeleteImageId !== null}
+        title="ยืนยันการลบรูปภาพ"
+        message="คุณต้องการลบรูปภาพนี้ออกใช่หรือไม่?"
+        confirmLabel="ลบรูป"
+        variant="danger"
+        isLoading={deletingImageId !== null}
+        onConfirm={handleConfirmDeleteImage}
+        onCancel={() => setConfirmDeleteImageId(null)}
+      />
     </div>
   )
 }

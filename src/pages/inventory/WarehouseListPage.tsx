@@ -5,6 +5,7 @@ import type { Warehouse } from '@/types/inventory'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 function PlusIcon() {
   return (
@@ -30,6 +31,7 @@ export function WarehouseListPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
   const search = searchParams.get('search') ?? ''
   const page = Number(searchParams.get('page') ?? '1')
@@ -60,8 +62,12 @@ export function WarehouseListPage() {
 
   useEffect(() => { loadWarehouses() }, [loadWarehouses])
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ยืนยันการลบคลังสินค้านี้?')) return
+  const handleDelete = (id: number) => { setConfirmDeleteId(id) }
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return
+    const id = confirmDeleteId
+    setConfirmDeleteId(null)
     setDeleteId(id)
     try {
       await warehouseService.deleteWarehouse(id)
@@ -206,6 +212,17 @@ export function WarehouseListPage() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={confirmDeleteId !== null}
+        title="ยืนยันการลบ"
+        message="คุณต้องการลบคลังสินค้ารายการนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้"
+        confirmLabel="ลบ"
+        variant="danger"
+        isLoading={deleteId !== null}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }

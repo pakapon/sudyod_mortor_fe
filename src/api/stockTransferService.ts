@@ -16,7 +16,7 @@ export const stockTransferService = {
   },
 
   updateStockTransfer(id: number, payload: Partial<StockTransferPayload>) {
-    return apiClient.put<ApiResponse<StockTransfer>>(`/stock-transfers/${id}`, payload)
+    return apiClient.patch<ApiResponse<StockTransfer>>(`/stock-transfers/${id}`, payload)
   },
 
   deleteStockTransfer(id: number) {
@@ -27,8 +27,8 @@ export const stockTransferService = {
     return apiClient.post<ApiResponse<null>>(`/stock-transfers/${id}/approve`)
   },
 
-  rejectStockTransfer(id: number, note?: string) {
-    return apiClient.post<ApiResponse<null>>(`/stock-transfers/${id}/reject`, { note })
+  cancelStockTransfer(id: number, reason?: string) {
+    return apiClient.post<ApiResponse<null>>(`/stock-transfers/${id}/cancel`, { reason })
   },
 
   completeStockTransfer(id: number) {

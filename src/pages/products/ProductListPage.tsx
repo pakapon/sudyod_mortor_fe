@@ -5,6 +5,7 @@ import type { Product, ProductType } from '@/types/product'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 const TYPE_LABEL: Record<ProductType, string> = {
   goods: 'สินค้า',
@@ -47,6 +48,7 @@ export function ProductListPage() {
   const [total, setTotal] = useState(0)
   const [isExporting, setIsExporting] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
   const search = searchParams.get('search') ?? ''
   const typeFilter = (searchParams.get('type') ?? '') as ProductType | ''
@@ -83,8 +85,14 @@ export function ProductListPage() {
 
   useEffect(() => { loadProducts() }, [loadProducts])
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ยืนยันการลบสินค้ารายการนี้?')) return
+  const handleDelete = (id: number) => {
+    setConfirmDeleteId(id)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return
+    const id = confirmDeleteId
+    setConfirmDeleteId(null)
     setDeleteId(id)
     try {
       await productService.deleteProduct(id)
@@ -292,6 +300,17 @@ export function ProductListPage() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={confirmDeleteId !== null}
+        title="ยืนยันการลบสินค้า"
+        message="คุณต้องการลบสินค้ารายการนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้"
+        confirmLabel="ลบ"
+        variant="danger"
+        isLoading={deleteId !== null}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }

@@ -48,6 +48,7 @@ import { GoodsReceiptFormPage } from '@/pages/inventory/GoodsReceiptFormPage'
 import { GoodsReceiptDetailPage } from '@/pages/inventory/GoodsReceiptDetailPage'
 import { StockTransferListPage } from '@/pages/inventory/StockTransferListPage'
 import { StockTransferFormPage } from '@/pages/inventory/StockTransferFormPage'
+import { StockTransferDetailPage } from '@/pages/inventory/StockTransferDetailPage'
 import { PurchaseOrderListPage } from '@/pages/purchase-orders/PurchaseOrderListPage'
 import { PurchaseOrderFormPage } from '@/pages/purchase-orders/PurchaseOrderFormPage'
 import { PurchaseOrderDetailPage } from '@/pages/purchase-orders/PurchaseOrderDetailPage'
@@ -312,7 +313,8 @@ export const router = createBrowserRouter([
             children: [
               { path: '/stock-transfers', element: <StockTransferListPage /> },
               { path: '/stock-transfers/create', element: <StockTransferFormPage /> },
-              { path: '/stock-transfers/:id', element: <StockTransferFormPage /> },
+              { path: '/stock-transfers/:id', element: <StockTransferDetailPage /> },
+              { path: '/stock-transfers/:id/edit', element: <StockTransferFormPage /> },
             ],
           },
         ],

@@ -90,6 +90,7 @@ const menuItems: MenuItem[] = [
     children: [
       { label: 'สินค้า', path: '/products' },
       { label: 'คลังสินค้า', path: '/warehouses' },
+      { label: 'สต็อกในคลัง', path: '/inventory' },
       { label: 'ใบรับสินค้า', path: '/goods-receipts' },
       { label: 'โอนย้ายสต็อก', path: '/stock-transfers' },
       { label: 'ใบสั่งซื้อ', path: '/purchase-orders' },

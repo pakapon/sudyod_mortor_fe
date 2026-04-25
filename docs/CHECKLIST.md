@@ -1,6 +1,6 @@
 # Checklist ระบบ — Sudyod Motor Frontend
 
-> อัปเดตล่าสุด: 25 เมษายน 2026  
+> อัปเดตล่าสุด: 26 เมษายน 2026  
 > Legend: ✅ เสร็จแล้ว | 🔧 กำลังทำ | ⬜ ยังไม่ทำ | 🔶 PlaceholderPage (มี route แล้ว ยังไม่มีหน้าจริง)
 
 ---
@@ -131,6 +131,11 @@
 | 6.4 | StockBalancePage (สินค้าคงเหลือ + filter + low-stock alert) | `src/pages/inventory/StockBalancePage.tsx` | ✅ |
 | 6.5 | GoodsReceiptListPage + GoodsReceiptFormPage (ใบรับสินค้า) | `src/pages/inventory/GoodsReceipt*.tsx` | ✅ |
 | 6.6 | StockTransferListPage + StockTransferFormPage (โอนย้ายสต็อก) | `src/pages/inventory/StockTransfer*.tsx` | ✅ |
+
+**Bug fixes & improvements (26 เม.ย. 2026):**
+- `InventoryItem` type แก้ชื่อ field ให้ตรง API จริง: `qty` → `quantity`, `reserved` → `reserved_quantity`, `min_stock` → `min_quantity`; ลบ `available` / `cost` ออก (API ไม่ส่งกลับ)
+- `StockBalancePage` แก้ rendering ทุก column ให้ใช้ field ที่ถูกต้อง — ยอดที่แสดงเป็น 0 ทั้งหมดแก้แล้ว
+- `StockTransferFormPage` เพิ่มยอดคงเหลือของคลังต้นทางใน option text ของ dropdown สินค้า (เช่น `SKU-WAVE110I — Honda Wave 110i (2025) (14 ชิ้น)`) — โหลดผ่าน `GET /inventory?warehouse_id=X&limit=500`
 | 6.7 | StockAdjustPage (ปรับสต็อก + cycle count) | `src/pages/inventory/StockAdjustPage.tsx` | ⬜ |
 | 6.8 | เพิ่ม route คลัง/สต็อก | `src/routes/index.tsx` | ✅ |
 

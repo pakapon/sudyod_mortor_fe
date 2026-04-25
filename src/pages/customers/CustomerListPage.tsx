@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink, ActionIconButton } from '@/components/ui/ActionIconButton'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 const GRADE_LABEL: Record<CustomerGrade, string> = {
   good: 'ดี',
@@ -70,6 +71,7 @@ export function CustomerListPage() {
   const [total, setTotal] = useState(0)
   const [isExporting, setIsExporting] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
   const search = searchParams.get('search') ?? ''
   const typeFilter = (searchParams.get('type') ?? '') as CustomerType | ''
@@ -116,8 +118,14 @@ export function CustomerListPage() {
 
   useEffect(() => { loadCustomers() }, [loadCustomers])
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('ยืนยันการลบลูกค้ารายนี้?')) return
+  const handleDelete = (id: number) => {
+    setConfirmDeleteId(id)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteId) return
+    const id = confirmDeleteId
+    setConfirmDeleteId(null)
     setDeleteId(id)
     try {
       await customerService.deleteCustomer(id)
@@ -422,6 +430,17 @@ export function CustomerListPage() {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmDeleteId !== null}
+        title="ยืนยันการลบลูกค้า"
+        message="คุณต้องการลบลูกค้ารายนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้"
+        confirmLabel="ลบ"
+        variant="danger"
+        isLoading={deleteId !== null}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }

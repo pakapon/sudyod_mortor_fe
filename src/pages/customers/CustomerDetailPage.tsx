@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { ActionIconButton } from '@/components/ui/ActionIconButton'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PHONE_TYPE_LABEL: Record<CustomerPhoneType, string> = {
@@ -104,6 +105,8 @@ export function CustomerDetailPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('profile')
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const { permissions } = useAuthStore()
   const canEdit = hasPermission(permissions, 'customers', 'can_edit')
@@ -292,11 +295,12 @@ export function CustomerDetailPage() {
 
   // ── Delete customer ───────────────────────────────────────────────────────
   const handleDeleteCustomer = async () => {
-    if (!window.confirm('ยืนยันการลบลูกค้ารายนี้?')) return
+    setIsDeleting(true)
     try {
       await customerService.deleteCustomer(customerId)
       navigate('/customers')
     } catch { /* interceptor handles display */ }
+    finally { setIsDeleting(false); setDeleteConfirmOpen(false) }
   }
 
   // ── Phone save ────────────────────────────────────────────────────────────
@@ -505,7 +509,7 @@ export function CustomerDetailPage() {
           )}
           {canDelete && (
             <button
-              onClick={handleDeleteCustomer}
+              onClick={() => setDeleteConfirmOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-red-600 hover:bg-red-50"
             >
               ลบลูกค้า
@@ -1542,6 +1546,17 @@ export function CustomerDetailPage() {
           />
         </Modal>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        title="ยืนยันการลบลูกค้า"
+        message="คุณต้องการลบลูกค้ารายนี้ออกจากระบบใช่หรือไม่? ข้อมูลทั้งหมดของลูกค้าจะถูกลบและไม่สามารถย้อนกลับได้"
+        confirmLabel="ลบลูกค้า"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={handleDeleteCustomer}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
     </div>
   )
 }
