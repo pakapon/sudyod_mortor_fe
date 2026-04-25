@@ -124,6 +124,7 @@ const menuItems: MenuItem[] = [
       { label: 'Supplier', path: '/settings/vendors' },
       { label: 'บริษัทไฟแนนซ์', path: '/settings/finance-companies' },
       { label: 'ตัวเลือกแบบสินค้า', path: '/settings/product-attributes' },
+      { label: 'รายการตรวจสอบสภาพรถ', path: '/settings/vehicle-inspection-checklists' },
     ],
   },
   { id: 'auditLog', label: 'Audit Log', icon: 'auditLog', path: '/audit-logs' },

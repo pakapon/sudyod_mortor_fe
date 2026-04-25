@@ -17,9 +17,10 @@ function PlusIcon() {
 
 const STATUS_CONFIG: Record<GoodsReceiptStatus, { label: string; className: string }> = {
   draft: { label: 'ร่าง', className: 'bg-gray-100 text-gray-600' },
-  received: { label: 'รับแล้ว', className: 'bg-green-100 text-green-700' },
+  approved: { label: 'รับแล้ว', className: 'bg-green-100 text-green-700' },
   cancelled: { label: 'ยกเลิก', className: 'bg-red-100 text-red-600' },
 }
+const FALLBACK_STATUS = { label: '-', className: 'bg-gray-100 text-gray-500' }
 
 export function GoodsReceiptListPage() {
   const navigate = useNavigate()
@@ -118,7 +119,7 @@ export function GoodsReceiptListPage() {
           >
             <option value="">สถานะทั้งหมด</option>
             <option value="draft">ร่าง</option>
-            <option value="received">รับแล้ว</option>
+            <option value="approved">รับแล้ว</option>
             <option value="cancelled">ยกเลิก</option>
           </select>
         </div>
@@ -158,14 +159,14 @@ export function GoodsReceiptListPage() {
                 </tr>
               ) : (
                 receipts.map((receipt) => {
-                  const statusCfg = STATUS_CONFIG[receipt.status]
+                  const statusCfg = STATUS_CONFIG[receipt.status] ?? FALLBACK_STATUS
                   return (
                     <tr
                       key={receipt.id}
                       onClick={() => navigate(`/goods-receipts/${receipt.id}`)}
                       className="cursor-pointer hover:bg-blue-50 transition-colors"
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{receipt.code}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{receipt.receipt_no}</td>
                       <td className="px-4 py-3 text-gray-900">{receipt.warehouse?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{receipt.vendor?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{receipt.reference_no ?? '—'}</td>
@@ -175,11 +176,18 @@ export function GoodsReceiptListPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                        {receipt.created_at ? new Date(receipt.created_at).toLocaleDateString('th-TH') : '—'}
+                        {receipt.received_date
+                          ? new Date(receipt.received_date).toLocaleDateString('th-TH')
+                          : receipt.created_at
+                            ? new Date(receipt.created_at).toLocaleDateString('th-TH')
+                            : '—'}
                       </td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <ActionIconLink to={`/goods-receipts/${receipt.id}`} title="ดูรายละเอียด" variant="view" />
+                          {receipt.status === 'draft' && (
+                            <ActionIconLink to={`/goods-receipts/${receipt.id}/edit`} title="แก้ไข" variant="edit" />
+                          )}
                           {canDelete && receipt.status === 'draft' && (
                             <ActionIconButton
                               onClick={() => handleDelete(receipt.id)}

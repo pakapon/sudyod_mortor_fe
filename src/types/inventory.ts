@@ -103,7 +103,7 @@ export interface StockAdjustPayload {
 
 // ---- Goods Receipt ----
 
-export type GoodsReceiptStatus = 'draft' | 'received' | 'cancelled'
+export type GoodsReceiptStatus = 'draft' | 'approved' | 'cancelled'
 
 export interface GoodsReceiptItem {
   id: number
@@ -119,19 +119,39 @@ export interface GoodsReceiptItemPayload {
   cost_price: number
 }
 
+export type GoodsReceiptDocumentType = 'invoice' | 'delivery_note' | 'receipt' | 'other'
+
+export interface GoodsReceiptDocument {
+  id: number
+  file_name: string
+  file_url: string
+  file_type: GoodsReceiptDocumentType
+  file_size?: number
+  mime_type?: string
+  note?: string
+  uploaded_at?: string
+  uploaded_by?: { id: number; first_name: string; last_name: string }
+}
+
 export interface GoodsReceipt {
   id: number
-  code: string
+  receipt_no: string
   warehouse_id: number
   warehouse?: { id: number; name: string }
   vendor_id?: number
   vendor?: { id: number; name: string }
-  reference_no?: string
-  note?: string
+  branch_id?: number
+  reference_no?: string | null
+  received_date?: string
+  notes?: string | null
   status: GoodsReceiptStatus
-  items: GoodsReceiptItem[]
-  approved_at?: string
-  approved_by?: { id: number; first_name: string; last_name: string }
+  total_items?: number
+  items?: GoodsReceiptItem[]
+  documents?: GoodsReceiptDocument[]
+  approved_at?: string | null
+  approved_by?: { id: number; first_name: string; last_name: string } | null
+  received_at?: string | null
+  received_by?: { id: number; first_name: string; last_name: string } | number | null
   created_at?: string
   created_by?: { id: number; first_name: string; last_name: string }
 }
@@ -140,7 +160,8 @@ export interface GoodsReceiptPayload {
   warehouse_id: number
   vendor_id?: number
   reference_no?: string
-  note?: string
+  received_date?: string
+  notes?: string
   items: GoodsReceiptItemPayload[]
 }
 

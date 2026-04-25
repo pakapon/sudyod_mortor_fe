@@ -64,7 +64,8 @@ Sidebar Menu:
 │   ├── หน่วยนับ
 │   ├── Supplier
 │   ├── บริษัทไฟแนนซ์
-│   └── ตัวเลือกแบบสินค้า
+│   ├── ตัวเลือกแบบสินค้า
+│   └── รายการตรวจสอบสภาพรถ
 ├── 📋 Audit Log
 └── 🔔 แจ้งเตือน (badge จำนวน)
 ```
@@ -98,6 +99,7 @@ Sidebar Menu:
 | ตั้งค่า › หมวดสินค้า | [17-settings.md](./17-settings.md) | 17.6 |
 | ตั้งค่า › บริษัทไฟแนนซ์ | [17-settings.md](./17-settings.md) | 17.7 |
 | ตั้งค่า › ตัวเลือกแบบสินค้า | [17-settings.md](./17-settings.md) | 17.8 |
+| ตั้งค่า › รายการตรวจสอบสภาพรถ | [17-settings.md](./17-settings.md) | 17.9 |
 | แจ้งเตือน | [18-notifications.md](./18-notifications.md) | ทั้งหมด |
 | Audit Log | [19-audit-log.md](./19-audit-log.md) | ทั้งหมด |
 | Business Flows (ทุก Scenario) | [20-flows.md](./20-flows.md) | ทั้งหมด |

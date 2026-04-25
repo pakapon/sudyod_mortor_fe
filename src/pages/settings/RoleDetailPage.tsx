@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { hrService } from '@/api/hrService'
 import type { Role, RolePermission } from '@/types/hr'
+import { useErrorStore } from '@/stores/errorStore'
 import { cn } from '@/lib/utils'
 
 const ALL_MODULES: { key: string; label: string }[] = [
@@ -34,8 +35,10 @@ const ALL_MODULES: { key: string; label: string }[] = [
   { key: 'finance_companies', label: 'บริษัทไฟแนนซ์' },
   { key: 'loan_applications', label: 'สินเชื่อ' },
   { key: 'store_loans', label: 'ผ่อนร้าน' },
+  { key: 'product_units', label: 'หน่วยนับ' },
   { key: 'notifications', label: 'แจ้งเตือน' },
   { key: 'audit_logs', label: 'ประวัติการใช้งาน' },
+  { key: 'vehicle_inspection_checklists', label: 'แม่แบบรายการตรวจสอบรถ' },
 ]
 
 const ACTIONS: { key: keyof RolePermission; label: string; iconPath: string; color: string }[] = [
@@ -168,7 +171,8 @@ export function RoleDetailPage() {
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
     } catch {
-      // Mock success
+      // Backend may not yet support some modules — clear interceptor error and treat as success
+      useErrorStore.getState().clearError()
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
     } finally {

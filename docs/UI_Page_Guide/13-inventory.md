@@ -53,15 +53,25 @@
 **Permission:** `goods_receipts.can_view`
 
 **สร้าง:**
-- Fields: `warehouse_id` (select), `vendor_id` (select — `GET /vendors`), `reference_no`, `note`
-- Items: เลือกสินค้า + จำนวน + cost_price
+- Fields: `warehouse_id` (select), `vendor_id` (select — `GET /vendors`), `received_date`, `reference_no` (เลขใบส่งของจาก vendor), `notes`
+- Items: เลือกสินค้า + `quantity_ordered` + `quantity_received` + `unit_cost` + `location_id` (optional)
 - API: `POST /goods-receipts`
 
 **Detail:**
 - ปุ่ม "อนุมัติรับ" → `POST /goods-receipts/{id}/approve` → สต็อกเข้าคลังทันที
-- ปุ่ม "ยกเลิก" → `POST /goods-receipts/{id}/cancel` (ได้เฉพาะ draft)
+- ปุ่ม "ยกเลิก" → `POST /goods-receipts/{id}/cancel` (ได้เฉพาะ draft; ถ้า approved แล้ว → reverse stock)
 
-**Status:** `draft → received / cancelled`
+**Tab เอกสารแนบ (Documents):**
+- Upload เอกสารจริงจาก vendor หลายไฟล์ (PDF / รูป / Word / Excel) — `multipart/form-data`
+- Fields ต่อไฟล์: `file` (binary), `file_type` (`invoice` | `delivery_note` | `receipt` | `other`), `file_name` (optional), `note` (optional)
+- ขนาดไฟล์: ตาม config global; รองรับ `application/pdf`, `image/jpeg`, `image/png`, `application/msword`, `docx`, `xls`, `xlsx`
+- API:
+  - `GET /goods-receipts/{id}/documents` — list
+  - `POST /goods-receipts/{id}/documents` — upload (เรียกซ้ำได้หลายไฟล์)
+  - `DELETE /goods-receipts/{id}/documents/{docId}` — ลบ
+- Detail (`GET /goods-receipts/{id}`) จะ include `documents[]` มาให้ด้วย
+
+**Status:** `draft → approved / cancelled`
 
 ---
 

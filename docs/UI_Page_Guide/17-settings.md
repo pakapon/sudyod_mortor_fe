@@ -51,7 +51,7 @@
 - `GET /permissions/roles/{id}`
 
 **Permission Matrix:**
-- **32 modules × 6 actions** = checkbox grid
+- **33 modules × 6 actions** = checkbox grid
 
 | Module | view | create | edit | delete | approve | export |
 |--------|------|--------|------|--------|---------|--------|
@@ -87,6 +87,7 @@
 | product_units | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | notifications | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 | audit_logs | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| vehicle_inspection_checklists | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 
 **UI Controls:**
 - "เลือกทั้งหมด/ยกเลิกทั้งหมด" ต่อ row (ต่อ module)
@@ -252,6 +253,78 @@
 > เมื่อ backend พร้อมจะ migrate ไปใช้ `/product-attribute-types` แยกต่างหาก
 
 **Sidebar:** แสดงใต้เมนู ตั้งค่า → "ตัวเลือกแบบสินค้า"
+
+---
+
+## 17.9 แม่แบบรายการตรวจสอบรถ (Vehicle Inspection Checklists)
+
+**Route:** `/settings/vehicle-inspection-checklists`
+**Permission:** `vehicle_inspection_checklists.can_view`
+**Sidebar label:** รายการตรวจสอบสภาพรถ
+**Status:** ✅ Implemented (25 เม.ย. 2026)
+
+> Template เพื่อกำหนดชุดรายการตรวจสอบตามรถแต่ละรุ่น/ปี — ใช้เปิดในหน้าสร้างใบงานซ่อม
+
+> ⚠️ **Backend note:** ตาราง `vehicle_inspection_checklists` ยังต้องรัน migration — API จะ return 500 จนกว่า backend พร้อม
+
+### รายการ Table
+- **คอลัมน์:** ประเภทรถ, แบรนด์, รุ่น, ปี, จำนวนรายการ (สิงหาอีรอดใน items), สถานะ, จัดการ
+- **Sortable:** `brand` (asc), `model` (asc), `year` (asc/desc), `vehicle_type` (asc), `created_at` (desc)
+- **Default sort:** `id DESC`
+- **Search:** `search` — ค้น brand, model, vehicle_type (LIKE)
+- **Filter:** `is_active` (boolean)
+
+### Fields (Create / Edit)
+| Field | Required | หมายเหตุ |
+|-------|----------|---------|
+| `vehicle_type` | ✅ | ประเภทรถ เช่น “มอเตอร์ไซค์”, “สกูตเตอร์” | max 100 |
+| `brand` | ✅ | ชื่อแบรนด์ เช่น Honda, Yamaha | max 100 |
+| `model` | ✅ | ชื่อรุ่น เช่น PCX, Wave 125, Click | max 100 |
+| `year` | ❌ | ปี (1900–2100), NULL = ทุกปี |
+| `is_active` | ✅ | default: true |
+| `items` | ❌ | array ของรายการตรวจสอบ |
+
+### Items (Checklist Sub-form)
+- แต่ละ item: `name` (text, required), `sort_order` (int, default = index)
+- **Full Replace:** ทุกครั้งที่ PUT ส่ง items array ทั้งหมด — backend ลบเก่าแล้ว insert ใหม่
+- รองรับ drag-and-drop reorder (เปลี่ยน sort_order)
+- ปุ่ม “+เพิ่มรายการ” สร้างบรรทัดรายการใหม่ / ไอคอนถังขยะลบ
+
+### APIs
+| Method | Endpoint | หมายเหตุ |
+|--------|----------|---------|
+| GET | `/vehicle-inspection-checklists` | `search`, `is_active`, `page`, `limit`, `sort`, `order` |
+| POST | `/vehicle-inspection-checklists` | สร้างพร้อม items |
+| GET | `/vehicle-inspection-checklists/{id}` | รวม items เรียงตาม sort_order |
+| PUT | `/vehicle-inspection-checklists/{id}` | Full replace items ถ้าส่ง items มา |
+| DELETE | `/vehicle-inspection-checklists/{id}` | Hard delete — items ถูกลบ cascade อัตโนมัติ |
+
+**Query params (GET list):**
+- `search` — ค้น brand / model / vehicle_type (LIKE)
+- `is_active` — true | false
+- `sort` — `id` | `brand` | `model` | `year` | `vehicle_type` | `created_at`
+- `order` — `asc` | `desc` (default: desc)
+- `page`, `limit` — pagination standard
+
+**ตัวอย่าง Payload:**
+```json
+{
+  "vehicle_type": "มอเตอร์ไชค์",
+  "brand": "Honda",
+  "model": "PCX",
+  "year": 2023,
+  "is_active": true,
+  "items": [
+    { "name": "เบรกยาง", "sort_order": 1 },
+    { "name": "หม้อน้ำ", "sort_order": 2 },
+    { "name": "น้ำมันเครื่อง", "sort_order": 3 }
+  ]
+}
+```
+
+**Delete:**
+- Hard Delete — ไม่ต้องตรวจ reference
+- items ถูกลบพร้อมกันผ่าน DB ON DELETE CASCADE
 
 ---
 

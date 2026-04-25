@@ -33,6 +33,8 @@ import { UnitListPage } from '@/pages/settings/UnitListPage'
 import { VendorListPage } from '@/pages/settings/VendorListPage'
 import { VendorFormPage } from '@/pages/settings/VendorFormPage'
 import { ProductAttributeOptionsPage } from '@/pages/settings/ProductAttributeOptionsPage'
+import { VehicleInspectionListPage } from '@/pages/settings/VehicleInspectionListPage'
+import { VehicleInspectionFormPage } from '@/pages/settings/VehicleInspectionFormPage'
 
 import { ProductListPage } from '@/pages/products/ProductListPage'
 import { ProductFormPage } from '@/pages/products/ProductFormPage'
@@ -43,6 +45,7 @@ import { WarehouseDetailPage } from '@/pages/inventory/WarehouseDetailPage'
 import { StockBalancePage } from '@/pages/inventory/StockBalancePage'
 import { GoodsReceiptListPage } from '@/pages/inventory/GoodsReceiptListPage'
 import { GoodsReceiptFormPage } from '@/pages/inventory/GoodsReceiptFormPage'
+import { GoodsReceiptDetailPage } from '@/pages/inventory/GoodsReceiptDetailPage'
 import { StockTransferListPage } from '@/pages/inventory/StockTransferListPage'
 import { StockTransferFormPage } from '@/pages/inventory/StockTransferFormPage'
 import { PurchaseOrderListPage } from '@/pages/purchase-orders/PurchaseOrderListPage'
@@ -222,6 +225,20 @@ export const router = createBrowserRouter([
         ],
       },
 
+      {
+        element: <PermissionGuard module="vehicle_inspection_checklists" />,
+        children: [
+          {
+            element: <AppLayout title="แม่แบบรายการตรวจสอบรถ" />,
+            children: [
+              { path: '/settings/vehicle-inspection-checklists', element: <VehicleInspectionListPage /> },
+              { path: '/settings/vehicle-inspection-checklists/create', element: <VehicleInspectionFormPage /> },
+              { path: '/settings/vehicle-inspection-checklists/:id/edit', element: <VehicleInspectionFormPage /> },
+            ],
+          },
+        ],
+      },
+
       // ─── Products & Inventory ───
       {
         element: <PermissionGuard module="products" />,
@@ -281,7 +298,8 @@ export const router = createBrowserRouter([
             children: [
               { path: '/goods-receipts', element: <GoodsReceiptListPage /> },
               { path: '/goods-receipts/create', element: <GoodsReceiptFormPage /> },
-              { path: '/goods-receipts/:id', element: <GoodsReceiptFormPage /> },
+              { path: '/goods-receipts/:id', element: <GoodsReceiptDetailPage /> },
+              { path: '/goods-receipts/:id/edit', element: <GoodsReceiptFormPage /> },
             ],
           },
         ],

@@ -1,6 +1,6 @@
 # Checklist ระบบ — Sudyod Motor Frontend
 
-> อัปเดตล่าสุด: 23 เมษายน 2026  
+> อัปเดตล่าสุด: 25 เมษายน 2026  
 > Legend: ✅ เสร็จแล้ว | 🔧 กำลังทำ | ⬜ ยังไม่ทำ | 🔶 PlaceholderPage (มี route แล้ว ยังไม่มีหน้าจริง)
 
 ---
@@ -46,7 +46,7 @@
 | 2.3 | EmployeeListPage (ค้นหา + filter + ตาราง + export) | `src/pages/hr/EmployeeListPage.tsx` | ✅ |
 | 2.4 | EmployeeFormPage (สร้าง/แก้ไข) | `src/pages/hr/EmployeeFormPage.tsx` | ✅ |
 | 2.5 | RoleManagementPage (CRUD บทบาท) | `src/pages/hr/RoleManagementPage.tsx` | ✅ |
-| 2.6 | RoleDetailPage (Permission Matrix 30 modules × 6 actions) | `src/pages/settings/RoleDetailPage.tsx` | ✅ |
+| 2.6 | RoleDetailPage (Permission Matrix 33 modules × 6 actions) | `src/pages/settings/RoleDetailPage.tsx` | ✅ |
 | 2.7 | PermissionMatrixPage (ดู/แก้สิทธิ์ภาพรวม) | `src/pages/settings/PermissionMatrixPage.tsx` | ✅ |
 | 2.8 | WorkScheduleListPage | `src/pages/hr/WorkScheduleListPage.tsx` | ✅ |
 | 2.9 | WorkScheduleFormPage (TimeSelect 24h) | `src/pages/hr/WorkScheduleFormPage.tsx` | ✅ |
@@ -68,6 +68,10 @@
 | 3.5 | CategoryListPage (หมวดสินค้า — modal CRUD + parent_id) | `src/pages/settings/CategoryListPage.tsx` | ✅ |
 | 3.6 | UnitListPage (หน่วยนับ — modal CRUD) | `src/pages/settings/UnitListPage.tsx` | ✅ |
 | 3.7 | VendorListPage + VendorFormPage (Supplier) | `src/pages/settings/Vendor*.tsx` | ✅ |
+| 3.8 | VehicleInspection types + service | `src/types/vehicleInspection.ts` + `src/api/vehicleInspectionService.ts` | ✅ |
+| 3.9 | VehicleInspectionListPage + VehicleInspectionFormPage (DnD items) | `src/pages/settings/VehicleInspection*.tsx` | ✅ |
+
+> ⚠️ **Backend note (3.9):** ตาราง `vehicle_inspection_checklists` ยังต้องรัน migration — API จะ return 500 จนกว่า backend จะพร้อม
 
 ---
 
@@ -231,7 +235,7 @@
 | Auth & Layout | 9 | 9 | 0 |
 | Dashboard | 1 | 1 (mock) | 0 (API จริง) |
 | HR | 12 | 12 | 0 |
-| Settings (Master Data) | 13 | 13 | 0 |
+| Settings (Master Data) | 15 | 15 | 0 (backend migration pending) |
 | Shared Components | — | ActionIconButton, TimeSelect24h | — |
 | ลูกค้า (Customers) | 3 | 3 | 0 (4.5a pending Phase 7/8) |
 | สินค้า (Products) | 3 | 3 | 0 |
@@ -242,7 +246,7 @@
 | ใบสั่งซื้อ (Purchase Orders) | 3 | 3 | 0 |
 | แจ้งเตือน & Audit | 2 | 0 | 2 |
 
-**คืบหน้ารวม: ~65% (Phase 0–6 + Phase 10 เสร็จแล้วทั้งหมด — รวม ApiErrorModal + Global Error Handling + Vite Proxy)**
+**คืบหน้ารวม: ~66% (Phase 0–6 + Phase 10 เสร็จแล้วทั้งหมด + Vehicle Inspection Checklists (17.9) — รวม ApiErrorModal + Global Error Handling + Vite Proxy)**
 
 ---
 
