@@ -94,49 +94,54 @@
 ### 13.2.2 Tab สต็อกในคลัง (Inventory)
 
 **UI:**
-- Filter: `product_id` (search dropdown), `low_stock_only` (checkbox)
-- Table: SKU, ชื่อสินค้า, จำนวนคงเหลือ, ตำแหน่งจัดเก็บ, cost price, badge "ต่ำกว่า reorder" (ถ้า `low_stock_only`)
-- ปุ่ม "ปรับสต็อก" / "นับสต็อก" ที่หัวตาราง (ตามสิทธิ์)
+- Filter: `product_variant_id` (search dropdown), `low_stock_only` (checkbox)
+- Table: SKU (`variant.sku`), ชื่อสินค้า (`variant.name`), จำนวนคงเหลือ, หน่วย (`variant.unit.name`), ตำแหน่งจัดเก็บ, badge "ต่ำกว่า reorder" (ถ้า `low_stock_only`)
+- ทุก column ใช้ข้อมูลจาก `variant.*` เป็น primary — **ไม่ fallback ไป `product.*`**
+- ⚠️ **Backend filter:** API คืนเฉพาะ records ที่ `product_variant_id IS NOT NULL` — records เก่า (legacy product-level) จะไม่ปรากฏ
 
 **APIs:**
 | Method | Endpoint | หมายเหตุ |
-|--------|----------|---------|
-| GET | `/warehouses/{id}/inventory` | query: `product_id`, `low_stock_only`, `page`, `limit` |
+|--------|----------|----------|
+| GET | `/warehouses/{id}/inventory` | query: `product_variant_id`, `low_stock_only`, `page`, `limit` |
 
 ---
 
 ### 13.2.3 ปรับสต็อก (Adjust)
 
-**UI:** Modal ฟอร์ม — เลือกสินค้า, ใส่จำนวน +/-, กรอกเหตุผล
+**UI:** Form ด้านข้าง — dropdown เลือกสินค้า, ใส่จำนวนใหม่ (ตัวเลขเต็ม = ค่าจริงใหม่), กรอกเหตุผล
+
+> 💡 **UX (Variant-centric):** dropdown แสดง **variants ทุกตัวในระบบ** (ไม่จำกัดเฉพาะที่มีสต็อกในคลังนี้) — option text: `{sku} — {name} ({color} {year}) — คงเหลือ {qty} ชิ้น` โดย `qty = 0` ถ้า variant ยังไม่เคยมีสต็อกในคลังนี้  
+> Blue card แสดงจำนวนปัจจุบัน (0 ถ้ายังไม่มี) เมื่อเลือก variant แล้ว
 
 **Fields:**
 | Field | Required | หมายเหตุ |
 |-------|----------|---------|
-| `product_id` | ✅ | int positive |
-| `quantity` | ✅ | int — บวก/ลบได้ (เช่น `-3` คือลด 3) |
+| `product_variant_id` | ✅ | int positive |
+| `quantity` | ✅ | int ≥ 0 — ค่าจำนวนจริงใหม่ (ไม่ใช่บวก/ลบ) |
 | `reason` | ✅ | string 1–500 chars |
 
 **Behavior:**
 - ตรวจ `branch_id` ของคลังต้องอยู่ใน `branch_ids_accessible` ของผู้ใช้ (มิฉะนั้น 403 `branch_access_denied`)
-- บันทึก `inventory_transactions` type `adjustment` พร้อม `created_by = employee_id`
+- บันทึก `inventory_transactions` type `adjust` พร้อม `created_by = employee_id`
+- `quantity` คือชัดเจนใหม่เลย — ระบบคำนวณ diff เอง
 
 **APIs:**
 | Method | Endpoint | หมายเหตุ |
 |--------|----------|---------|
-| PATCH | `/warehouses/{id}/inventory/adjust` | คืน inventory row ที่อัปเดตแล้ว |
+| PATCH | `/warehouses/{id}/inventory/adjust` | คืน inventory row ที่อัปเดตแล้ว (include `warehouse`, `product`, `variant`, `location`) |
 
 ---
 
 ### 13.2.4 นับสต็อก (Cycle Count)
 
-**UI:** ฟอร์มหลายแถว — แต่ละแถว = 1 สินค้า + จำนวนที่นับได้จริง → กดบันทึก ระบบจะคำนวณ diff + ปรับสต็อกอัตโนมัติ
+**UI:** ฟอร์มหลายแถว — แต่ละแถว = 1 สินค้า (variant) + จำนวนที่นับได้จริง → กดบันทึก ระบบจะคำนวณ diff + ปรับสต็อกอัตโนมัติ
 
 **Body:**
 ```json
 {
   "items": [
-    { "product_id": 10, "counted_quantity": 5 },
-    { "product_id": 12, "counted_quantity": 0 }
+    { "product_variant_id": 10, "actual_quantity": 5 },
+    { "product_variant_id": 12, "actual_quantity": 0 }
   ]
 }
 ```
@@ -144,8 +149,8 @@
 **Item fields:**
 | Field | Required | หมายเหตุ |
 |-------|----------|---------|
-| `product_id` | ✅ | |
-| `counted_quantity` | ✅ | จำนวนที่นับได้จริง (≥ 0) |
+| `product_variant_id` | ✅ | |
+| `actual_quantity` | ✅ | จำนวนที่นับได้จริง (≥ 0) |
 
 **Behavior:**
 - ตรวจ branch access เหมือน adjust
@@ -156,7 +161,7 @@
 **APIs:**
 | Method | Endpoint | หมายเหตุ |
 |--------|----------|---------|
-| POST | `/warehouses/{id}/inventory/cycle-count` | คืน array ผลลัพธ์ต่อ item (`product_id`, `before`, `counted`, `diff`) |
+| POST | `/warehouses/{id}/inventory/cycle-count` | คืน array ผลลัพธ์ต่อ item (`product_variant_id`, `before`, `actual_quantity`, `diff`) |
 
 ---
 
@@ -171,12 +176,17 @@
 **InventoryItem response fields (เส้น API จริง):**
 | Field | คำอธิบาย | หมายเหตุ |
 |-------|------------|----------|
+| `product_variant_id` | id ของ variant | **required** (`number`) — ไม่มี `undefined` |
 | `quantity` | จำนวนคงเหลือ | |
 | `reserved_quantity` | จอง | nullable |
 | `min_quantity` | สต็อกขั้นต่ำ (reorder point) | nullable |
-| `product`, `warehouse`, `branch`, `location` | nested objects | nullable |
+| `variant` | nested object (sku, name, color, year, unit) | primary source สำหรับแสดงผล |
+| `warehouse`, `branch`, `location` | nested objects | nullable |
+| `product` | nested object | **deprecated** — ไม่ใช้เป็น primary source อีกต่อไป |
 
-> ⚠️ API **ไม่ส่ง** `available` หรือ `cost` — คำนวณ available ที่ UI: `quantity - (reserved_quantity ?? 0)`
+> ⚠️ API **ไม่ส่ง** `available` หรือ `cost` — คำนวณ available ที่ UI: `quantity - (reserved_quantity ?? 0)`  
+> ✅ ทุก column SKU/ชื่อ/หน่วย ใช้ `variant.sku`, `variant.name`, `variant.unit.name` — **ไม่ fallback ไป `product.*`**  
+> ⚠️ **Backend filter (ทั้ง 4 endpoints):** `/inventory`, `/inventory/low-stock`, `/inventory/transactions`, `/warehouses/{id}/inventory` คืนเฉพาะ records ที่ `product_variant_id IS NOT NULL` — records เก่า (legacy product-level) ถูก filter ออกอัตโนมัติ
 
 **APIs:**
 | Method | Endpoint | หมายเหตุ |
@@ -186,7 +196,7 @@
 | GET | `/inventory/transactions` | ประวัติเข้า/ออก — query: `warehouse_id`, `product_id`, `transaction_type`, `date_from`, `date_to` |
 | GET | `/inventory/export` | export รายการสต็อกทั้งหมด (`limit=0`) |
 
-**`transaction_type` enum:** `goods_receipt` | `service_order` | `transfer_in` | `transfer_out` | `adjustment` | `cycle_count` | `sale`
+**`transaction_type` enum:** `goods_receipt` | `service_use` | `transfer_in` | `transfer_out` | `adjust` | `cycle_count` | `sale` | `return`
 
 ---
 
@@ -209,7 +219,9 @@
 | `notes` | ❌ | |
 | `items` | ✅ | array — ต้องไม่ว่าง |
 
-**Item fields:** `product_id`, `quantity_ordered`, `quantity_received`, `unit_cost`, `location_id` (optional), `note` (optional)
+**Item fields:** `product_variant_id`, `quantity_ordered`, `quantity_received`, `unit_cost`, `location_id` (optional), `note` (optional)
+
+> 💡 **UX (Dedup):** dropdown เลือกสินค้าในแต่ละแถวจะ **filter variant ที่ถูกเลือกไปแล้วในแถวอื่นออก** — ป้องกัน duplicate ใน items list (เปรียบด้วย `product_variant_id`)
 
 ### APIs
 
@@ -217,7 +229,7 @@
 |--------|----------|---------|
 | GET | `/goods-receipts` | list + filter |
 | POST | `/goods-receipts` | สร้าง draft, `gr_no` auto-generate `GR-YYYY-XXXX` |
-| GET | `/goods-receipts/{id}` | include `branch`, `vendor`, `warehouse`, `creator`, `approver`, `items[].product`, `documents[]` |
+| GET | `/goods-receipts/{id}` | include `branch`, `vendor`, `warehouse`, `creator`, `approver`, `items[].product`, `items[].variant`, `documents[]` |
 | POST | `/goods-receipts/{id}/approve` | สต็อกเข้าคลังทันที (atomic) — บันทึก transaction `goods_receipt` |
 | POST | `/goods-receipts/{id}/cancel` | ได้ทุกสถานะ; ถ้า `approved` แล้ว → reverse stock อัตโนมัติ |
 
@@ -262,9 +274,9 @@
 | `reason` | ❌ | เหตุผลการโอน |
 | `items` | ✅ | array — ต้องไม่ว่าง |
 
-**Item fields:** `product_id`, `quantity`, `notes` (optional)
+**Item fields:** `product_variant_id`, `quantity`, `notes` (optional)
 
-> 💡 **UX:** dropdown เลือกสินค้าแสดงยอดคงเหลือของคลังต้นทางใน option text (e.g. `SKU-WAVE110I — Honda Wave 110i (2025) (14 ชิ้น)`) — โหลดผ่าน `GET /inventory?warehouse_id=X&limit=500` เมื่อเลือกคลังต้นทาง
+> 💡 **UX:** dropdown เลือกสินค้าแสดงยอดคงเหลือของคลังต้นทางใน option text (e.g. `SKU-WAVE110I — Honda Wave 110i (2025) (14 ชิ้น)`) — โหลดผ่าน `GET /inventory?warehouse_id=X&limit=500` เมื่อเลือกคลังต้นทาง (`product_variant_id` ใน response)
 
 ### APIs
 
@@ -272,7 +284,7 @@
 |--------|----------|---------|
 | GET | `/stock-transfers` | list + filter |
 | POST | `/stock-transfers` | `transfer_no` auto-generate `ST-YYYY-XXXX` |
-| GET | `/stock-transfers/{id}` | include `branch`, `fromWarehouse`, `toWarehouse`, `creator`, `approver`, `items[].product` |
+| GET | `/stock-transfers/{id}` | include `branch`, `fromWarehouse`, `toWarehouse`, `creator`, `approver`, `items[].product`, `items[].variant` |
 | PATCH | `/stock-transfers/{id}` | แก้ได้เฉพาะ `draft` — ส่ง `items` ใหม่จะ replace ทั้งชุด |
 | DELETE | `/stock-transfers/{id}` | hard delete — ได้เฉพาะ `draft` |
 | POST | `/stock-transfers/{id}/approve` | ตรวจสต็อกต้นทางพอ (`stock_insufficient`) แล้วเปลี่ยน → `approved` **(ยังไม่ตัดสต็อก)** + ส่ง notification ให้คลังปลายทาง |

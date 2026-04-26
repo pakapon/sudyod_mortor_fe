@@ -1,3 +1,5 @@
+import type { ProductVariant } from '@/types/product'
+
 // ---- Warehouse ----
 
 export interface Warehouse {
@@ -49,7 +51,9 @@ export interface WarehouseLocationPayload {
 export interface InventoryItem {
   id: number
   product_id: number
+  product_variant_id: number
   product?: { id: number; sku: string; name: string; unit?: { id: number; name: string } }
+  variant?: ProductVariant
   warehouse_id: number
   warehouse?: { id: number; name: string }
   branch?: { id: number; name: string }
@@ -73,7 +77,9 @@ export interface InventoryListParams {
 export interface InventoryTransaction {
   id: number
   product_id: number
+  product_variant_id?: number
   product?: { id: number; sku: string; name: string }
+  variant?: ProductVariant
   warehouse_id: number
   warehouse?: { id: number; name: string }
   transaction_type: string
@@ -98,10 +104,9 @@ export interface InventoryTransactionListParams {
 }
 
 export interface StockAdjustPayload {
-  product_id: number
-  location_id?: number
-  qty: number
-  note: string
+  product_variant_id: number
+  quantity: number
+  reason: string
 }
 
 // ---- Goods Receipt ----
@@ -110,16 +115,22 @@ export type GoodsReceiptStatus = 'draft' | 'approved' | 'cancelled'
 
 export interface GoodsReceiptItem {
   id: number
-  product_id: number
+  product_id?: number
+  product_variant_id: number
   product?: { id: number; sku: string; name: string; unit?: { id: number; name: string } }
-  qty: number
-  cost_price: number
+  variant?: ProductVariant
+  quantity_ordered: number
+  quantity_received?: number
+  unit_cost: number
+  note?: string | null
+  qty?: number
+  cost_price?: number
 }
 
 export interface GoodsReceiptItemPayload {
-  product_id: number
-  qty: number
-  cost_price: number
+  product_variant_id: number
+  quantity_ordered: number
+  unit_cost: number
 }
 
 export type GoodsReceiptDocumentType = 'invoice' | 'delivery_note' | 'receipt' | 'other'
@@ -185,14 +196,16 @@ export type StockTransferStatus = 'draft' | 'approved' | 'completed' | 'cancelle
 
 export interface StockTransferItem {
   id: number
-  product_id: number
+  product_id?: number
+  product_variant_id: number
   product?: { id: number; sku: string; name: string; unit?: { id: number; name: string } }
+  variant?: ProductVariant
   quantity: number
   notes?: string | null
 }
 
 export interface StockTransferItemPayload {
-  product_id: number
+  product_variant_id: number
   quantity: number
   notes?: string
 }

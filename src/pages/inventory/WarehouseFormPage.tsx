@@ -113,15 +113,6 @@ export function WarehouseFormPage() {
               {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
             </div>
             <div>
-              <label className={lbl}>รหัสคลัง <span className="text-red-500">*</span></label>
-              <input
-                {...register('code', { required: 'กรุณากรอกรหัสคลัง' })}
-                className={cn(field, errors.code && 'border-red-400')}
-                placeholder="เช่น WH-001"
-              />
-              {errors.code && <p className="mt-1 text-xs text-red-500">{errors.code.message}</p>}
-            </div>
-            <div>
               <label className={lbl}>สาขา</label>
               <select {...register('branch_id')} className={field}>
                 <option value="">— เลือกสาขา —</option>

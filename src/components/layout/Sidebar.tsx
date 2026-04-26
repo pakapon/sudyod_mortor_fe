@@ -93,7 +93,6 @@ const menuItems: MenuItem[] = [
       { label: 'สต็อกในคลัง', path: '/inventory' },
       { label: 'ใบรับสินค้า', path: '/goods-receipts' },
       { label: 'โอนย้ายสต็อก', path: '/stock-transfers' },
-      { label: 'ใบสั่งซื้อ', path: '/purchase-orders' },
     ],
   },
   {

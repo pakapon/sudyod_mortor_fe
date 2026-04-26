@@ -55,6 +55,6 @@ export const warehouseService = {
   },
 
   adjustStock(warehouseId: number, payload: StockAdjustPayload) {
-    return apiClient.post<ApiResponse<null>>(`/warehouses/${warehouseId}/inventory/adjust`, payload)
+    return apiClient.patch<ApiResponse<null>>(`/warehouses/${warehouseId}/inventory/adjust`, payload)
   },
 }

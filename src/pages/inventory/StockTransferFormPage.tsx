@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { inventoryService } from '@/api/inventoryService'
+import { productService } from '@/api/productService'
 import { stockTransferService } from '@/api/stockTransferService'
 import { warehouseService } from '@/api/warehouseService'
-import type { StockTransfer, StockTransferPayload } from '@/types/inventory'
+import type { InventoryItem, StockTransfer, StockTransferPayload } from '@/types/inventory'
+import type { ProductVariant } from '@/types/product'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
-import { apiClient } from '@/api/client'
 
 const field = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
 const lbl = 'mb-1.5 block text-sm font-medium text-gray-700'
@@ -36,9 +37,31 @@ function TrashIcon() {
 }
 
 interface ItemRow {
-  product_id: string
+  product_variant_id: string
+  product_id?: string
   quantity: string
   notes: string
+}
+
+const getInventoryVariant = (item: InventoryItem, variants: ProductVariant[]) =>
+  item.variant
+  ?? variants.find((variant) => variant.id === item.product_variant_id)
+  ?? variants.find((variant) => variant.product_id === item.product_id && variant.sku === item.product?.sku)
+  ?? variants.find((variant) => variant.product_id === item.product_id)
+
+const getInventoryVariantId = (item: InventoryItem, variants: ProductVariant[]) =>
+  item.product_variant_id ?? item.variant?.id ?? getInventoryVariant(item, variants)?.id
+
+const findVariantByProductId = (productId: string | undefined, variants: ProductVariant[]) =>
+  productId ? variants.find((variant) => variant.product_id === Number(productId)) : undefined
+
+const formatInventoryOption = (item: InventoryItem, variants: ProductVariant[]) => {
+  const variant = getInventoryVariant(item, variants)
+  const sku = variant?.sku ?? item.product?.sku ?? '—'
+  const name = variant?.name ?? item.product?.name ?? '—'
+  const variantText = [variant?.color, variant?.year].filter(Boolean).join(' ')
+  const stockText = `${(item.quantity ?? 0).toLocaleString('th-TH')} ชิ้น`
+  return `${sku} — ${name}${variantText ? ` (${variantText})` : ''} — เหลือ ${stockText}`
 }
 
 interface FormValues {
@@ -55,11 +78,11 @@ export function StockTransferFormPage() {
 
   const [transfer, setTransfer] = useState<StockTransfer | null>(null)
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([])
-  const [products, setProducts] = useState<{ id: number; sku: string; name: string }[]>([])
-  const [items, setItems] = useState<ItemRow[]>([{ product_id: '', quantity: '', notes: '' }])
+  const [variants, setVariants] = useState<ProductVariant[]>([])
+  const [sourceStockItems, setSourceStockItems] = useState<InventoryItem[]>([])
+  const [items, setItems] = useState<ItemRow[]>([{ product_variant_id: '', quantity: '', notes: '' }])
   const [isLoading, setIsLoading] = useState(isEdit)
   const [isSaving, setIsSaving] = useState(false)
-  const [stockMap, setStockMap] = useState<Record<number, number>>({})
 
   const canCreate = hasPermission(permissions, 'stock_transfers', 'can_create')
   const canEdit = hasPermission(permissions, 'stock_transfers', 'can_edit')
@@ -69,17 +92,12 @@ export function StockTransferFormPage() {
   })
 
   const fromWarehouseId = watch('from_warehouse_id')
+  const hasSelectableSourceStockItems = sourceStockItems.some((item) => Boolean(getInventoryVariantId(item, variants)))
 
   const loadStock = useCallback((warehouseId: string) => {
-    if (!warehouseId) { setStockMap({}); return }
+    if (!warehouseId) { setSourceStockItems([]); return }
     inventoryService.getInventory({ warehouse_id: Number(warehouseId), limit: 500 })
-      .then((res) => {
-        const map: Record<number, number> = {}
-        for (const item of res.data.data ?? []) {
-          map[item.product_id] = item.quantity
-        }
-        setStockMap(map)
-      })
+      .then((res) => setSourceStockItems(res.data.data ?? []))
       .catch(() => {})
   }, [])
 
@@ -91,10 +109,19 @@ export function StockTransferFormPage() {
     warehouseService.getWarehouses({ limit: 200 })
       .then((res) => setWarehouses(res.data.data ?? []))
       .catch(() => {})
-    apiClient.get('/products?limit=200')
-      .then((res) => setProducts(res.data?.data ?? []))
+    productService.searchVariants({ limit: 500 })
+      .then((res) => setVariants(res.data.data ?? []))
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!variants.length) return
+    setItems((prev) => prev.map((row) => {
+      if (row.product_variant_id) return row
+      const variant = findVariantByProductId(row.product_id, variants)
+      return variant ? { ...row, product_variant_id: String(variant.id) } : row
+    }))
+  }, [variants])
 
   useEffect(() => {
     if (!id) return
@@ -114,7 +141,8 @@ export function StockTransferFormPage() {
         })
         if (data.items?.length) {
           setItems(data.items.map((it) => ({
-            product_id: String(it.product_id ?? ''),
+            product_variant_id: String(it.product_variant_id ?? it.variant?.id ?? ''),
+            product_id: it.product_id != null ? String(it.product_id) : undefined,
             quantity: String(it.quantity ?? ''),
             notes: it.notes ?? '',
           })))
@@ -124,7 +152,7 @@ export function StockTransferFormPage() {
       .finally(() => setIsLoading(false))
   }, [id, reset, navigate])
 
-  const addItem = () => setItems((prev) => [...prev, { product_id: '', quantity: '', notes: '' }])
+  const addItem = () => setItems((prev) => [...prev, { product_variant_id: '', quantity: '', notes: '' }])
   const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx))
   const updateItem = (idx: number, key: keyof ItemRow, value: string) =>
     setItems((prev) => prev.map((row, i) => i === idx ? { ...row, [key]: value } : row))
@@ -133,8 +161,8 @@ export function StockTransferFormPage() {
     from_warehouse_id: Number(values.from_warehouse_id),
     to_warehouse_id: Number(values.to_warehouse_id),
     reason: values.reason || undefined,
-    items: items.filter((it) => it.product_id && it.quantity).map((it) => ({
-      product_id: Number(it.product_id),
+    items: items.filter((it) => it.product_variant_id && it.quantity).map((it) => ({
+      product_variant_id: Number(it.product_variant_id),
       quantity: Number(it.quantity),
       ...(it.notes ? { notes: it.notes } : {}),
     })),
@@ -236,18 +264,43 @@ export function StockTransferFormPage() {
                 <div>
                   {idx === 0 && <label className={lbl}>สินค้า <span className="text-red-500">*</span></label>}
                   <select
-                    value={row.product_id}
-                    onChange={(e) => updateItem(idx, 'product_id', e.target.value)}
+                    value={row.product_variant_id}
+                    onChange={(e) => updateItem(idx, 'product_variant_id', e.target.value)}
                     className={field}
                     required
                   >
-                    <option value="">— เลือกสินค้า —</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.sku} — {p.name}{fromWarehouseId ? ` (${(stockMap[p.id] ?? 0).toLocaleString('th-TH')} ชิ้น)` : ''}
+                    <option value="">— เลือกสินค้า / รุ่นย่อย —</option>
+                    {sourceStockItems.map((item) => {
+                      const variantId = getInventoryVariantId(item, variants)
+                      if (!variantId) {
+                        return (
+                          <option key={item.id} value={`missing-${item.id}`} disabled>
+                            {formatInventoryOption(item, variants)} — ยังไม่มีรุ่นย่อย
+                          </option>
+                        )
+                      }
+                      return (
+                        <option key={item.id} value={variantId}>
+                          {formatInventoryOption(item, variants)}
+                        </option>
+                      )
+                    })}
+                    {!fromWarehouseId && (
+                      <option value="" disabled>
+                        กรุณาเลือกคลังต้นทางก่อน
                       </option>
-                    ))}
+                    )}
                   </select>
+                  {fromWarehouseId && sourceStockItems.length > 0 && !hasSelectableSourceStockItems && (
+                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      <p>สต็อกของคลังต้นทางยังไม่ได้ผูก variant จึงยังเลือกเพื่อโอนตาม contract ใหม่ไม่ได้</p>
+                      <ul className="mt-1 space-y-1">
+                        {sourceStockItems.map((item) => (
+                          <li key={item.id}>{formatInventoryOption(item, variants)} — ยังไม่มีรุ่นย่อย</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                 </div>
                 <div>

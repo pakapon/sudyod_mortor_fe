@@ -101,7 +101,7 @@ export const productService = {
   },
 
   // Global variant search (for BOM component picker)
-  searchVariants(params: { search: string; exclude_product_id?: number; limit?: number }) {
+  searchVariants(params: { search?: string; exclude_product_id?: number; limit?: number }) {
     return apiClient.get<ApiResponse<ProductVariant[]>>('/product-variants', { params })
   },
 

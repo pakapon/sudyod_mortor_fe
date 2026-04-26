@@ -124,7 +124,6 @@ export function WarehouseListPage() {
           <table className="w-full text-sm text-left">
             <thead className="border-b border-gray-200 bg-gray-50">
               <tr>
-                <th className="px-4 py-3 font-medium text-gray-600 whitespace-nowrap">รหัส</th>
                 <th className="px-4 py-3 font-medium text-gray-600">ชื่อคลัง</th>
                 <th className="px-4 py-3 font-medium text-gray-600 whitespace-nowrap">สาขา</th>
                 <th className="px-4 py-3 font-medium text-gray-600">ที่อยู่</th>
@@ -136,7 +135,7 @@ export function WarehouseListPage() {
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 6 }).map((__, j) => (
+                    {Array.from({ length: 5 }).map((__, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 rounded bg-gray-100 animate-pulse" />
                       </td>
@@ -145,7 +144,7 @@ export function WarehouseListPage() {
                 ))
               ) : warehouses.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={5} className="px-4 py-12 text-center text-gray-400">
                     ไม่พบข้อมูลคลังสินค้า
                   </td>
                 </tr>
@@ -156,7 +155,6 @@ export function WarehouseListPage() {
                     onClick={() => navigate(`/warehouses/${wh.id}`)}
                     className="cursor-pointer hover:bg-blue-50 transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{wh.code}</td>
                     <td className="px-4 py-3 font-medium text-gray-900">{wh.name}</td>
                     <td className="px-4 py-3 text-gray-600">{wh.branch?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-600 max-w-xs truncate">{wh.address ?? '—'}</td>

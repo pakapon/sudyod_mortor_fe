@@ -1,6 +1,6 @@
 # Checklist ระบบ — Sudyod Motor Frontend
 
-> อัปเดตล่าสุด: 26 เมษายน 2026  
+> อัปเดตล่าสุด: 26 เมษายน 2026 (รอบ 2)  
 > Legend: ✅ เสร็จแล้ว | 🔧 กำลังทำ | ⬜ ยังไม่ทำ | 🔶 PlaceholderPage (มี route แล้ว ยังไม่มีหน้าจริง)
 
 ---
@@ -136,6 +136,14 @@
 - `InventoryItem` type แก้ชื่อ field ให้ตรง API จริง: `qty` → `quantity`, `reserved` → `reserved_quantity`, `min_stock` → `min_quantity`; ลบ `available` / `cost` ออก (API ไม่ส่งกลับ)
 - `StockBalancePage` แก้ rendering ทุก column ให้ใช้ field ที่ถูกต้อง — ยอดที่แสดงเป็น 0 ทั้งหมดแก้แล้ว
 - `StockTransferFormPage` เพิ่มยอดคงเหลือของคลังต้นทางใน option text ของ dropdown สินค้า (เช่น `SKU-WAVE110I — Honda Wave 110i (2025) (14 ชิ้น)`) — โหลดผ่าน `GET /inventory?warehouse_id=X&limit=500`
+
+**Variant-centric migration (26 เม.ย. 2026 รอบ 2):**
+- `InventoryItem.product_variant_id` เปลี่ยนเป็น required (`number`) ใน `src/types/inventory.ts` — ลบ `| undefined` ออก
+- `GoodsReceiptFormPage` — filter dropdown variants ให้ไม่ซ้ำกันระหว่าง rows (dedup โดยเปรียบ `product_variant_id`)
+- `WarehouseDetailPage` แท็บ **ปรับสต็อก** — ลบ legacy helpers (`getInventoryVariant`, `getInventoryVariantId`, `formatInventoryOption`, `hasSelectableStockItems`) ออก; dropdown ตอนนี้ iterate `variants` ทุกตัวในระบบ (ไม่จำกัดเฉพาะที่มีสต็อกในคลัง) และแสดงยอดคงเหลือปัจจุบัน (0 ถ้ายังไม่มีในคลัง); ลบ amber warning block ออก
+- `WarehouseDetailPage` แท็บ **สต็อก** — column SKU/ชื่อ/หน่วย ใช้ `item.variant?.` เป็น primary ตัดทิ้ง `item.product?.` fallbacks ทั้งหมด
+- `StockBalancePage` — แท็บ สต็อกทั้งหมด และ ประวัติการเคลื่อนไหว: column SKU/ชื่อ/หน่วย ใช้ `item.variant?.` / `tx.variant?.` เป็น primary ตัดทิ้ง `product?` fallbacks
+
 | 6.7 | StockAdjustPage (ปรับสต็อก + cycle count) | `src/pages/inventory/StockAdjustPage.tsx` | ⬜ |
 | 6.8 | เพิ่ม route คลัง/สต็อก | `src/routes/index.tsx` | ✅ |
 
@@ -211,15 +219,15 @@
 
 ---
 
-## Phase 10 — ใบสั่งซื้อ (Purchase Orders) ✅ เสร็จแล้วทั้งหมด
+## Phase 10 — ใบสั่งซื้อ (Purchase Orders) ❌ ยกเลิก module ทั้งหมด
 
 | # | งาน | ไฟล์ | สถานะ |
 |---|-----|------|--------|
-| 10.1 | Purchase Order types + service | `src/types/inventory.ts` + `src/api/purchaseOrderService.ts` | ✅ |
-| 10.2 | PurchaseOrderListPage | `src/pages/purchase-orders/PurchaseOrderListPage.tsx` | ✅ |
-| 10.3 | PurchaseOrderFormPage (draft → sent → received) | `src/pages/purchase-orders/PurchaseOrderFormPage.tsx` | ✅ |
-| 10.3a | PurchaseOrderDetailPage (header + items + action buttons) | `src/pages/purchase-orders/PurchaseOrderDetailPage.tsx` | ✅ |
-| 10.4 | เพิ่ม route | `src/routes/index.tsx` | ✅ |
+| 10.1 | Purchase Order types + service | `src/types/inventory.ts` + `src/api/purchaseOrderService.ts` | ❌ ยกเลิก |
+| 10.2 | PurchaseOrderListPage | `src/pages/purchase-orders/PurchaseOrderListPage.tsx` | ❌ ยกเลิก |
+| 10.3 | PurchaseOrderFormPage (draft → sent → received) | `src/pages/purchase-orders/PurchaseOrderFormPage.tsx` | ❌ ยกเลิก |
+| 10.3a | PurchaseOrderDetailPage (header + items + action buttons) | `src/pages/purchase-orders/PurchaseOrderDetailPage.tsx` | ❌ ยกเลิก |
+| 10.4 | เพิ่ม route | `src/routes/index.tsx` | ❌ ยกเลิก |
 
 ---
 

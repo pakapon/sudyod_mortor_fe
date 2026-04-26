@@ -50,6 +50,9 @@ function SearchIcon() {
   )
 }
 
+const formatVariantText = (color?: string | null, year?: number | string | null) =>
+  [color, year].filter(Boolean).join(' ')
+
 export function StockBalancePage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { permissions } = useAuthStore()
@@ -303,10 +306,15 @@ export function StockBalancePage() {
                     </td>
                   </tr>
                 ) : (
-                  items.map((item) => (
+                  items.map((item) => {
+                    const variantText = formatVariantText(item.variant?.color, item.variant?.year)
+                    return (
                     <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.product?.sku ?? '—'}</td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{item.product?.name ?? '—'}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.variant?.sku ?? '—'}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900">
+                        {item.variant?.name ?? '—'}
+                        {variantText && <span className="ml-1 text-xs font-normal text-gray-500">({variantText})</span>}
+                      </td>
                       <td className="px-4 py-3 text-gray-500">{item.branch?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{item.warehouse?.name ?? '—'}</td>
                       <td className={cn('px-4 py-3 text-right font-semibold', item.min_quantity != null && item.quantity < item.min_quantity ? 'text-red-600' : 'text-gray-900')}>
@@ -316,10 +324,11 @@ export function StockBalancePage() {
                       <td className="px-4 py-3 text-right text-gray-600">{item.reserved_quantity != null ? (item.quantity - item.reserved_quantity).toLocaleString('th-TH') : '—'}</td>
                       <td className="px-4 py-3 text-right text-gray-500">{item.min_quantity?.toLocaleString('th-TH') ?? '—'}</td>
                       <td className="px-4 py-3 text-right text-gray-500">—</td>
-                      <td className="px-4 py-3 text-gray-600">{item.product?.unit?.name ?? '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{item.variant?.unit?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{item.location?.name ?? '—'}</td>
                     </tr>
-                  ))
+                    )
+                  })
                 )}
               </tbody>
             </table>
@@ -389,10 +398,14 @@ export function StockBalancePage() {
                   transactions.map((tx) => {
                     const txCfg = TX_TYPE_CONFIG[tx.transaction_type] ?? { label: tx.transaction_type, className: 'bg-gray-100 text-gray-600' }
                     const isPositive = (tx.quantity_change ?? 0) > 0
+                    const variantText = formatVariantText(tx.variant?.color, tx.variant?.year)
                     return (
                       <tr key={tx.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-mono text-xs text-gray-600">{tx.product?.sku ?? '—'}</td>
-                        <td className="px-4 py-3 font-medium text-gray-900">{tx.product?.name ?? '—'}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-gray-600">{tx.variant?.sku ?? '—'}</td>
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          {tx.variant?.name ?? '—'}
+                          {variantText && <span className="ml-1 text-xs font-normal text-gray-500">({variantText})</span>}
+                        </td>
                         <td className="px-4 py-3 text-gray-600">{tx.warehouse?.name ?? '—'}</td>
                         <td className="px-4 py-3">
                           <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', txCfg.className)}>

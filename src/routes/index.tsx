@@ -49,9 +49,6 @@ import { GoodsReceiptDetailPage } from '@/pages/inventory/GoodsReceiptDetailPage
 import { StockTransferListPage } from '@/pages/inventory/StockTransferListPage'
 import { StockTransferFormPage } from '@/pages/inventory/StockTransferFormPage'
 import { StockTransferDetailPage } from '@/pages/inventory/StockTransferDetailPage'
-import { PurchaseOrderListPage } from '@/pages/purchase-orders/PurchaseOrderListPage'
-import { PurchaseOrderFormPage } from '@/pages/purchase-orders/PurchaseOrderFormPage'
-import { PurchaseOrderDetailPage } from '@/pages/purchase-orders/PurchaseOrderDetailPage'
 
 export const router = createBrowserRouter([
   {
@@ -319,20 +316,6 @@ export const router = createBrowserRouter([
           },
         ],
       },
-      {
-        element: <PermissionGuard module="purchase_orders" />,
-        children: [
-          {
-            element: <AppLayout title="ใบสั่งซื้อ" />,
-            children: [
-              { path: '/purchase-orders', element: <PurchaseOrderListPage /> },
-              { path: '/purchase-orders/create', element: <PurchaseOrderFormPage /> },
-              { path: '/purchase-orders/:id', element: <PurchaseOrderDetailPage /> },
-            ],
-          },
-        ],
-      },
-
       // ─── Other modules (TODO: implement pages) ───
       {
         element: <PermissionGuard module="customers" />,

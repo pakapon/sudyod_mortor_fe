@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { goodsReceiptService } from '@/api/goodsReceiptService'
-import type { GoodsReceipt, GoodsReceiptDocument, GoodsReceiptDocumentType, GoodsReceiptStatus } from '@/types/inventory'
+import type { GoodsReceipt, GoodsReceiptDocument, GoodsReceiptStatus } from '@/types/inventory'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
@@ -68,8 +68,11 @@ const formatFileSize = (bytes?: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const formatPerson = (p?: { first_name: string; last_name: string } | null) =>
-  p ? `${p.first_name} ${p.last_name}`.trim() : '—'
+const formatPerson = (p?: { first_name?: string; last_name?: string; name?: string } | null) =>
+  p ? (`${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || p.name || '—') : '—'
+
+const formatVariantText = (color?: string | null, year?: number | string | null) =>
+  [color, year].filter(Boolean).join(' ')
 
 export function GoodsReceiptDetailPage() {
   const { id } = useParams()
@@ -151,7 +154,7 @@ export function GoodsReceiptDetailPage() {
   const statusCfg = STATUS_CONFIG[data.status] ?? FALLBACK_STATUS
   const isDraft = data.status === 'draft'
   const totalAmount = (data.items ?? []).reduce(
-    (sum, it) => sum + (Number(it.qty) || 0) * (Number(it.cost_price) || 0),
+    (sum, it) => sum + (Number(it.quantity_received ?? it.quantity_ordered ?? it.qty) || 0) * (Number(it.unit_cost ?? it.cost_price) || 0),
     0,
   )
 
@@ -254,16 +257,22 @@ export function GoodsReceiptDetailPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {data.items.map((it) => {
-                  const sub = (Number(it.qty) || 0) * (Number(it.cost_price) || 0)
+                  const quantity = Number(it.quantity_received ?? it.quantity_ordered ?? it.qty) || 0
+                  const unitCost = Number(it.unit_cost ?? it.cost_price) || 0
+                  const sub = quantity * unitCost
+                  const variantText = formatVariantText(it.variant?.color, it.variant?.year)
                   return (
                     <tr key={it.id}>
-                      <td className="px-4 py-2 font-mono text-xs text-gray-600">{it.product?.sku ?? '—'}</td>
-                      <td className="px-4 py-2 text-gray-900">{it.product?.name ?? `#${it.product_id}`}</td>
+                      <td className="px-4 py-2 font-mono text-xs text-gray-600">{it.variant?.sku ?? it.product?.sku ?? '—'}</td>
+                      <td className="px-4 py-2 text-gray-900">
+                        {it.product?.name ?? it.variant?.name ?? (it.product_variant_id ? `#${it.product_variant_id}` : '—')}
+                        {variantText && <span className="ml-1 text-xs text-gray-500">({variantText})</span>}
+                      </td>
                       <td className="px-4 py-2 text-right text-gray-900">
-                        {Number(it.qty).toLocaleString('th-TH')} {it.product?.unit?.name ?? ''}
+                        {quantity.toLocaleString('th-TH')} {it.variant?.unit?.name ?? it.product?.unit?.name ?? ''}
                       </td>
                       <td className="px-4 py-2 text-right text-gray-700">
-                        {Number(it.cost_price).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                        {unitCost.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-2 text-right font-medium text-gray-900">
                         {sub.toLocaleString('th-TH', { minimumFractionDigits: 2 })}

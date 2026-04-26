@@ -35,8 +35,11 @@ const formatDateTime = (s?: string | null) =>
     ? new Date(s).toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '—'
 
-const formatPerson = (p?: { first_name: string; last_name: string } | null) =>
-  p ? `${p.first_name} ${p.last_name}`.trim() : '—'
+const formatPerson = (p?: { first_name?: string; last_name?: string; name?: string } | null) =>
+  p ? (`${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || p.name || '—') : '—'
+
+const formatVariantText = (color?: string | null, year?: number | string | null) =>
+  [color, year].filter(Boolean).join(' ')
 
 export function StockTransferDetailPage() {
   const { id } = useParams()
@@ -236,16 +239,22 @@ export function StockTransferDetailPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {data.items.map((it) => (
-                  <tr key={it.id}>
-                    <td className="px-4 py-2 font-mono text-xs text-gray-600">{it.product?.sku ?? '—'}</td>
-                    <td className="px-4 py-2 text-gray-900">{it.product?.name ?? `#${it.product_id}`}</td>
-                    <td className="px-4 py-2 text-right text-gray-900">
-                      {Number(it.quantity).toLocaleString('th-TH')} {it.product?.unit?.name ?? ''}
-                    </td>
-                    <td className="px-4 py-2 text-gray-600">{it.notes || '—'}</td>
-                  </tr>
-                ))}
+                {data.items.map((it) => {
+                  const variantText = formatVariantText(it.variant?.color, it.variant?.year)
+                  return (
+                    <tr key={it.id}>
+                      <td className="px-4 py-2 font-mono text-xs text-gray-600">{it.variant?.sku ?? it.product?.sku ?? '—'}</td>
+                      <td className="px-4 py-2 text-gray-900">
+                        {it.product?.name ?? it.variant?.name ?? (it.product_variant_id ? `#${it.product_variant_id}` : '—')}
+                        {variantText && <span className="ml-1 text-xs text-gray-500">({variantText})</span>}
+                      </td>
+                      <td className="px-4 py-2 text-right text-gray-900">
+                        {Number(it.quantity).toLocaleString('th-TH')} {it.variant?.unit?.name ?? it.product?.unit?.name ?? ''}
+                      </td>
+                      <td className="px-4 py-2 text-gray-600">{it.notes || '—'}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

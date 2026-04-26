@@ -147,6 +147,8 @@ export interface ProductVariant {
   product_id: number
   sku: string
   name: string
+  color?: string | null
+  year?: number | string | null
   cost_price?: number | string | null
   selling_price?: number | string | null
   attributes?: Record<string, string>

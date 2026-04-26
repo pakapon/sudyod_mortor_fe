@@ -2,14 +2,15 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { goodsReceiptService } from '@/api/goodsReceiptService'
+import { productService } from '@/api/productService'
 import { purchaseOrderService } from '@/api/purchaseOrderService'
 import { warehouseService } from '@/api/warehouseService'
 import type { GoodsReceiptPayload, GoodsReceiptDocument, GoodsReceiptDocumentType } from '@/types/inventory'
 import type { Vendor } from '@/types/inventory'
+import type { ProductVariant } from '@/types/product'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
-import { apiClient } from '@/api/client'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { RichTextToolbar } from '@/components/RichTextToolbar'
 
@@ -56,10 +57,19 @@ function TrashIcon() {
 }
 
 interface ItemRow {
-  product_id: string
-  qty: string
-  cost_price: string
+  product_variant_id: string
+  product_id?: string
+  quantity_ordered: string
+  unit_cost: string
 }
+
+const formatVariantOption = (variant: ProductVariant) => {
+  const variantText = [variant.color, variant.year].filter(Boolean).join(' ')
+  return `${variant.sku} — ${variant.name}${variantText ? ` (${variantText})` : ''}`
+}
+
+const findVariantByProductId = (productId: string | undefined, variants: ProductVariant[]) =>
+  productId ? variants.find((variant) => variant.product_id === Number(productId)) : undefined
 
 interface FormValues {
   warehouse_id: string
@@ -77,8 +87,8 @@ export function GoodsReceiptFormPage() {
 
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
-  const [products, setProducts] = useState<{ id: number; sku: string; name: string }[]>([])
-  const [items, setItems] = useState<ItemRow[]>([{ product_id: '', qty: '', cost_price: '' }])
+  const [variants, setVariants] = useState<ProductVariant[]>([])
+  const [items, setItems] = useState<ItemRow[]>([{ product_variant_id: '', quantity_ordered: '', unit_cost: '' }])
   const [documents, setDocuments] = useState<GoodsReceiptDocument[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [deletingDocId, setDeletingDocId] = useState<number | null>(null)
@@ -103,8 +113,8 @@ export function GoodsReceiptFormPage() {
     purchaseOrderService.getVendors()
       .then((res) => setVendors(res.data.data ?? []))
       .catch(() => {})
-    apiClient.get('/products?limit=200')
-      .then((res) => setProducts(res.data?.data ?? []))
+    productService.searchVariants({ limit: 200 })
+      .then((res) => setVariants(res.data?.data ?? []))
       .catch(() => {})
   }, [])
 
@@ -127,9 +137,10 @@ export function GoodsReceiptFormPage() {
         })
         if (data.items?.length) {
           setItems(data.items.map((it) => ({
-            product_id: it.product_id != null ? String(it.product_id) : '',
-            qty: it.qty != null ? String(it.qty) : '',
-            cost_price: it.cost_price != null ? String(it.cost_price) : '',
+            product_variant_id: it.product_variant_id != null ? String(it.product_variant_id) : String(it.variant?.id ?? ''),
+            product_id: it.product_id != null ? String(it.product_id) : undefined,
+            quantity_ordered: it.quantity_ordered != null ? String(it.quantity_ordered) : String(it.qty ?? ''),
+            unit_cost: it.unit_cost != null ? String(it.unit_cost) : String(it.cost_price ?? ''),
           })))
         }
         setDocuments(data.documents ?? [])
@@ -138,7 +149,16 @@ export function GoodsReceiptFormPage() {
       .finally(() => setIsLoading(false))
   }, [id, reset, navigate])
 
-  const addItem = () => setItems((prev) => [...prev, { product_id: '', qty: '', cost_price: '' }])
+  useEffect(() => {
+    if (!variants.length) return
+    setItems((prev) => prev.map((row) => {
+      if (row.product_variant_id) return row
+      const variant = findVariantByProductId(row.product_id, variants)
+      return variant ? { ...row, product_variant_id: String(variant.id) } : row
+    }))
+  }, [variants])
+
+  const addItem = () => setItems((prev) => [...prev, { product_variant_id: '', quantity_ordered: '', unit_cost: '' }])
   const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx))
   const updateItem = (idx: number, key: keyof ItemRow, value: string) =>
     setItems((prev) => prev.map((row, i) => i === idx ? { ...row, [key]: value } : row))
@@ -192,10 +212,10 @@ export function GoodsReceiptFormPage() {
     reference_no: values.reference_no || undefined,
     received_date: values.received_date || undefined,
     notes: values.notes || undefined,
-    items: items.filter((it) => it.product_id && it.qty).map((it) => ({
-      product_id: Number(it.product_id),
-      qty: Number(it.qty),
-      cost_price: Number(it.cost_price) || 0,
+    items: items.filter((it) => it.product_variant_id && it.quantity_ordered).map((it) => ({
+      product_variant_id: Number(it.product_variant_id),
+      quantity_ordered: Number(it.quantity_ordered),
+      unit_cost: Number(it.unit_cost) || 0,
     })),
   })
 
@@ -318,14 +338,16 @@ export function GoodsReceiptFormPage() {
                 <div>
                   {idx === 0 && <label className={lbl}>สินค้า <span className="text-red-500">*</span></label>}
                   <select
-                    value={row.product_id}
-                    onChange={(e) => updateItem(idx, 'product_id', e.target.value)}
+                    value={row.product_variant_id}
+                    onChange={(e) => updateItem(idx, 'product_variant_id', e.target.value)}
                     className={field}
                     required
                   >
-                    <option value="">— เลือกสินค้า —</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>
+                    <option value="">— เลือกสินค้า / รุ่นย่อย —</option>
+                    {variants
+                      .filter((variant) => String(variant.id) === row.product_variant_id || !items.some((r) => r.product_variant_id === String(variant.id)))
+                      .map((variant) => (
+                        <option key={variant.id} value={variant.id}>{formatVariantOption(variant)}</option>
                     ))}
                   </select>
                 </div>
@@ -334,8 +356,8 @@ export function GoodsReceiptFormPage() {
                   <input
                     type="number"
                     min="1"
-                    value={row.qty}
-                    onChange={(e) => updateItem(idx, 'qty', e.target.value)}
+                    value={row.quantity_ordered}
+                    onChange={(e) => updateItem(idx, 'quantity_ordered', e.target.value)}
                     className={field}
                     placeholder="จำนวน"
                     required
@@ -347,8 +369,8 @@ export function GoodsReceiptFormPage() {
                     type="number"
                     min="0"
                     step="0.01"
-                    value={row.cost_price}
-                    onChange={(e) => updateItem(idx, 'cost_price', e.target.value)}
+                    value={row.unit_cost}
+                    onChange={(e) => updateItem(idx, 'unit_cost', e.target.value)}
                     className={field}
                     placeholder="ราคาทุน"
                   />
@@ -367,13 +389,13 @@ export function GoodsReceiptFormPage() {
               </div>
             ))}
           </div>
-          {items.some((r) => r.qty && r.cost_price) && (
+          {items.some((r) => r.quantity_ordered && r.unit_cost) && (
             <div className="mt-4 flex justify-end border-t border-gray-100 pt-4">
               <p className="text-sm text-gray-500">
                 ยอดรวมโดยประมาณ{' '}
                 <span className="font-semibold text-gray-900">
                   {items
-                    .reduce((sum, r) => sum + (parseFloat(r.qty) || 0) * (parseFloat(r.cost_price) || 0), 0)
+                    .reduce((sum, r) => sum + (parseFloat(r.quantity_ordered) || 0) * (parseFloat(r.unit_cost) || 0), 0)
                     .toLocaleString('th-TH', { minimumFractionDigits: 2 })}{' '}฿
                 </span>
               </p>

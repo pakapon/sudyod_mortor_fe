@@ -2,18 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { purchaseOrderService } from '@/api/purchaseOrderService'
 import type { PurchaseOrder, PurchaseOrderStatus } from '@/types/inventory'
-import { useAuthStore } from '@/stores/authStore'
-import { hasPermission } from '@/lib/permissions'
 import { ActionIconLink } from '@/components/ui/ActionIconButton'
 import { cn } from '@/lib/utils'
-
-function PlusIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  )
-}
 
 const STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; className: string }> = {
   draft: { label: 'ร่าง', className: 'bg-gray-100 text-gray-600' },
@@ -25,8 +15,6 @@ const STATUS_CONFIG: Record<PurchaseOrderStatus, { label: string; className: str
 export function PurchaseOrderListPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { permissions } = useAuthStore()
-
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [total, setTotal] = useState(0)
@@ -64,7 +52,6 @@ export function PurchaseOrderListPage() {
 
   useEffect(() => { loadOrders() }, [loadOrders])
 
-  const canCreate = hasPermission(permissions, 'purchase_orders', 'can_create')
   const totalPages = Math.ceil(total / limit)
 
   return (
@@ -74,14 +61,6 @@ export function PurchaseOrderListPage() {
           <h1 className="text-2xl font-bold text-gray-900">ใบสั่งซื้อ</h1>
           <p className="mt-1 text-sm text-gray-500">รายการใบสั่งซื้อทั้งหมด</p>
         </div>
-        {canCreate && (
-          <Link
-            to="/purchase-orders/create"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            <PlusIcon /> สร้างใบสั่งซื้อ
-          </Link>
-        )}
       </div>
 
       {/* Filters */}

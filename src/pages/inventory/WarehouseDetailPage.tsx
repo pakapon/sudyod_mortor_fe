@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
+import { productService } from '@/api/productService'
 import { warehouseService } from '@/api/warehouseService'
+import { RichTextToolbar } from '@/components/RichTextToolbar'
 import type { Warehouse, WarehouseLocation, InventoryItem } from '@/types/inventory'
+import type { ProductVariant } from '@/types/product'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
-import { apiClient } from '@/api/client'
 
 type TabKey = 'locations' | 'stock' | 'adjust'
 
@@ -36,9 +38,15 @@ function EditIcon() {
 }
 
 interface AdjustFormValues {
-  product_id: string
-  qty: string
-  note: string
+  product_variant_id: string
+  quantity: string
+  reason: string
+}
+
+const formatVariantOption = (variant: ProductVariant, qty: number) => {
+  const variantText = [variant.color, variant.year].filter(Boolean).join(' ')
+  const stockText = qty.toLocaleString('th-TH')
+  return `${variant.sku} — ${variant.name}${variantText ? ` (${variantText})` : ''} — คงเหลือ ${stockText} ชิ้น`
 }
 
 export function WarehouseDetailPage() {
@@ -48,17 +56,21 @@ export function WarehouseDetailPage() {
   const [warehouse, setWarehouse] = useState<Warehouse | null>(null)
   const [locations, setLocations] = useState<WarehouseLocation[]>([])
   const [stockItems, setStockItems] = useState<InventoryItem[]>([])
+  const [variants, setVariants] = useState<ProductVariant[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAdjusting, setIsAdjusting] = useState(false)
   const [adjustSuccess, setAdjustSuccess] = useState(false)
-  const [products, setProducts] = useState<{ id: number; name: string; sku: string }[]>([])
 
   const warehouseId = Number(id)
   const canEdit = hasPermission(permissions, 'warehouses', 'can_edit')
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<AdjustFormValues>({
-    defaultValues: { product_id: '', qty: '', note: '' },
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<AdjustFormValues>({
+    defaultValues: { product_variant_id: '', quantity: '', reason: '' },
   })
+  const selectedVariantId = watch('product_variant_id')
+  const selectedStockItem = selectedVariantId
+    ? stockItems.find((item) => String(item.product_variant_id) === selectedVariantId)
+    : undefined
 
   useEffect(() => {
     if (!warehouseId) return
@@ -75,13 +87,12 @@ export function WarehouseDetailPage() {
       warehouseService.getWarehouseLocations(warehouseId)
         .then((res) => setLocations(res.data.data ?? []))
         .catch(() => {})
-    } else if (activeTab === 'stock') {
+    } else if (activeTab === 'stock' || activeTab === 'adjust') {
       warehouseService.getWarehouseInventory(warehouseId, { limit: 100 })
         .then((res) => setStockItems(res.data.data ?? []))
         .catch(() => {})
-    } else if (activeTab === 'adjust') {
-      apiClient.get('/products?limit=200')
-        .then((res) => setProducts(res.data?.data ?? []))
+      productService.searchVariants({ limit: 500 })
+        .then((res) => setVariants(res.data.data ?? []))
         .catch(() => {})
     }
   }, [activeTab, warehouseId])
@@ -90,10 +101,12 @@ export function WarehouseDetailPage() {
     setIsAdjusting(true)
     try {
       await warehouseService.adjustStock(warehouseId, {
-        product_id: Number(values.product_id),
-        qty: Number(values.qty),
-        note: values.note,
+        product_variant_id: Number(values.product_variant_id),
+        quantity: Number(values.quantity),
+        reason: values.reason,
       })
+      const stockRes = await warehouseService.getWarehouseInventory(warehouseId, { limit: 100 })
+      setStockItems(stockRes.data.data ?? [])
       setAdjustSuccess(true)
       reset()
       setTimeout(() => setAdjustSuccess(false), 3000)
@@ -136,7 +149,7 @@ export function WarehouseDetailPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{warehouse.name}</h1>
-            <p className="mt-1 text-sm text-gray-500">รหัส: {warehouse.code}</p>
+
           </div>
         </div>
         {canEdit && (
@@ -151,10 +164,6 @@ export function WarehouseDetailPage() {
 
       {/* Summary card */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500">รหัส</p>
-          <p className="mt-1 font-mono text-sm font-semibold text-gray-900">{warehouse.code}</p>
-        </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-xs text-gray-500">สาขา</p>
           <p className="mt-1 text-sm font-semibold text-gray-900">{warehouse.branch?.name ?? '—'}</p>
@@ -243,10 +252,15 @@ export function WarehouseDetailPage() {
               ) : (
                 stockItems.map((item) => (
                   <tr key={item.id}>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.product?.sku ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-900">{item.product?.name ?? '—'}</td>
-                    <td className="px-4 py-3 text-right font-medium text-gray-900">{item.qty.toLocaleString('th-TH')}</td>
-                    <td className="px-4 py-3 text-gray-600">{item.product?.unit?.name ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.variant?.sku ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-900">
+                      {item.variant?.name ?? '—'}
+                      {(item.variant?.color || item.variant?.year) && (
+                        <span className="ml-1 text-xs text-gray-500">({[item.variant.color, item.variant.year].filter(Boolean).join(' ')})</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-gray-900">{(item.quantity ?? 0).toLocaleString('th-TH')}</td>
+                    <td className="px-4 py-3 text-gray-600">{item.variant?.unit?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{item.location?.name ?? '—'}</td>
                   </tr>
                 ))
@@ -258,53 +272,90 @@ export function WarehouseDetailPage() {
 
       {/* Tab: Adjust Stock */}
       {activeTab === 'adjust' && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-base font-semibold text-gray-800">ปรับจำนวนสต็อก</h2>
-          {adjustSuccess && (
-            <div className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
-              ปรับสต็อกสำเร็จ
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+          <div className="lg:col-span-3 rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-100 px-6 py-4">
+              <h2 className="text-base font-semibold text-gray-900">ปรับจำนวนสต็อก</h2>
+              <p className="mt-0.5 text-xs text-gray-500">กำหนดจำนวนสต็อกจริงใหม่ของสินค้าในคลังนี้</p>
             </div>
-          )}
-          <form onSubmit={handleSubmit(handleAdjust)} className="max-w-md space-y-4">
-            <div>
-              <label className={lbl}>สินค้า <span className="text-red-500">*</span></label>
-              <select
-                {...register('product_id', { required: 'กรุณาเลือกสินค้า' })}
-                className={cn(field, errors.product_id && 'border-red-400')}
+            {adjustSuccess && (
+              <div className="mx-6 mt-4 flex items-center gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                ปรับสต็อกสำเร็จ
+              </div>
+            )}
+            <form onSubmit={handleSubmit(handleAdjust)} className="space-y-5 p-6">
+              <div>
+                <label className={lbl}>สินค้า / รุ่นย่อย <span className="text-red-500">*</span></label>
+                <select
+                  {...register('product_variant_id', { required: 'กรุณาเลือกสินค้า' })}
+                  className={cn(field, errors.product_variant_id && 'border-red-400')}
+                >
+                  <option value="">— เลือกสินค้า —</option>
+                  {variants.map((variant) => {
+                    const stockItem = stockItems.find((item) => item.product_variant_id === variant.id)
+                    const qty = stockItem?.quantity ?? 0
+                    return <option key={variant.id} value={variant.id}>{formatVariantOption(variant, qty)}</option>
+                  })}
+                </select>
+                {errors.product_variant_id && <p className="mt-1 text-xs text-red-500">{errors.product_variant_id.message}</p>}
+              </div>
+
+              {selectedVariantId && (
+                <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                  <p className="text-xs text-blue-700">จำนวนปัจจุบัน</p>
+                  <p className="mt-1 text-2xl font-semibold text-blue-900">
+                    {(selectedStockItem?.quantity ?? 0).toLocaleString('th-TH')} <span className="text-sm font-normal">ชิ้น</span>
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className={lbl}>จำนวนสต็อกจริงใหม่ <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  min="0"
+                  {...register('quantity', { required: 'กรุณากรอกจำนวน', min: { value: 0, message: 'จำนวนต้องไม่น้อยกว่า 0' } })}
+                  className={cn(field, errors.quantity && 'border-red-400')}
+                  placeholder="เช่น 7"
+                />
+                {errors.quantity && <p className="mt-1 text-xs text-red-500">{errors.quantity.message}</p>}
+              </div>
+
+              <div>
+                <label className={lbl}>เหตุผล <span className="text-red-500">*</span></label>
+                <div className={cn('overflow-hidden rounded-lg border border-gray-200 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500', errors.reason && 'border-red-400')}>
+                  <RichTextToolbar />
+                  <textarea
+                    {...register('reason', { required: 'กรุณากรอกเหตุผล' })}
+                    rows={4}
+                    className="w-full border-0 bg-white px-3 py-2.5 text-sm text-gray-700 resize-y focus:outline-none"
+                    placeholder="เช่น นับสต็อกใหม่, ปรับตามตรวจนับจริง"
+                  />
+                </div>
+                {errors.reason && <p className="mt-1 text-xs text-red-500">{errors.reason.message}</p>}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isAdjusting}
+                className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
               >
-                <option value="">— เลือกสินค้า —</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>
-                ))}
-              </select>
-              {errors.product_id && <p className="mt-1 text-xs text-red-500">{errors.product_id.message}</p>}
+                {isAdjusting ? 'กำลังบันทึก...' : 'บันทึกจำนวนสต็อกใหม่'}
+              </button>
+            </form>
+          </div>
+
+          <div className="lg:col-span-2 space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-blue-50 p-5">
+              <p className="mb-2 text-sm font-semibold text-blue-800">คำแนะนำ</p>
+              <ul className="space-y-2 text-xs text-blue-700">
+                <li className="flex items-start gap-1.5"><span className="mt-0.5 font-bold">•</span>กรอกจำนวนสต็อกจริงที่ต้องการให้เป็นหลังปรับ ไม่ใช่จำนวนบวกหรือลบ</li>
+                <li className="flex items-start gap-1.5"><span className="mt-0.5 font-bold">•</span>ระบบจะคำนวณส่วนต่างจากจำนวนปัจจุบันให้อัตโนมัติ</li>
+                <li className="flex items-start gap-1.5"><span className="mt-0.5 font-bold">•</span>กรอก <strong>เหตุผล</strong> เพื่อบันทึกไว้ตรวจสอบย้อนหลัง</li>
+              </ul>
             </div>
-            <div>
-              <label className={lbl}>จำนวน (บวก = รับเข้า, ลบ = ตัดออก) <span className="text-red-500">*</span></label>
-              <input
-                type="number"
-                {...register('qty', { required: 'กรุณากรอกจำนวน' })}
-                className={cn(field, errors.qty && 'border-red-400')}
-                placeholder="เช่น 10 หรือ -5"
-              />
-              {errors.qty && <p className="mt-1 text-xs text-red-500">{errors.qty.message}</p>}
-            </div>
-            <div>
-              <label className={lbl}>หมายเหตุ</label>
-              <input
-                {...register('note')}
-                className={field}
-                placeholder="เหตุผลการปรับสต็อก"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isAdjusting}
-              className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-            >
-              {isAdjusting ? 'กำลังปรับ...' : 'ปรับสต็อก'}
-            </button>
-          </form>
+          </div>
         </div>
       )}
     </div>
