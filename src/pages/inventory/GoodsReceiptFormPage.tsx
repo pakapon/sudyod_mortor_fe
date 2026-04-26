@@ -227,7 +227,7 @@ export function GoodsReceiptFormPage() {
         navigate(`/goods-receipts/${id}`)
       } else {
         const res = await goodsReceiptService.createGoodsReceipt(buildPayload(values))
-        navigate(`/goods-receipts/${res.data.data.id}`)
+        navigate(`/goods-receipts/${res.data.data.id}/edit`)
       }
     } catch {
       // interceptor handles display

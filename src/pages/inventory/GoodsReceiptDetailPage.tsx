@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { goodsReceiptService } from '@/api/goodsReceiptService'
-import type { GoodsReceipt, GoodsReceiptDocument, GoodsReceiptStatus } from '@/types/inventory'
+import type { GoodsReceipt, GoodsReceiptDocument, GoodsReceiptDocumentType, GoodsReceiptStatus } from '@/types/inventory'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
@@ -52,6 +52,27 @@ function FileIcon() {
     </svg>
   )
 }
+function UploadIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  )
+}
+function TrashIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+    </svg>
+  )
+}
+function XIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
 
 const formatDate = (s?: string | null) =>
   s ? new Date(s).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
@@ -94,6 +115,13 @@ export function GoodsReceiptDetailPage() {
 
   const reload = useRef<() => void>(() => {})
 
+  const [activeTab, setActiveTab] = useState<'detail' | 'documents'>('detail')
+  const [stagedFiles, setStagedFiles] = useState<Array<{ file: File; file_type: GoodsReceiptDocumentType }>>([])
+  const [isUploading, setIsUploading] = useState(false)
+  const [deleteDocId, setDeleteDocId] = useState<number | null>(null)
+  const [isDeletingDoc, setIsDeletingDoc] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (!id) return
     const load = () => {
@@ -133,6 +161,43 @@ export function GoodsReceiptDetailPage() {
     } finally {
       setIsCancelling(false)
       setCancelOpen(false)
+    }
+  }
+
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    setStagedFiles((prev) => [...prev, ...files.map((file) => ({ file, file_type: 'other' as GoodsReceiptDocumentType }))])
+    e.target.value = ''
+  }
+
+  const handleUploadAll = async () => {
+    if (!id || stagedFiles.length === 0) return
+    setIsUploading(true)
+    try {
+      for (const staged of stagedFiles) {
+        await goodsReceiptService.uploadDocument(Number(id), staged.file, { file_type: staged.file_type })
+      }
+      const res = await goodsReceiptService.getDocuments(Number(id))
+      setDocuments(res.data.data ?? [])
+      setStagedFiles([])
+    } catch {
+      // interceptor handles display
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleDeleteDoc = async () => {
+    if (!id || deleteDocId === null) return
+    setIsDeletingDoc(true)
+    try {
+      await goodsReceiptService.deleteDocument(Number(id), deleteDocId)
+      setDocuments((prev) => prev.filter((d) => d.id !== deleteDocId))
+      setDeleteDocId(null)
+    } catch {
+      // interceptor handles display
+    } finally {
+      setIsDeletingDoc(false)
     }
   }
 
@@ -203,6 +268,31 @@ export function GoodsReceiptDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Tab bar */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex gap-4">
+          <button
+            type="button"
+            onClick={() => setActiveTab('detail')}
+            className={cn('border-b-2 px-1 pb-3 text-sm font-medium', activeTab === 'detail' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700')}
+          >
+            รายละเอียด
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('documents')}
+            className={cn('border-b-2 px-1 pb-3 text-sm font-medium', activeTab === 'documents' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700')}
+          >
+            เอกสารแนบ
+            {documents.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">{documents.length}</span>
+            )}
+          </button>
+        </nav>
+      </div>
+
+      {activeTab === 'detail' && <>
 
       {/* General info */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -294,37 +384,6 @@ export function GoodsReceiptDetailPage() {
         )}
       </div>
 
-      {/* Documents */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">เอกสารแนบ</h2>
-        {documents.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-400">ไม่มีเอกสารแนบ</p>
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {documents.map((doc) => (
-              <li key={doc.id} className="flex items-center gap-3 py-2">
-                <FileIcon />
-                <span className={cn('inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium', fileTypeBadge(doc.file_type))}>
-                  {fileTypeLabel(doc.file_type)}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <a
-                    href={doc.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block truncate text-sm text-blue-600 hover:underline"
-                  >
-                    {doc.file_name}
-                  </a>
-                  {doc.note && <p className="truncate text-xs text-gray-400">{doc.note}</p>}
-                </div>
-                {doc.file_size != null && <span className="text-xs text-gray-400">{formatFileSize(doc.file_size)}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
       {/* Audit info */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">ประวัติการดำเนินการ</h2>
@@ -350,6 +409,90 @@ export function GoodsReceiptDetailPage() {
           )}
         </dl>
       </div>
+      </>}
+
+      {activeTab === 'documents' && <>
+        {canEdit && (
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">อัปโหลดเอกสาร</h2>
+            <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFilesSelected} />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600"
+            >
+              <UploadIcon /> เลือกไฟล์
+            </button>
+            {stagedFiles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {stagedFiles.map((staged, idx) => (
+                  <div key={idx} className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                    <FileIcon />
+                    <span className="flex-1 min-w-0 truncate text-sm text-gray-800">{staged.file.name}</span>
+                    <select
+                      value={staged.file_type}
+                      onChange={(e) => {
+                        const type = e.target.value as GoodsReceiptDocumentType
+                        setStagedFiles((prev) => prev.map((s, i) => i === idx ? { ...s, file_type: type } : s))
+                      }}
+                      className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-700"
+                    >
+                      <option value="invoice">ใบกำกับภาษี</option>
+                      <option value="delivery_note">ใบส่งของ</option>
+                      <option value="receipt">ใบเสร็จรับเงิน</option>
+                      <option value="other">อื่นๆ</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setStagedFiles((prev) => prev.filter((_, i) => i !== idx))}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      <XIcon />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={handleUploadAll}
+                  disabled={isUploading}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {isUploading ? 'กำลังอัปโหลด...' : `อัปโหลด ${stagedFiles.length} ไฟล์`}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">เอกสารที่อัปโหลดแล้ว</h2>
+          {documents.length === 0 ? (
+            <p className="py-6 text-center text-sm text-gray-400">ไม่มีเอกสารแนบ</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {documents.map((doc) => (
+                <li key={doc.id} className="flex items-center gap-3 py-2">
+                  <FileIcon />
+                  <span className={cn('inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-medium', fileTypeBadge(doc.file_type))}>
+                    {fileTypeLabel(doc.file_type)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="block truncate text-sm text-blue-600 hover:underline">
+                      {doc.file_name}
+                    </a>
+                    {doc.note && <p className="truncate text-xs text-gray-400">{doc.note}</p>}
+                  </div>
+                  {doc.file_size != null && <span className="text-xs text-gray-400">{formatFileSize(doc.file_size)}</span>}
+                  {canEdit && (
+                    <button type="button" onClick={() => setDeleteDocId(doc.id)} className="text-gray-400 hover:text-red-500">
+                      <TrashIcon />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </>}
 
       <ConfirmModal
         isOpen={approveOpen}
@@ -371,6 +514,17 @@ export function GoodsReceiptDetailPage() {
         isLoading={isCancelling}
         onConfirm={handleCancel}
         onCancel={() => setCancelOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={deleteDocId !== null}
+        title="ยืนยันการลบเอกสาร"
+        message="คุณต้องการลบเอกสารนี้ใช่หรือไม่?"
+        confirmLabel="ลบเอกสาร"
+        variant="danger"
+        isLoading={isDeletingDoc}
+        onConfirm={handleDeleteDoc}
+        onCancel={() => setDeleteDocId(null)}
       />
     </div>
   )
