@@ -10,11 +10,13 @@
 > ลูกค้าขอสินเชื่อกับบริษัทไฟแนนซ์ **ไฟแนนซ์จ่ายเงินให้ร้าน** ลูกค้าผ่อนกับไฟแนนซ์โดยตรง — **ระบบไม่ติดตามการผ่อน**
 
 ```
-1. สร้าง Loan Application     POST /loan-applications
-2. เพิ่มผู้ค้ำ (ถ้ามี)        POST /loan-applications/{id}/guarantors
-3. รอผลจากไฟแนนซ์ภายนอก
-4a. อนุมัติ                   PATCH /loan-applications/{id}/approve
-4b. ปฏิเสธ                   PATCH /loan-applications/{id}/reject
+1. สร้าง Loan Application           POST /loan-applications
+2. แนบเอกสาร (บัตรประชาชน, บช, สลิปเงินเดือน ฯลฯ)
+                                     POST /loan-applications/{id}/documents
+3. เพิ่มผู้ค้ำ (ถ้ามี)              POST /loan-applications/{id}/guarantors
+4. รอผลจากไฟแนนซ์ภายนอก
+5a. อนุมัติ                         PATCH /loan-applications/{id}/approve
+5b. ปฏิเสธ                         PATCH /loan-applications/{id}/reject
 ```
 
 ### Flow B — สินเชื่อร้าน
@@ -51,6 +53,9 @@
 | PATCH | `/loan-applications/{id}/cancel` | `can_edit` | ยกเลิก |
 | POST | `/loan-applications/{id}/guarantors` | `can_edit` | เพิ่มผู้ค้ำ |
 | DELETE | `/loan-applications/{id}/guarantors/{gid}` | `can_edit` | ลบผู้ค้ำ |
+| GET | `/loan-applications/{id}/documents` | `can_view` | รายการเอกสารแนบ |
+| POST | `/loan-applications/{id}/documents` | `can_edit` | อัปโหลดเอกสารแนบ |
+| DELETE | `/loan-applications/{id}/documents/{docId}` | `can_edit` | ลบเอกสารแนบ |
 
 ### List Filters (`GET /loan-applications`)
 
@@ -116,6 +121,28 @@
 | `address` | ❌ | |
 | `relationship` | ❌ | ความสัมพันธ์ เช่น `spouse`, `parent`, `sibling` |
 
+### Upload Document Body (`POST /loan-applications/{id}/documents`)
+
+ส่งเป็น `multipart/form-data`
+
+| Field | Required | คำอธิบาย |
+|-------|----------|---------|
+| `file` | ✅ | ไฟล์เอกสาร (PDF, JPG, PNG, DOC, DOCX, XLS, XLSX) |
+| `document_type` | ✅ | ประเภทเอกสาร ดูค่าที่รองรับด้านล่าง |
+| `file_name` | ❌ | ชื่อไฟล์ที่จะแสดง (ถ้าไม่ส่ง ใช้ชื่อไฟล์จริง) |
+| `note` | ❌ | หมายเหตุ |
+
+**`document_type` ที่รองรับ:**
+
+| ค่า | คำอธิบาย |
+|-----|---------|
+| `id_card` | สำเนาบัตรประชาชน |
+| `bank_statement` | Statement บัญชีธนาคาร (บช.) |
+| `salary_slip` | สลิปเงินเดือน / หลักฐานรายได้ |
+| `house_registration` | สำเนาทะเบียนบ้าน |
+| `vehicle_registration` | สำเนาทะเบียนรถ |
+| `other` | เอกสารอื่น ๆ |
+
 ### Status Flow
 
 ```
@@ -145,6 +172,9 @@ pending → approved
 | GET | `/store-loans/{id}/calculate` | `can_view` | คำนวณ PMT (ก่อนสร้าง) |
 | POST | `/store-loans/{id}/payments` | `can_edit` | บันทึกชำระงวด |
 | GET | `/store-loans/{id}/payments` | `can_view` | ประวัติชำระ |
+| GET | `/store-loans/{id}/documents` | `can_view` | รายการเอกสารแนบ |
+| POST | `/store-loans/{id}/documents` | `can_edit` | อัปโหลดเอกสารแนบ |
+| DELETE | `/store-loans/{id}/documents/{docId}` | `can_edit` | ลบเอกสารแนบ |
 
 ### List Filters (`GET /store-loans`)
 
@@ -171,16 +201,64 @@ GET /store-loans/{id}/calculate?principal=60000&interest_rate=12&term_months=12
 | `principal` | ✅ | ยอดเงินกู้ (หลังหักดาวน์) |
 | `interest_rate` | ✅ | % ต่อปี |
 | `term_months` | ✅ | จำนวนงวด |
+| `start_date` | ❌ | วันชำระงวดแรก (YYYY-MM-DD) ถ้าไม่ส่งใช้วันที่ 1 ของเดือนถัดไป |
 
 **Response:**
 ```json
 {
-  "principal": 60000,
-  "interest_rate": 12,
-  "term_months": 12,
-  "monthly_payment": 5330.07
+  "summary": {
+    "principal": 60000,
+    "interest_rate": 12,
+    "term_months": 12,
+    "monthly_payment": 5330.07,
+    "total_paid": 63960.84,
+    "total_interest": 3960.84,
+    "total_principal_paid": 60000,
+    "first_payment_date": "2026-05-01",
+    "last_payment_date": "2027-04-01"
+  },
+  "schedule": [
+    {
+      "installment": 1,
+      "payment_date": "2026-05-01",
+      "beginning_balance": 60000,
+      "payment": 5330.07,
+      "principal": 4730.07,
+      "interest": 600.00,
+      "ending_balance": 55269.93
+    },
+    {
+      "installment": 2,
+      "payment_date": "2026-06-01",
+      "beginning_balance": 55269.93,
+      "payment": 5330.07,
+      "principal": 4777.37,
+      "interest": 552.70,
+      "ending_balance": 50492.56
+    },
+    "..."
+  ]
 }
 ```
+
+| Field (summary) | คำอธิบาย |
+|-----------------|---------|
+| `monthly_payment` | ค่างวดคงที่ทุกเดือน (ยกเว้นงวดสุดท้ายอาจต่างเล็กน้อย) |
+| `total_paid` | ยอดชำระรวมทั้งสัญญา |
+| `total_interest` | ดอกเบี้ยรวมทั้งสัญญา |
+| `total_principal_paid` | เงินต้นรวม |
+| `first_payment_date` | วันชำระงวดที่ 1 |
+| `last_payment_date` | วันชำระงวดสุดท้าย |
+
+| Field (schedule แต่ละงวด) | คำอธิบาย |
+|--------------------------|---------|
+| `installment` | งวดที่ |
+| `payment_date` | วันครบกำหนดชำระ |
+| `beginning_balance` | ยอดหนี้ต้นงวด |
+| `payment` | ค่างวด (เงินต้น + ดอกเบี้ย) |
+| `principal` | ส่วนที่ตัดเงินต้น |
+| `interest` | ส่วนที่เป็นดอกเบี้ย |
+| `ending_balance` | ยอดหนี้คงเหลือหลังชำระ |
 
 ### Create Body (`POST /store-loans`)
 
@@ -212,6 +290,19 @@ GET /store-loans/{id}/calculate?principal=60000&interest_rate=12&term_months=12
 | `paid_at` | ❌ | วันเวลาชำระ (YYYY-MM-DDTHH:mm:ss) ถ้าไม่ส่งใช้เวลาปัจจุบัน |
 | `receipt_url` | ❌ | URL ไฟล์สลิป/ใบเสร็จ |
 | `note` | ❌ | |
+
+### Upload Document Body (`POST /store-loans/{id}/documents`)
+
+`Content-Type: multipart/form-data`
+
+| Field | Required | คำอธิบาย |
+|-------|----------|---------|
+| `file` | ✅ | ไฟล์เอกสาร (PDF, JPEG, PNG, DOC, DOCX, XLS, XLSX) |
+| `document_type` | ❌ | `id_card` / `bank_statement` / `salary_slip` / `house_registration` / `vehicle_registration` / `other` (default: `other`) |
+| `file_name` | ❌ | ชื่อไฟล์ที่ต้องการแสดง |
+| `note` | ❌ | หมายเหตุ |
+
+**Path บน DO Spaces:** `store-loans/{id}/documents/{hex}.{ext}`
 
 ### Status Flow
 

@@ -1,0 +1,225 @@
+import { useState, useEffect, useCallback } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { loanService } from '@/api/loanService'
+import type { StoreLoan, StoreLoanStatus } from '@/types/loans'
+import { useAuthStore } from '@/stores/authStore'
+import { hasPermission } from '@/lib/permissions'
+import { cn } from '@/lib/utils'
+
+const STATUS_CONFIG: Record<StoreLoanStatus, { label: string; className: string }> = {
+  active: { label: 'กำลังผ่อน', className: 'bg-blue-100 text-blue-700' },
+  completed: { label: 'ชำระครบ', className: 'bg-green-100 text-green-700' },
+  overdue: { label: 'ค้างชำระ', className: 'bg-red-100 text-red-700' },
+  cancelled: { label: 'ยกเลิก', className: 'bg-gray-100 text-gray-500' },
+}
+
+const formatDate = (s?: string | null) =>
+  s ? new Date(s).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
+
+const formatMoney = (n?: number | null) =>
+  n != null ? n.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '—'
+
+function PlusIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  )
+}
+function EyeIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  )
+}
+function SearchIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="8" strokeWidth={2} />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+    </svg>
+  )
+}
+
+export function StoreLoanListPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { permissions } = useAuthStore()
+
+  const [items, setItems] = useState<StoreLoan[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [total, setTotal] = useState(0)
+
+  const search = searchParams.get('search') ?? ''
+  const statusFilter = (searchParams.get('status') ?? '') as StoreLoanStatus | ''
+  const page = Number(searchParams.get('page') ?? '1')
+  const limit = 20
+
+  const canCreate = hasPermission(permissions, 'store_loans', 'can_create')
+
+  const load = useCallback(() => {
+    setIsLoading(true)
+    loanService.getStoreLoans({
+      search: search || undefined,
+      status: statusFilter || undefined,
+      page,
+      limit,
+    })
+      .then((res) => {
+        setItems(res.data.data)
+        setTotal(res.data.pagination.total)
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [search, statusFilter, page, limit])
+
+  useEffect(() => { load() }, [load])
+
+  const setParam = (key: string, value: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value) next.set(key, value)
+      else next.delete(key)
+      next.delete('page')
+      return next
+    })
+  }
+
+  const totalPages = Math.ceil(total / limit)
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-gray-900">สินเชื่อร้าน</h1>
+        {canCreate && (
+          <Link
+            to="/store-loans/create"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            <PlusIcon /> สร้างสัญญา
+          </Link>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
+              <SearchIcon />
+            </span>
+            <input
+              type="text"
+              placeholder="ค้นหาเลขสัญญา, ชื่อลูกค้า..."
+              value={search}
+              onChange={(e) => setParam('search', e.target.value)}
+              className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setParam('status', e.target.value)}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          >
+            <option value="">ทุกสถานะ</option>
+            <option value="active">กำลังผ่อน</option>
+            <option value="completed">ชำระครบ</option>
+            <option value="overdue">ค้างชำระ</option>
+            <option value="cancelled">ยกเลิก</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-4 py-3 font-medium">เลขสัญญา</th>
+                <th className="px-4 py-3 font-medium">ลูกค้า</th>
+                <th className="px-4 py-3 font-medium text-right">ยอดรวม</th>
+                <th className="px-4 py-3 font-medium text-center">จำนวนงวด</th>
+                <th className="px-4 py-3 font-medium text-right">ค่างวด/เดือน</th>
+                <th className="px-4 py-3 font-medium">วันครบกำหนด</th>
+                <th className="px-4 py-3 font-medium">สถานะ</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 8 }).map((__, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="h-4 rounded bg-gray-100 animate-pulse" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-400">
+                    ไม่พบรายการ
+                  </td>
+                </tr>
+              ) : (
+                items.map((item) => {
+                  const cfg = STATUS_CONFIG[item.status]
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.loan_no}</td>
+                      <td className="px-4 py-3 text-gray-900 font-medium">{item.customer_name}</td>
+                      <td className="px-4 py-3 text-right text-gray-900">{formatMoney(item.total_amount)} ฿</td>
+                      <td className="px-4 py-3 text-center text-gray-600">{item.term_months}</td>
+                      <td className="px-4 py-3 text-right text-gray-900">{formatMoney(item.monthly_payment)} ฿</td>
+                      <td className="px-4 py-3 text-gray-600">{formatDate(item.next_due_date)}</td>
+                      <td className="px-4 py-3">
+                        <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', cfg.className)}>
+                          {cfg.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          to={`/store-loans/${item.id}`}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg transition-colors"
+                          title="ดูรายละเอียด"
+                        >
+                          <EyeIcon />
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
+            <p className="text-xs text-gray-500">ทั้งหมด {total} รายการ</p>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set('page', String(p)); return n })}
+                  className={cn(
+                    'h-8 w-8 rounded text-xs',
+                    p === page ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100',
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

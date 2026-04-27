@@ -28,6 +28,13 @@ import { FinanceCompanyListPage } from '@/pages/settings/FinanceCompanyListPage'
 import { FinanceCompanyFormPage } from '@/pages/settings/FinanceCompanyFormPage'
 import { FinanceCompanyDetailPage } from '@/pages/settings/FinanceCompanyDetailPage'
 import { BrandListPage } from '@/pages/settings/BrandListPage'
+import { LoanApplicationListPage } from '@/pages/loans/LoanApplicationListPage'
+import { LoanApplicationFormPage } from '@/pages/loans/LoanApplicationFormPage'
+import { LoanApplicationDetailPage } from '@/pages/loans/LoanApplicationDetailPage'
+import { StoreLoanListPage } from '@/pages/loans/StoreLoanListPage'
+import { StoreLoanFormPage } from '@/pages/loans/StoreLoanFormPage'
+import { StoreLoanDetailPage } from '@/pages/loans/StoreLoanDetailPage'
+import { LoanSearchPage } from '@/pages/loans/LoanSearchPage'
 import { CategoryListPage } from '@/pages/settings/CategoryListPage'
 import { UnitListPage } from '@/pages/settings/UnitListPage'
 import { VendorListPage } from '@/pages/settings/VendorListPage'
@@ -338,6 +345,50 @@ export const router = createBrowserRouter([
             element: <AppLayout title="ใบสั่งซ่อม" />,
             children: [
               { path: '/service-orders', element: <PlaceholderPage title="ใบสั่งซ่อม" /> },
+            ],
+          },
+        ],
+      },
+
+      // ─── Loan Applications ───
+      {
+        element: <PermissionGuard module="loan_applications" />,
+        children: [
+          {
+            element: <AppLayout title="สมัครไฟแนนซ์" />,
+            children: [
+              { path: '/loan-applications', element: <LoanApplicationListPage /> },
+              { path: '/loan-applications/create', element: <LoanApplicationFormPage /> },
+              { path: '/loan-applications/:id', element: <LoanApplicationDetailPage /> },
+              { path: '/loan-applications/:id/edit', element: <LoanApplicationFormPage /> },
+            ],
+          },
+        ],
+      },
+
+      // ─── Store Loans ───
+      {
+        element: <PermissionGuard module="store_loans" />,
+        children: [
+          {
+            element: <AppLayout title="สินเชื่อร้าน" />,
+            children: [
+              { path: '/store-loans', element: <StoreLoanListPage /> },
+              { path: '/store-loans/create', element: <StoreLoanFormPage /> },
+              { path: '/store-loans/:id', element: <StoreLoanDetailPage /> },
+            ],
+          },
+        ],
+      },
+
+      // ─── Loan Search ───
+      {
+        element: <PermissionGuard module="loan_applications" />,
+        children: [
+          {
+            element: <AppLayout title="ค้นหาสินเชื่อ" />,
+            children: [
+              { path: '/loans/search', element: <LoanSearchPage /> },
             ],
           },
         ],
