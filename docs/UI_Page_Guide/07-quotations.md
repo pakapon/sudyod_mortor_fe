@@ -36,8 +36,11 @@
 | `type` | Select: service / sale | ✅ | |
 | `customer_id` | Autocomplete | ✅ | |
 | `service_order_id` | Hidden | ถ้า service | |
-| `validity_days` | Number | ✅ | จำนวนวันหมดอายุ (default 30) |
+| `validity_days` | Number | ✅ | จำนวนวันหมดอายุ (default 30) — backend แปลงเป็น `valid_until` ให้อัตโนมัติ |
 | `note` | Textarea | ❌ | |
+
+> **API Note:** ส่ง `validity_days` (int) ขึ้นมา — backend คำนวณ `valid_until = วันนี้ + validity_days` แล้วเก็บใน DB
+> Response จะมี `valid_until` (date string `YYYY-MM-DD`) ไม่มี `validity_days`
 
 **Items Table (เหมือน SO Items):**
 - สินค้า/บริการ, จำนวน, ราคา, ส่วนลด

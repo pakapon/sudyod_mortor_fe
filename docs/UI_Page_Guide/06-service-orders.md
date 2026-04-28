@@ -48,16 +48,21 @@
 - ถ้ายังไม่มีรถ → ปุ่ม "เพิ่มรถ" (modal)
 
 **Section 2: ข้อมูลใบสั่งซ่อม**
-| Field | Type | Required |
-|-------|------|----------|
-| `description` | Textarea | ✅ | อาการเสีย/สิ่งที่ต้องทำ |
-| `mileage_in` | Number | ❌ | เลขไมล์ตอนรับรถ |
-| `estimated_completion_date` | Date | ❌ | วันนัดรับ |
+| Field | Type | Required | หมายเหตุ |
+|-------|------|----------|---------|
+| `symptom` | Textarea | ✅ | อาการเสีย/สิ่งที่ต้องทำ |
+| `received_date` | Date | ✅ | วันที่รับรถจริง |
+| `mileage` | Number | ❌ | เลขไมล์ตอนรับรถ |
+| `expected_completion_date` | Date | ❌ | วันนัดรับ |
+| `is_quick_repair` | Checkbox | ❌ | ซ่อมด่วน (ข้าม pending_quote) |
 | `branch_id` | Select | ✅ | (auto จาก current branch) |
 
 - ปุ่ม "บันทึกฉบับร่าง" → สถานะ `draft`
 - API: `POST /service-orders`
 - สำเร็จ → redirect ไป `/service-orders/{id}` (หน้า detail)
+
+> **แก้ไข SO:** `PATCH /service-orders/{id}` — แก้ได้เฉพาะ status `draft` และ `pending_review` เท่านั้น
+> Fields ที่แก้ได้: `symptom`, `received_date`, `mileage`, `expected_completion_date`, `is_quick_repair`, `diagnosis`, `internal_note`
 
 ---
 
@@ -83,6 +88,7 @@
 | `draft` | "ส่งตรวจสอบ" | `PATCH /service-orders/{id}/transition { status: "pending_review" }` | ⚠️ ต้องมี GPS pre_intake ≥1 |
 | `draft` | "ยกเลิก" | `POST /service-orders/{id}/cancel` | |
 | `pending_review` | "พร้อมเสนอราคา" | transition → `pending_quote` | |
+| `pending_review` | "อนุมัติด่วน" | transition → `approved` | กรณีซ่อมด่วน/Scenario B ไม่ต้องเสนอราคา |
 | `pending_quote` | "สร้างใบเสนอราคา" | → navigate ไป `/quotations/create?service_order_id={id}` | |
 | `pending_quote` | "ยกเลิก" | cancel | |
 | `approved` | "มอบหมายช่าง" | `PATCH /service-orders/{id}/assign { technician_id }` | dropdown เลือกช่าง |
@@ -103,7 +109,8 @@
 - ลบรายการ: `DELETE /service-orders/{id}/items/{iid}`
 - สรุปยอดรวม (subtotal, discount, vat, total)
 - API: `GET /service-orders/{id}/items`, `POST /service-orders/{id}/items`
-- ⚠️ แก้ได้เฉพาะ status ≤ pending_quote
+- ⚠️ แก้ได้เฉพาะ status ≤ pending_quote; เพิ่มได้หลัง `approved` แต่จะถูก flag `is_additional = true`
+- ⚠️ ลบรายการไม่ได้เมื่อ status ≥ `in_progress` (สต็อกถูกตัดแล้ว)
 
 **Tab: GPS Photos**
 - แสดงรูปทั้งหมดจัดกลุ่มตาม `photo_type`:

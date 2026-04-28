@@ -21,7 +21,7 @@ export function AppLayout({ title }: AppLayoutProps) {
 
       <main
         className={cn(
-          'pt-16 transition-all duration-300',
+          'pt-16 transition-all duration-300 print:ml-0 print:pt-0',
           sidebarCollapsed ? 'ml-16' : 'ml-60',
         )}
       >

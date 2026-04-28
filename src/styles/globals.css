@@ -101,6 +101,53 @@ body {
   animation: shake 0.4s ease-in-out;
 }
 
+/* ─── Print Styles ─── */
+@page {
+  size: A4;
+  margin: 15mm;
+}
+
+@media print {
+  /* ซ่อน UI shell — handled by print:hidden Tailwind utilities */
+  aside,
+  header {
+    display: none !important;
+  }
+
+  /* reset main layout */
+  body {
+    background: white !important;
+  }
+
+  main {
+    margin-left: 0 !important;
+    padding-top: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Remove p-6 wrapper padding from AppLayout */
+  main > div {
+    padding: 0 !important;
+  }
+
+  /* ตัดหน้าอย่างถูกต้อง */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  /* Repeat table header on every page */
+  thead {
+    display: table-header-group;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 /* ─── Auth Form Inputs ─── */
 .auth-label {
   display: block;

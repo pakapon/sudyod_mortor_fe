@@ -28,6 +28,12 @@ import { FinanceCompanyListPage } from '@/pages/settings/FinanceCompanyListPage'
 import { FinanceCompanyFormPage } from '@/pages/settings/FinanceCompanyFormPage'
 import { FinanceCompanyDetailPage } from '@/pages/settings/FinanceCompanyDetailPage'
 import { BrandListPage } from '@/pages/settings/BrandListPage'
+import { ServiceOrderListPage } from '@/pages/service-orders/ServiceOrderListPage'
+import { ServiceOrderFormPage } from '@/pages/service-orders/ServiceOrderFormPage'
+import { ServiceOrderDetailPage } from '@/pages/service-orders/ServiceOrderDetailPage'
+import { QuotationListPage } from '@/pages/quotations/QuotationListPage'
+import { QuotationFormPage } from '@/pages/quotations/QuotationFormPage'
+import { QuotationDetailPage } from '@/pages/quotations/QuotationDetailPage'
 import { LoanApplicationListPage } from '@/pages/loans/LoanApplicationListPage'
 import { LoanApplicationFormPage } from '@/pages/loans/LoanApplicationFormPage'
 import { LoanApplicationDetailPage } from '@/pages/loans/LoanApplicationDetailPage'
@@ -344,7 +350,26 @@ export const router = createBrowserRouter([
           {
             element: <AppLayout title="ใบสั่งซ่อม" />,
             children: [
-              { path: '/service-orders', element: <PlaceholderPage title="ใบสั่งซ่อม" /> },
+              { path: '/service-orders', element: <ServiceOrderListPage /> },
+              { path: '/service-orders/create', element: <ServiceOrderFormPage /> },
+              { path: '/service-orders/:id', element: <ServiceOrderDetailPage /> },
+              { path: '/service-orders/:id/edit', element: <ServiceOrderFormPage /> },
+            ],
+          },
+        ],
+      },
+
+      // ─── Quotations ───
+      {
+        element: <PermissionGuard module="quotations" />,
+        children: [
+          {
+            element: <AppLayout title="ใบเสนอราคา" />,
+            children: [
+              { path: '/quotations', element: <QuotationListPage /> },
+              { path: '/quotations/create', element: <QuotationFormPage /> },
+              { path: '/quotations/:id', element: <QuotationDetailPage /> },
+              { path: '/quotations/:id/edit', element: <QuotationFormPage /> },
             ],
           },
         ],
