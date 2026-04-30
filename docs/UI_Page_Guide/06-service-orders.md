@@ -2,6 +2,7 @@
 
 > ดู common conventions → [00-common.md](./00-common.md)
 > **หัวใจของระบบ** — ทุก Scenario A (ซ่อมรถ) เริ่มที่นี่
+> **📋 Reference เท่านั้น** — ดู API sequence จริงตาม flow ที่ [20-flows.md](./20-flows.md)
 
 ---
 
@@ -156,11 +157,43 @@ draft ──→ pending_review ──→ pending_quote ──→ approved ──
 
 ---
 
+---
+
+## Billing Hub Integration
+
+SO ถูก integrate เข้า **Billing Hub** ([12-billing-hub.md](./12-billing-hub.md)) ใน 2 ทาง:
+
+### Job Flow Tracker (`/billing/jobs/:id`)
+
+- SO แต่ละใบจะปรากฏใน Job List ที่หน้า `/billing`
+- คลิก → `/billing/jobs/:id` → เห็น 8-step progress tracker
+- Step names: `receive` → `assess` → `quote` → `approve` → `invoice` → `repair_wk` → `payment` → `deliver`
+- Map จาก SO status → current step:
+
+| SO Status | Current Step |
+|-----------|-------------|
+| `draft` | `receive` |
+| `pending_review` | `assess` |
+| `pending_quote` | `quote` |
+| `approved` | `approve` |
+| `in_progress` | `repair_wk` |
+| `completed` | `invoice` |
+| `pending_payment` | `payment` |
+| `pending_pickup` / `closed` | `deliver` |
+
+### สร้าง SO ใหม่จาก Billing Hub
+
+- Flow card "ซ่อมรถ" ที่ `/billing` → `/billing/new/repair`
+- Navigate ไป `/service-orders/create` (หน้าเดิม)
+
+---
+
 ## ดูเพิ่มเติม
 - [05-customers.md](./05-customers.md) — เลือกลูกค้า + รถ
 - [07-quotations.md](./07-quotations.md) — สร้างใบเสนอราคา (QT) จาก SO
 - [08-invoices.md](./08-invoices.md) — ใบแจ้งหนี้ที่ผูกกับ SO
 - [10-delivery-notes.md](./10-delivery-notes.md) — ใบส่งมอบ (DN) บังคับก่อน closed
 - [11-warranties.md](./11-warranties.md) — ใบรับประกัน
+- [12-billing-hub.md](./12-billing-hub.md) — Billing Hub + Job Flow UX
 - [12-products.md](./12-products.md) — ค้นหาอะไหล่ตอนเพิ่ม SO items
-- [20-flows.md](./20-flows.md) — Flow A ทั้งหมด 19 ขั้นตอน
+- [20-flows.md](./20-flows.md) — Flow A ทั้งหมด (A-1 ถึง A-25)

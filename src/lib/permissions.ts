@@ -50,7 +50,7 @@ export const MENU_PERMISSION_MAP: Record<string, ModuleKey | ModuleKey[]> = {
   dashboard: 'branches', // dashboard ไม่มี dedicated permission, fallback
   customer: 'customers',
   service: 'service_orders',
-  finance: ['quotations', 'invoices'],
+  billing: ['service_orders', 'quotations', 'invoices'],
   product: ['products', 'warehouses', 'goods_receipts', 'stock_transfers', 'purchase_orders'],
   credit: ['loan_applications', 'store_loans'],
   team: ['employees', 'attendance', 'holidays'],
@@ -68,6 +68,9 @@ export const ROUTE_PERMISSION_MAP: Record<string, ModuleKey> = {
   '/deposits': 'invoices',
   '/delivery-notes': 'invoices',
   '/warranties': 'invoices',
+  '/billing': 'service_orders',
+  '/billing/pos': 'invoices',
+  '/billing/documents': 'invoices',
   '/products': 'products',
   '/warehouses': 'warehouses',
   '/goods-receipts': 'goods_receipts',

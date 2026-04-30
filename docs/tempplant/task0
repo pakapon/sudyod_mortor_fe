@@ -1,0 +1,26 @@
+# Billing Hub Implementation Tasks
+
+## Phase 1 — Foundation
+- [x] Update Sidebar — replace finance menu with "บิล/เอกสาร"
+- [x] Update permissions — add billing route mappings
+- [x] Add billing routes to router
+
+## Phase 2 — Pages
+- [x] BillingHubPage — Dashboard with Flow cards + Job list
+- [x] JobFlowPage — Stepper + Step detail
+- [x] RetailPosPage — POS interface with barcode
+- [x] DocumentBrowserPage — Unified document search
+
+## Phase 3 — Flow Components
+- [x] FlowStepper — Reusable stepper component (in JobFlowPage)
+- [ ] Step components (ReceiveVehicle, Assessment, Quotation, etc.)
+- [ ] PaymentModal
+- [ ] RoleBadge
+
+## Phase 4 — Redirects & Cleanup
+- [x] Redirect old routes → /billing
+- [ ] Test all flows in browser (blocked by login credentials)
+
+## Status
+Phase 1 & 2 complete. Phase 3 step-specific forms are placeholder (marked "อยู่ระหว่างพัฒนา").
+Phase 4 redirects done. Visual verification pending user login.

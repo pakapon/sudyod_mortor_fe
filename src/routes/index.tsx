@@ -63,6 +63,11 @@ import { StockTransferListPage } from '@/pages/inventory/StockTransferListPage'
 import { StockTransferFormPage } from '@/pages/inventory/StockTransferFormPage'
 import { StockTransferDetailPage } from '@/pages/inventory/StockTransferDetailPage'
 
+import { BillingHubPage } from '@/pages/billing/BillingHubPage'
+import { JobFlowPage } from '@/pages/billing/JobFlowPage'
+import { RetailPosPage } from '@/pages/billing/RetailPosPage'
+import { DocumentBrowserPage } from '@/pages/billing/DocumentBrowserPage'
+
 export const router = createBrowserRouter([
   {
     path: '/login',
@@ -424,6 +429,34 @@ export const router = createBrowserRouter([
         element: <AppLayout title="ข้อมูลส่วนตัว" />,
         children: [{ path: '/profile', element: <MyProfilePage /> }],
       },
+
+      // ─── Billing Hub ───
+      {
+        element: <PermissionGuard module="service_orders" />,
+        children: [
+          {
+            element: <AppLayout title="บิล / เอกสาร" />,
+            children: [
+              { path: '/billing', element: <BillingHubPage /> },
+              { path: '/billing/jobs/:id', element: <JobFlowPage /> },
+              { path: '/billing/new/repair', element: <JobFlowPage /> },
+              { path: '/billing/new/sale', element: <JobFlowPage /> },
+              { path: '/billing/pos', element: <RetailPosPage /> },
+              { path: '/billing/documents', element: <DocumentBrowserPage /> },
+            ],
+          },
+        ],
+      },
+
+      // ─── Legacy redirects → Billing Hub ───
+      { path: '/invoices', element: <Navigate to="/billing" replace /> },
+      { path: '/invoices/*', element: <Navigate to="/billing" replace /> },
+      { path: '/deposits', element: <Navigate to="/billing" replace /> },
+      { path: '/deposits/*', element: <Navigate to="/billing" replace /> },
+      { path: '/delivery-notes', element: <Navigate to="/billing" replace /> },
+      { path: '/delivery-notes/*', element: <Navigate to="/billing" replace /> },
+      { path: '/warranties', element: <Navigate to="/billing" replace /> },
+      { path: '/warranties/*', element: <Navigate to="/billing" replace /> },
 
       // ─── Audit & Notification (TODO: determine permission) ───
       {

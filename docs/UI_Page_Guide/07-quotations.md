@@ -1,6 +1,7 @@
 # ใบเสนอราคา (Quotations)
 
 > ดู common conventions → [00-common.md](./00-common.md)
+> **📋 Reference เท่านั้น** — ดู API sequence จริงตาม flow ที่ [20-flows.md](./20-flows.md)
 
 ---
 
@@ -80,8 +81,37 @@ draft → sent → approved → (สร้าง Invoice ได้)
 
 ---
 
+---
+
+## Billing Hub Integration
+
+QT type=sale ถูก integrate เข้า **Billing Hub** ([12-billing-hub.md](./12-billing-hub.md)):
+
+### Job Flow Tracker (`/billing/jobs/:id`)
+
+- QT type=sale จะปรากฏใน Job List ที่หน้า `/billing` (type=sale)
+- คลิก → `/billing/jobs/:id` → เห็น 4-step (ไม่มัดจำ) หรือ 5-step (มัดจำ) progress tracker
+
+**sale_no_deposit (4 steps):** `quote` → `approve` → `payment` → `deliver`  
+**sale_deposit (5 steps):** `quote` → `deposit` → `invoice` → `payment` → `deliver`
+
+| QT Status | Current Step |
+|-----------|-------------|
+| `draft` / `sent` | `quote` |
+| `approved` (ไม่มีมัดจำ) | `payment` |
+| `approved` (มีมัดจำ รอจ่าย) | `deposit` |
+| `approved` (มีมัดจำ มี INV) | `invoice` / `payment` |
+
+### สร้าง QT ใหม่จาก Billing Hub
+
+- Flow card "ขายอะไหล่" ที่ `/billing` → `/billing/new/sale`
+- Navigate ไป `/quotations/create?type=sale`
+
+---
+
 ## ดูเพิ่มเติม
 - [06-service-orders.md](./06-service-orders.md) — SO ที่ผูกกับ QT (type=service)
 - [08-invoices.md](./08-invoices.md) — สร้าง Invoice จาก QT
 - [09-deposits.md](./09-deposits.md) — รับมัดจำ (Flow B2)
+- [12-billing-hub.md](./12-billing-hub.md) — Billing Hub + Job Flow UX
 - [20-flows.md](./20-flows.md) — Flow A, B1, B2

@@ -21,9 +21,9 @@ const icons = {
       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
     </svg>
   ),
-  finance: (
+  billing: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+      <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 14l2 2 4-4" />
     </svg>
   ),
   product: (
@@ -76,13 +76,11 @@ const menuItems: MenuItem[] = [
   { id: 'customer', label: 'ลูกค้า', icon: 'customer', path: '/customers' },
   { id: 'service', label: 'ใบสั่งซ่อม', icon: 'service', path: '/service-orders' },
   {
-    id: 'finance', label: 'การเงิน', icon: 'finance',
+    id: 'billing', label: 'บิล/เอกสาร', icon: 'billing',
     children: [
-      { label: 'ใบเสนอราคา', path: '/quotations' },
-      { label: 'ใบแจ้งหนี้', path: '/invoices' },
-      { label: 'มัดจำ', path: '/deposits' },
-      { label: 'ใบส่งมอบ', path: '/delivery-notes' },
-      { label: 'ใบรับประกัน', path: '/warranties' },
+      { label: 'ภาพรวมงาน', path: '/billing' },
+      { label: 'ขายหน้าร้าน (POS)', path: '/billing/pos' },
+      { label: 'ค้นหาเอกสาร', path: '/billing/documents' },
     ],
   },
   {
