@@ -13597,6 +13597,39 @@
         "name": "Products",
         "item": [
           {
+            "name": "Search BOM Variants",
+            "id": "aaa00001-0000-0000-0000-000000000001",
+            "protocolProfileBehavior": {
+              "disableBodyPruning": true
+            },
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/product-variants?search=wave",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "product-variants"
+                ],
+                "query": [
+                  {
+                    "key": "search",
+                    "value": "wave"
+                  },
+                  {
+                    "key": "product_id",
+                    "value": "",
+                    "disabled": true
+                  }
+                ]
+              },
+              "description": "ค้นหา Product Variants"
+            },
+            "response": []
+          },
+          {
             "name": "List Products",
             "id": "5b7130b5-a6bb-400e-9421-336a411f50dc",
             "protocolProfileBehavior": {
@@ -16275,191 +16308,6 @@
             "uid": "25233413-7b115996-ae99-4818-960f-539f6a2b1283"
           },
           {
-            "name": "Update BOM Component",
-            "id": "c78757ee-2b64-4945-8835-34089029d8e0",
-            "protocolProfileBehavior": {
-              "disableBodyPruning": true
-            },
-            "request": {
-              "method": "PUT",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": {
-                "mode": "raw",
-                "raw": "{\n    \"quantity\": 2\n}",
-                "options": {
-                  "raw": {
-                    "language": "json"
-                  }
-                }
-              },
-              "url": {
-                "raw": "{{base_url}}/products/:id/bom/:cid",
-                "host": [
-                  "{{base_url}}"
-                ],
-                "path": [
-                  "products",
-                  ":id",
-                  "bom",
-                  ":cid"
-                ],
-                "variable": [
-                  {
-                    "id": "4dd43fbf-2104-4f74-9db3-0229ad6f7e8b",
-                    "key": "id",
-                    "value": "1",
-                    "description": "Product ID"
-                  },
-                  {
-                    "id": "ba66c261-8fee-49a8-ab05-51e72f9de4cd",
-                    "key": "cid",
-                    "value": "1",
-                    "description": "BOM Component ID"
-                  }
-                ]
-              },
-              "description": "แก้ไข BOM"
-            },
-            "response": [
-              {
-                "id": "00b1074a-4578-4df4-bf23-0fb6d603a33a",
-                "name": "BOM Updated",
-                "originalRequest": {
-                  "method": "PUT",
-                  "header": [
-                    {
-                      "key": "Content-Type",
-                      "value": "application/json"
-                    }
-                  ],
-                  "body": {
-                    "mode": "raw",
-                    "raw": "{\n    \"quantity\": 2\n}",
-                    "options": {
-                      "raw": {
-                        "language": "json"
-                      }
-                    }
-                  },
-                  "url": {
-                    "raw": "{{base_url}}/products/:id/bom/:cid",
-                    "host": [
-                      "{{base_url}}"
-                    ],
-                    "path": [
-                      "products",
-                      ":id",
-                      "bom",
-                      ":cid"
-                    ],
-                    "variable": [
-                      {
-                        "id": "4dd43fbf-2104-4f74-9db3-0229ad6f7e8b",
-                        "key": "id",
-                        "value": "1",
-                        "description": "Product ID"
-                      },
-                      {
-                        "id": "ba66c261-8fee-49a8-ab05-51e72f9de4cd",
-                        "key": "cid",
-                        "value": "1",
-                        "description": "BOM Component ID"
-                      }
-                    ]
-                  },
-                  "description": "แก้ไข BOM"
-                },
-                "status": "OK",
-                "code": 200,
-                "_postman_previewlanguage": "json",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "cookie": [],
-                "responseTime": null,
-                "body": "{\n  \"success\": true,\n  \"message\": \"แก้ไขสำเร็จ\"\n}",
-                "createdAt": "2026-04-19T11:48:44.000Z",
-                "updatedAt": "2026-04-19T11:48:44.000Z",
-                "uid": "25233413-00b1074a-4578-4df4-bf23-0fb6d603a33a"
-              },
-              {
-                "id": "1d1ca139-49e0-4d5f-940b-279f93f4d43a",
-                "name": "Validation Error",
-                "originalRequest": {
-                  "method": "PUT",
-                  "header": [
-                    {
-                      "key": "Content-Type",
-                      "value": "application/json"
-                    }
-                  ],
-                  "body": {
-                    "mode": "raw",
-                    "raw": "{\n    \"quantity\": 2\n}",
-                    "options": {
-                      "raw": {
-                        "language": "json"
-                      }
-                    }
-                  },
-                  "url": {
-                    "raw": "{{base_url}}/products/:id/bom/:cid",
-                    "host": [
-                      "{{base_url}}"
-                    ],
-                    "path": [
-                      "products",
-                      ":id",
-                      "bom",
-                      ":cid"
-                    ],
-                    "variable": [
-                      {
-                        "id": "4dd43fbf-2104-4f74-9db3-0229ad6f7e8b",
-                        "key": "id",
-                        "value": "1",
-                        "description": "Product ID"
-                      },
-                      {
-                        "id": "ba66c261-8fee-49a8-ab05-51e72f9de4cd",
-                        "key": "cid",
-                        "value": "1",
-                        "description": "BOM Component ID"
-                      }
-                    ]
-                  },
-                  "description": "แก้ไข BOM"
-                },
-                "status": "Unprocessable Entity",
-                "code": 422,
-                "_postman_previewlanguage": "json",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "cookie": [],
-                "responseTime": null,
-                "body": "{\n    \"success\": false,\n    \"message\": \"ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบ\"\n}",
-                "createdAt": "2026-04-19T11:48:44.000Z",
-                "updatedAt": "2026-04-19T11:48:44.000Z",
-                "uid": "25233413-1d1ca139-49e0-4d5f-940b-279f93f4d43a"
-              }
-            ],
-            "createdAt": "2026-04-19T11:48:44.000Z",
-            "updatedAt": "2026-04-19T11:48:44.000Z",
-            "uid": "25233413-c78757ee-2b64-4945-8835-34089029d8e0"
-          },
-          {
             "name": "Delete BOM Component",
             "id": "c7ec2073-a196-4cc9-9a70-ddd817567c39",
             "protocolProfileBehavior": {
@@ -16726,6 +16574,638 @@
             "createdAt": "2026-04-19T11:48:44.000Z",
             "updatedAt": "2026-04-19T11:48:44.000Z",
             "uid": "25233413-9efc1500-b5f9-4970-801e-08eac07928a2"
+          },
+          {
+            "name": "List Product Tags",
+            "id": "aaa00002-0000-0000-0000-000000000001",
+            "protocolProfileBehavior": {
+              "disableBodyPruning": true
+            },
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/products/:id/tags",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "tags"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  }
+                ]
+              },
+              "description": "รายการ Tag ของสินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "Add Product Tag",
+            "id": "aaa00002-0000-0000-0000-000000000002",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n    \"name\": \"OEM\",\n    \"slug\": \"oem\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "url": {
+                "raw": "{{base_url}}/products/:id/tags",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "tags"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  }
+                ]
+              },
+              "description": "เพิ่ม Tag ให้สินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "Remove Product Tag",
+            "id": "aaa00002-0000-0000-0000-000000000003",
+            "request": {
+              "method": "DELETE",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/products/:id/tags/:tid",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "tags",
+                  ":tid"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  },
+                  {
+                    "key": "tid",
+                    "value": "1",
+                    "description": "Tag ID"
+                  }
+                ]
+              },
+              "description": "ลบ Tag ออกจากสินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "List Product Attachments",
+            "id": "aaa00003-0000-0000-0000-000000000001",
+            "protocolProfileBehavior": {
+              "disableBodyPruning": true
+            },
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/products/:id/attachments",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "attachments"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  }
+                ]
+              },
+              "description": "รายการไฟล์แนบของสินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "Upload Product Attachment",
+            "id": "aaa00003-0000-0000-0000-000000000002",
+            "request": {
+              "method": "POST",
+              "header": [],
+              "body": {
+                "mode": "formdata",
+                "formdata": [
+                  {
+                    "key": "file",
+                    "type": "file",
+                    "src": ""
+                  },
+                  {
+                    "key": "name",
+                    "value": "คู่มือการติดตั้ง",
+                    "type": "text"
+                  }
+                ]
+              },
+              "url": {
+                "raw": "{{base_url}}/products/:id/attachments",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "attachments"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  }
+                ]
+              },
+              "description": "อัปโหลดไฟล์แนบสินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "Delete Product Attachment",
+            "id": "aaa00003-0000-0000-0000-000000000003",
+            "request": {
+              "method": "DELETE",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/products/:id/attachments/:aid",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "attachments",
+                  ":aid"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  },
+                  {
+                    "key": "aid",
+                    "value": "1",
+                    "description": "Attachment ID"
+                  }
+                ]
+              },
+              "description": "ลบไฟล์แนบสินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "List Product Variants",
+            "id": "aaa00004p-000-0000-0000-000000000001",
+            "protocolProfileBehavior": {
+              "disableBodyPruning": true
+            },
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/products/:id/variants",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "variants"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  }
+                ]
+              },
+              "description": "รายการ Variants ของสินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "Create Product Variant",
+            "id": "aaa00004p-000-0000-0000-000000000002",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n    \"sku\": \"PROD-001-RED\",\n    \"name\": \"สีแดง\",\n    \"price\": 500.00,\n    \"stock_qty\": 10\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "url": {
+                "raw": "{{base_url}}/products/:id/variants",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "variants"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  }
+                ]
+              },
+              "description": "สร้าง Variant สินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "Update Product Variant",
+            "id": "aaa00004p-000-0000-0000-000000000003",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n    \"sku\": \"PROD-001-RED\",\n    \"name\": \"สีแดง\",\n    \"price\": 500.00,\n    \"stock_qty\": 10\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "url": {
+                "raw": "{{base_url}}/products/:id/variants/:vid",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "variants",
+                  ":vid"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  },
+                  {
+                    "key": "vid",
+                    "value": "1",
+                    "description": "Variant ID"
+                  }
+                ]
+              },
+              "description": "แก้ไข Variant สินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "Delete Product Variant",
+            "id": "aaa00004p-000-0000-0000-000000000004",
+            "request": {
+              "method": "DELETE",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/products/:id/variants/:vid",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "variants",
+                  ":vid"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  },
+                  {
+                    "key": "vid",
+                    "value": "1",
+                    "description": "Variant ID"
+                  }
+                ]
+              },
+              "description": "ลบ Variant สินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "List Product Attribute Options",
+            "id": "aaa00005p-000-0000-0000-000000000001",
+            "protocolProfileBehavior": {
+              "disableBodyPruning": true
+            },
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/products/:id/attribute-options",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "attribute-options"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  }
+                ]
+              },
+              "description": "รายการ Attribute Options ของสินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "Create Product Attribute Option",
+            "id": "aaa00005p-000-0000-0000-000000000002",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n    \"attribute_name\": \"สี\",\n    \"option_value\": \"แดง\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "url": {
+                "raw": "{{base_url}}/products/:id/attribute-options",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "attribute-options"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  }
+                ]
+              },
+              "description": "สร้าง Attribute Option สินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "Delete Product Attribute Option",
+            "id": "aaa00005p-000-0000-0000-000000000003",
+            "request": {
+              "method": "DELETE",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/products/:id/attribute-options/:oid",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "attribute-options",
+                  ":oid"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  },
+                  {
+                    "key": "oid",
+                    "value": "1",
+                    "description": "Attribute Option ID"
+                  }
+                ]
+              },
+              "description": "ลบ Attribute Option สินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "List Product Compatibility",
+            "id": "aaa00006p-000-0000-0000-000000000001",
+            "protocolProfileBehavior": {
+              "disableBodyPruning": true
+            },
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/products/:id/compatibility",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "compatibility"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  }
+                ]
+              },
+              "description": "รายการความเข้ากันได้ของสินค้า"
+            },
+            "response": []
+          },
+          {
+            "name": "Create Product Compatibility",
+            "id": "aaa00006p-000-0000-0000-000000000002",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n    \"vehicle_make\": \"Honda\",\n    \"vehicle_model\": \"Wave\",\n    \"year_from\": 2020,\n    \"year_to\": 2025\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "url": {
+                "raw": "{{base_url}}/products/:id/compatibility",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "compatibility"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  }
+                ]
+              },
+              "description": "สร้างรายการความเข้ากันได้"
+            },
+            "response": []
+          },
+          {
+            "name": "Update Product Compatibility",
+            "id": "aaa00006p-000-0000-0000-000000000003",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n    \"vehicle_make\": \"Honda\",\n    \"vehicle_model\": \"Wave\",\n    \"year_from\": 2020,\n    \"year_to\": 2025\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "url": {
+                "raw": "{{base_url}}/products/:id/compatibility/:cid",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "compatibility",
+                  ":cid"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  },
+                  {
+                    "key": "cid",
+                    "value": "1",
+                    "description": "Compatibility ID"
+                  }
+                ]
+              },
+              "description": "แก้ไขรายการความเข้ากันได้"
+            },
+            "response": []
+          },
+          {
+            "name": "Delete Product Compatibility",
+            "id": "aaa00006p-000-0000-0000-000000000004",
+            "request": {
+              "method": "DELETE",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/products/:id/compatibility/:cid",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "products",
+                  ":id",
+                  "compatibility",
+                  ":cid"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "Product ID"
+                  },
+                  {
+                    "key": "cid",
+                    "value": "1",
+                    "description": "Compatibility ID"
+                  }
+                ]
+              },
+              "description": "ลบรายการความเข้ากันได้"
+            },
+            "response": []
           }
         ],
         "id": "7d046be6-0db7-4b22-8f33-b09ab48790f9",
@@ -19337,6 +19817,47 @@
             "uid": "25233413-7fbfe9ea-4db4-4d33-88d3-c7594b3d099d"
           },
           {
+            "name": "Update Goods Receipt",
+            "id": "aaa00004-0000-0000-0000-000000000001",
+            "request": {
+              "method": "PUT",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n    \"reference_no\": \"GR-2026-0001\",\n    \"notes\": \"หมายเหตุ\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 10,\n            \"unit_cost\": 100.00\n        }\n    ]\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "url": {
+                "raw": "{{base_url}}/goods-receipts/:id",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "goods-receipts",
+                  ":id"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "GR ID"
+                  }
+                ]
+              },
+              "description": "แก้ไขใบรับ (เฉพาะ draft)"
+            },
+            "response": []
+          },
+          {
             "name": "Approve Goods Receipt",
             "id": "0045639b-e9e4-4d88-9325-897f23280feb",
             "protocolProfileBehavior": {
@@ -19579,6 +20100,121 @@
             "createdAt": "2026-04-19T11:48:44.000Z",
             "updatedAt": "2026-04-19T11:48:44.000Z",
             "uid": "25233413-2352b2e7-c838-48c4-bdc2-a29eeb03cc46"
+          },
+          {
+            "name": "Documents",
+            "item": [
+              {
+                "name": "List Goods Receipt Documents",
+                "id": "aaa00005-0000-0000-0000-000000000001",
+                "protocolProfileBehavior": {
+                  "disableBodyPruning": true
+                },
+                "request": {
+                  "method": "GET",
+                  "header": [],
+                  "url": {
+                    "raw": "{{base_url}}/goods-receipts/:id/documents",
+                    "host": [
+                      "{{base_url}}"
+                    ],
+                    "path": [
+                      "goods-receipts",
+                      ":id",
+                      "documents"
+                    ],
+                    "variable": [
+                      {
+                        "key": "id",
+                        "value": "1",
+                        "description": "GR ID"
+                      }
+                    ]
+                  },
+                  "description": "รายการเอกสารแนบของใบรับสินค้า"
+                },
+                "response": []
+              },
+              {
+                "name": "Upload Goods Receipt Document",
+                "id": "aaa00005-0000-0000-0000-000000000002",
+                "request": {
+                  "method": "POST",
+                  "header": [],
+                  "body": {
+                    "mode": "formdata",
+                    "formdata": [
+                      {
+                        "key": "file",
+                        "type": "file",
+                        "src": ""
+                      },
+                      {
+                        "key": "document_type",
+                        "value": "invoice",
+                        "type": "text"
+                      }
+                    ]
+                  },
+                  "url": {
+                    "raw": "{{base_url}}/goods-receipts/:id/documents",
+                    "host": [
+                      "{{base_url}}"
+                    ],
+                    "path": [
+                      "goods-receipts",
+                      ":id",
+                      "documents"
+                    ],
+                    "variable": [
+                      {
+                        "key": "id",
+                        "value": "1",
+                        "description": "GR ID"
+                      }
+                    ]
+                  },
+                  "description": "อัปโหลดเอกสารแนบใบรับสินค้า"
+                },
+                "response": []
+              },
+              {
+                "name": "Delete Goods Receipt Document",
+                "id": "aaa00005-0000-0000-0000-000000000003",
+                "request": {
+                  "method": "DELETE",
+                  "header": [],
+                  "url": {
+                    "raw": "{{base_url}}/goods-receipts/:id/documents/:docId",
+                    "host": [
+                      "{{base_url}}"
+                    ],
+                    "path": [
+                      "goods-receipts",
+                      ":id",
+                      "documents",
+                      ":docId"
+                    ],
+                    "variable": [
+                      {
+                        "key": "id",
+                        "value": "1",
+                        "description": "GR ID"
+                      },
+                      {
+                        "key": "docId",
+                        "value": "1",
+                        "description": "Document ID"
+                      }
+                    ]
+                  },
+                  "description": "ลบเอกสารแนบใบรับสินค้า"
+                },
+                "response": []
+              }
+            ],
+            "id": "aaa00005-0000-0000-0000-000000000000",
+            "description": "เอกสารแนบใบรับสินค้า"
           }
         ],
         "id": "7e7cbb9b-0a24-4871-add5-b9ac82fb086e",
@@ -20013,6 +20649,74 @@
             "uid": "25233413-83be3081-df69-4276-8969-c0a82b923ec1"
           },
           {
+            "name": "Update Stock Transfer",
+            "id": "aaa00006-0000-0000-0000-000000000001",
+            "request": {
+              "method": "PATCH",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n    \"notes\": \"\u0e2b\u0e21\u0e32\u0e22\u0e40\u0e2b\u0e15\u0e38\",\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 5\n        }\n    ]\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "url": {
+                "raw": "{{base_url}}/stock-transfers/:id",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "stock-transfers",
+                  ":id"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "ST ID"
+                  }
+                ]
+              },
+              "description": "\u0e41\u0e01\u0e49\u0e44\u0e02\u0e43\u0e1a\u0e42\u0e2d\u0e19 (\u0e40\u0e09\u0e1e\u0e32\u0e30 draft)"
+            },
+            "response": []
+          },
+          {
+            "name": "Delete Stock Transfer",
+            "id": "aaa00006-0000-0000-0000-000000000002",
+            "request": {
+              "method": "DELETE",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/stock-transfers/:id",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "stock-transfers",
+                  ":id"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "ST ID"
+                  }
+                ]
+              },
+              "description": "\u0e25\u0e1a\u0e43\u0e1a\u0e42\u0e2d\u0e19 (\u0e40\u0e09\u0e1e\u0e32\u0e30 draft)"
+            },
+            "response": []
+          },
+          {
             "name": "Approve Stock Transfer",
             "id": "522ecb36-ff38-4553-9d56-7b917be3d042",
             "protocolProfileBehavior": {
@@ -20255,6 +20959,48 @@
             "createdAt": "2026-04-19T11:48:44.000Z",
             "updatedAt": "2026-04-19T11:48:44.000Z",
             "uid": "25233413-1b4a2048-8592-4372-b722-387bbb15251f"
+          },
+          {
+            "name": "Cancel Stock Transfer",
+            "id": "aaa00007-0000-0000-0000-000000000001",
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n    \"reason\": \"เหตุผลการยกเลิก\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "url": {
+                "raw": "{{base_url}}/stock-transfers/:id/cancel",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "stock-transfers",
+                  ":id",
+                  "cancel"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "ST ID"
+                  }
+                ]
+              },
+              "description": "ยกเลิกใบโอน"
+            },
+            "response": []
           }
         ],
         "id": "4ebf630a-68d3-42ae-9114-c579bf8c2be3",
@@ -24289,6 +25035,43 @@
             "createdAt": "2026-04-19T11:48:44.000Z",
             "updatedAt": "2026-04-19T11:48:44.000Z",
             "uid": "25233413-032d6dab-c6b3-4741-9b65-5fadfe977bed"
+          },
+          {
+            "name": "Send Quotation",
+            "id": "aaa00008-0000-0000-0000-000000000001",
+            "request": {
+              "method": "PATCH",
+              "header": [],
+              "body": {
+                "mode": "raw",
+                "raw": "{}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "url": {
+                "raw": "{{base_url}}/quotations/:id/send",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "quotations",
+                  ":id",
+                  "send"
+                ],
+                "variable": [
+                  {
+                    "key": "id",
+                    "value": "1",
+                    "description": "QT ID"
+                  }
+                ]
+              },
+              "description": "ส่งใบเสนอราคา (draft → sent)"
+            },
+            "response": []
           },
           {
             "name": "Approve Quotation",
@@ -32442,6 +33225,29 @@
       {
         "name": "Audit Logs",
         "item": [
+          {
+            "name": "List Entity Types",
+            "id": "aaa00009-0000-0000-0000-000000000001",
+            "protocolProfileBehavior": {
+              "disableBodyPruning": true
+            },
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{base_url}}/audit-logs/entity-types",
+                "host": [
+                  "{{base_url}}"
+                ],
+                "path": [
+                  "audit-logs",
+                  "entity-types"
+                ]
+              },
+              "description": "Get list of all entity types available for filtering"
+            },
+            "response": []
+          },
           {
             "name": "List Audit Logs",
             "id": "5c3ba759-4ba2-41c2-8f18-eb389af8e625",

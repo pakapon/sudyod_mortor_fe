@@ -199,7 +199,7 @@ Billing Hub คือ UI hub ที่รวมทุก flow การเรี
 
 ```
 /billing              → Billing Hub (overview)
-/billing/new/repair   → สร้าง SO ใหม่ (→ /service-orders/create)
+/billing/new/repair   → สร้าง SO ใหม่ (ผ่าน Receive Vehicle step → POST /api/v1/service-orders)
 /billing/new/sale     → สร้าง QT ใหม่ (→ /quotations/create?type=sale)
 /billing/jobs/:id     → Job Flow tracker
 /billing/documents    → Document Browser

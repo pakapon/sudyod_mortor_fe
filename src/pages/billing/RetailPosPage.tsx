@@ -1,29 +1,38 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { inventoryService } from '@/api/inventoryService'
+import { customerService } from '@/api/customerService'
+import { invoiceService } from '@/api/invoiceService'
+import { useAuthStore } from '@/stores/authStore'
+import type { InventoryItem } from '@/types/inventory'
 
-/* ─── Mock Product Data ─── */
+/* ─── POS Product (variant-level) ─── */
 interface Product {
-  id: number
+  id: number              // variant id (cart key)
+  productId: number       // parent product id (for invoice payload)
   sku: string
-  barcode: string
   name: string
   price: number
   stock: number
   unit: string
-  image?: string
+  barcode?: string | null
 }
 
-const MOCK_PRODUCTS: Product[] = [
-  { id: 1, sku: 'ACC-001', barcode: '8850001000011', name: 'หมวกกันน็อค Honda (สีดำ)', price: 1290, stock: 15, unit: 'ชิ้น' },
-  { id: 2, sku: 'ACC-002', barcode: '8850001000028', name: 'เสื้อฮอนด้า Racing (M)', price: 890, stock: 20, unit: 'ตัว' },
-  { id: 3, sku: 'OIL-001', barcode: '8850001000035', name: 'น้ำมันเครื่อง Honda 10W-30 1L', price: 250, stock: 50, unit: 'ขวด' },
-  { id: 4, sku: 'OIL-002', barcode: '8850001000042', name: 'น้ำมันเกียร์ Honda 80W-90', price: 180, stock: 30, unit: 'ขวด' },
-  { id: 5, sku: 'ACC-003', barcode: '8850001000059', name: 'สติ๊กเกอร์ตกแต่ง Honda Wing', price: 150, stock: 100, unit: 'แผ่น' },
-  { id: 6, sku: 'ACC-004', barcode: '8850001000066', name: 'ถุงมือขับขี่ Honda (L)', price: 390, stock: 25, unit: 'คู่' },
-  { id: 7, sku: 'OIL-003', barcode: '8850001000073', name: 'น้ำมันเบรค DOT4 Honda', price: 220, stock: 40, unit: 'ขวด' },
-  { id: 8, sku: 'ACC-005', barcode: '8850001000080', name: 'ปลอกแฮนด์ Honda สีแดง', price: 290, stock: 35, unit: 'คู่' },
-]
+function toPosProduct(inv: InventoryItem): Product {
+  const v = inv.variant
+  const p = inv.product
+  return {
+    id: inv.product_variant_id,
+    productId: inv.product_id,
+    sku: v?.sku ?? p?.sku ?? '',
+    name: v?.name ?? p?.name ?? '',
+    price: Number(v?.selling_price ?? 0),
+    stock: Number(inv.quantity ?? 0),
+    unit: p?.unit?.name ?? 'ชิ้น',
+    barcode: v?.barcode ?? null,
+  }
+}
 
 /* ─── Cart Item ─── */
 interface CartItem extends Product {
@@ -50,26 +59,47 @@ function TrashIcon() {
 /* ─── Main POS Page ─── */
 export function RetailPosPage() {
   const navigate = useNavigate()
+  const { employee } = useAuthStore()
   const barcodeRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState('')
+  const [products, setProducts] = useState<Product[]>([])
+  const [productsLoading, setProductsLoading] = useState(false)
   const [cart, setCart] = useState<CartItem[]>([])
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerName, setCustomerName] = useState<string | null>(null)
+  const [customerId, setCustomerId] = useState<number | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card'>('cash')
   const [showCheckout, setShowCheckout] = useState(false)
   const [amountReceived, setAmountReceived] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [lastReceiptNo, setLastReceiptNo] = useState<string | null>(null)
 
   // Focus barcode input on mount
   useEffect(() => {
     barcodeRef.current?.focus()
   }, [])
 
-  // Search products
-  const filteredProducts = MOCK_PRODUCTS.filter((p) => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.includes(q)
-  })
+  // Fetch inventory items (variant-level, debounced search)
+  useEffect(() => {
+    let cancelled = false
+    setProductsLoading(true)
+    const t = setTimeout(() => {
+      inventoryService
+        .getInventory({ search: search || undefined, limit: 24 })
+        .then((r) => {
+          if (cancelled) return
+          const list = (r.data.data ?? []).map(toPosProduct)
+          setProducts(list)
+        })
+        .catch(() => { if (!cancelled) setProducts([]) })
+        .finally(() => { if (!cancelled) setProductsLoading(false) })
+    }, 250)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [search])
+
+  // Search products (already filtered server-side)
+  const filteredProducts = products
 
   // Add to cart
   const addToCart = (product: Product) => {
@@ -84,11 +114,14 @@ export function RetailPosPage() {
     barcodeRef.current?.focus()
   }
 
-  // Handle barcode scan
-  const handleBarcodeScan = (value: string) => {
-    const product = MOCK_PRODUCTS.find((p) => p.barcode === value || p.sku === value)
-    if (product) {
-      addToCart(product)
+  // Handle barcode scan (match variant by barcode/SKU server-side)
+  const handleBarcodeScan = async (value: string) => {
+    try {
+      const res = await inventoryService.getInventory({ search: value, limit: 1 })
+      const first = (res.data.data ?? [])[0]
+      if (first) addToCart(toPosProduct(first))
+    } catch {
+      // ignore
     }
   }
 
@@ -117,11 +150,28 @@ export function RetailPosPage() {
   const change = amountReceived ? Number(amountReceived) - total : 0
 
   // Lookup customer by phone
-  const lookupCustomer = () => {
-    if (customerPhone === '0891234567') {
-      setCustomerName('นายสมชาย ใจดี')
-    } else if (customerPhone) {
+  const lookupCustomer = async () => {
+    if (!customerPhone.trim()) {
       setCustomerName(null)
+      setCustomerId(null)
+      return
+    }
+    try {
+      const res = await customerService.getCustomers({ search: customerPhone.trim(), limit: 1 })
+      const c = (res.data.data ?? [])[0]
+      if (c) {
+        setCustomerId(c.id)
+        const name = c.type === 'corporate'
+          ? (c.company_name ?? '')
+          : `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()
+        setCustomerName(name || null)
+      } else {
+        setCustomerName(null)
+        setCustomerId(null)
+      }
+    } catch {
+      setCustomerName(null)
+      setCustomerId(null)
     }
   }
 
@@ -161,6 +211,9 @@ export function RetailPosPage() {
 
         {/* Product Grid */}
         <div className="flex-1 overflow-y-auto p-3">
+          {productsLoading && (
+            <div className="py-2 text-center text-xs text-gray-400">กำลังโหลด...</div>
+          )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {filteredProducts.map((p) => (
               <button
@@ -346,23 +399,56 @@ export function RetailPosPage() {
                     ยกเลิก
                   </button>
                   <button
-                    className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
-                    onClick={() => {
-                      // Print receipt then reset
-                      setTimeout(() => window.print(), 100)
-                      setTimeout(() => {
-                        setCart([])
-                        setShowCheckout(false)
-                        setAmountReceived('')
-                        setCustomerPhone('')
-                        setCustomerName(null)
-                        barcodeRef.current?.focus()
-                      }, 500)
+                    disabled={submitting || (paymentMethod === 'cash' && Number(amountReceived) < total)}
+                    className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-semibold text-white hover:bg-green-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={async () => {
+                      setSubmitError(null)
+                      setSubmitting(true)
+                      try {
+                        const createRes = await invoiceService.createRetail({
+                          customer_id: customerId ?? undefined,
+                          branch_id: employee?.branch_id,
+                          vat_percent: 7,
+                          items: cart.map((c) => ({
+                            product_id: c.productId,
+                            product_variant_id: c.id,
+                            quantity: c.qty,
+                            unit_price: c.price,
+                          })),
+                        })
+                        const invId = createRes.data.data.id
+                        await invoiceService.issue(invId)
+                        await invoiceService.addPayment(invId, {
+                          amount: total,
+                          method: paymentMethod,
+                        })
+                        const rcpRes = await invoiceService.issueReceipt(invId)
+                        setLastReceiptNo(rcpRes.data.data.receipt_no ?? null)
+                        setTimeout(() => window.print(), 100)
+                        setTimeout(() => {
+                          setCart([])
+                          setShowCheckout(false)
+                          setAmountReceived('')
+                          setCustomerPhone('')
+                          setCustomerName(null)
+                          setCustomerId(null)
+                          setLastReceiptNo(null)
+                          barcodeRef.current?.focus()
+                        }, 800)
+                      } catch (err) {
+                        const e = err as { response?: { data?: { message?: string } } }
+                        setSubmitError(e.response?.data?.message ?? 'ชำระเงินไม่สำเร็จ')
+                      } finally {
+                        setSubmitting(false)
+                      }
                     }}
                   >
-                    🖨️ ยืนยัน + ปริ้นใบเสร็จ
+                    {submitting ? 'กำลังบันทึก...' : '🖨️ ยืนยัน + ปริ้นใบเสร็จ'}
                   </button>
                 </div>
+                {submitError && (
+                  <p className="mt-2 text-xs text-red-600">{submitError}</p>
+                )}
               </div>
             )}
           </div>
@@ -373,7 +459,7 @@ export function RetailPosPage() {
     {/* ─── Print Receipt ─── */}
     {(() => {
       const now = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-      const rcpNo = `RCP-${Date.now().toString(36).toUpperCase()}`
+      const rcpNo = lastReceiptNo ?? `RCP-${Date.now().toString(36).toUpperCase()}`
       return (
         <div className="hidden print:block" style={{ fontFamily: 'monospace', fontSize: '12px', color: '#000', maxWidth: '280px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '8px', marginBottom: '8px' }}>

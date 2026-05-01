@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { serviceOrderService } from '@/api/serviceOrderService'
+import { quotationService } from '@/api/quotationService'
+import { invoiceService } from '@/api/invoiceService'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
+import type { ServiceOrder, ServiceOrderStatus } from '@/types/serviceOrder'
+import type { Quotation, QuotationStatus } from '@/types/quotation'
 
 /* ─── Flow Config ─── */
 const FLOW_TYPES = [
@@ -128,11 +132,12 @@ function FlowCard({ flow, onClick }: { flow: typeof FLOW_TYPES[number]; onClick:
   )
 }
 
-/* ─── Mock Job Row ─── */
+/* ─── Job Row ─── */
 interface JobItem {
   id: number
   jobNumber: string
   flowType: 'repair' | 'sale' | 'pos'
+  sourceKey: string
   customerName: string
   description: string
   currentStep: string
@@ -141,34 +146,105 @@ interface JobItem {
   updatedAt: string
 }
 
-const MOCK_JOBS: JobItem[] = [
-  { id: 1, jobNumber: 'JOB-2026-0051', flowType: 'repair', customerName: 'นายสมชาย ใจดี', description: 'Toyota Camry กข-1234 / เปลี่ยนหม้อน้ำ', currentStep: 'ซ่อม (6/8)', assignedTo: 'ช่างวิทย์', status: 'active', updatedAt: '2 ชม. ที่แล้ว' },
-  { id: 2, jobNumber: 'JOB-2026-0050', flowType: 'sale', customerName: 'น.ส.มาลี สุขใจ', description: 'Honda Wave 125i สีแดง', currentStep: 'รอชำระ (3/4)', assignedTo: 'บัญชี', status: 'waiting', updatedAt: '4 ชม. ที่แล้ว' },
-  { id: 3, jobNumber: 'JOB-2026-0049', flowType: 'repair', customerName: 'บจก.รุ่งเรือง', description: 'Isuzu D-Max มค-5678 / เช็คระยะ', currentStep: 'เสนอราคา (3/8)', assignedTo: 'หน้าร้าน', status: 'waiting', updatedAt: '5 ชม. ที่แล้ว' },
-  { id: 4, jobNumber: 'JOB-2026-0048', flowType: 'sale', customerName: 'นายประสิทธิ์ ดีงาม', description: 'Honda Click 150i + อุปกรณ์เสริม', currentStep: 'ส่งมอบ (4/5)', assignedTo: 'หน้าร้าน', status: 'active', updatedAt: '1 วัน ที่แล้ว' },
-  { id: 5, jobNumber: 'JOB-2026-0047', flowType: 'repair', customerName: 'นายวิชัย มั่นคง', description: 'Nissan March สก-9012 / เปลี่ยนผ้าเบรค', currentStep: 'ปิดงาน ✓', assignedTo: '—', status: 'completed', updatedAt: '1 วัน ที่แล้ว' },
-]
+const SO_STATUS_LABEL: Record<ServiceOrderStatus, string> = {
+  draft: 'ร่าง', pending_review: 'รอตรวจ', pending_quote: 'รอเสนอราคา', approved: 'อนุมัติ',
+  in_progress: 'กำลังซ่อม', completed: 'ซ่อมเสร็จ', pending_payment: 'รอชำระ',
+  pending_pickup: 'รอรับรถ', closed: 'ปิดงาน', cancelled: 'ยกเลิก',
+}
+
+const QT_STATUS_LABEL: Record<QuotationStatus, string> = {
+  draft: 'ร่าง', sent: 'รอลูกค้า', approved: 'อนุมัติ', rejected: 'ปฏิเสธ', expired: 'หมดอายุ',
+}
+
+function soToJob(so: ServiceOrder): JobItem {
+  const c = so.customer
+  const cName = c ? (c.type === 'corporate' ? (c.company_name ?? '') : `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()) : ''
+  const v = so.vehicle
+  const desc = [v?.brand, v?.model, v?.plate_number].filter(Boolean).join(' ') + (so.symptom ? ` / ${so.symptom}` : '')
+  let status: JobStatus = 'waiting'
+  if (['in_progress', 'pending_payment', 'pending_pickup'].includes(so.status)) status = 'active'
+  else if (so.status === 'closed') status = 'completed'
+  else if (so.status === 'cancelled') status = 'cancelled'
+  return {
+    id: so.id, jobNumber: so.so_number, flowType: 'repair', sourceKey: `repair:${so.id}`,
+    customerName: cName || '—', description: desc || '—',
+    currentStep: SO_STATUS_LABEL[so.status] ?? so.status,
+    assignedTo: so.technician ? `${so.technician.first_name ?? ''} ${so.technician.last_name ?? ''}`.trim() || '—' : '—',
+    status, updatedAt: so.updated_at ?? so.created_at ?? '',
+  }
+}
+
+function qtToJob(qt: Quotation): JobItem {
+  const c = qt.customer
+  const cName = c ? (c.type === 'corporate' ? (c.company_name ?? '') : `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()) : ''
+  let status: JobStatus = 'waiting'
+  if (qt.status === 'approved') status = 'active'
+  else if (qt.status === 'rejected' || qt.status === 'expired') status = 'cancelled'
+  return {
+    id: qt.id, jobNumber: qt.quotation_no, flowType: 'sale', sourceKey: `sale:${qt.id}`,
+    customerName: cName || '—', description: qt.note ?? '—',
+    currentStep: QT_STATUS_LABEL[qt.status] ?? qt.status, assignedTo: '—',
+    status, updatedAt: qt.updated_at ?? qt.created_at ?? '',
+  }
+}
 
 const FLOW_ICONS: Record<string, string> = { repair: '🔧', sale: '🏷️', pos: '🛒' }
 
-function formatDate(d: string) { return d }
+function formatRelative(iso: string) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'เมื่อสักครู่'
+  if (m < 60) return `${m} นาทีที่แล้ว`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} ชม. ที่แล้ว`
+  const days = Math.floor(h / 24)
+  return `${days} วัน ที่แล้ว`
+}
 
 /* ─── Main Page ─── */
 export function BillingHubPage() {
   const navigate = useNavigate()
   const { permissions } = useAuthStore()
-  const [searchParams, setSearchParams] = useSearchParams()
   const [statusFilter, setStatusFilter] = useState<JobStatus | ''>('')
   const [search, setSearch] = useState('')
+  const [jobs, setJobs] = useState<JobItem[]>([])
+  const [summary, setSummary] = useState<SummaryData>({ active: 0, waiting: 0, completedToday: 0, totalRevenue: 0 })
+  const [loading, setLoading] = useState(true)
 
   const canCreateSO = hasPermission(permissions, 'service_orders', 'can_create')
   const canCreateQT = hasPermission(permissions, 'quotations', 'can_create')
   const canCreateINV = hasPermission(permissions, 'invoices', 'can_create')
 
-  // Mock summary
-  const summary: SummaryData = { active: 8, waiting: 5, completedToday: 3, totalRevenue: 47500 }
+  useEffect(() => {
+    let cancelled = false
+    const today = new Date().toISOString().split('T')[0]
+    setLoading(true)
+    Promise.all([
+      serviceOrderService.getSummary().then((r) => r.data.data).catch(() => null),
+      serviceOrderService.getServiceOrders({ page: 1, limit: 50 }).then((r) => r.data.data ?? []).catch(() => []),
+      quotationService.getQuotations({ type: 'sale', page: 1, limit: 50 }).then((r) => r.data.data ?? []).catch(() => []),
+      invoiceService.getInvoices({ status: 'paid', date_from: today, limit: 100 }).then((r) => r.data.data ?? []).catch(() => []),
+    ]).then(([soSummary, sos, saleQts, paidInvs]) => {
+      if (cancelled) return
+      const merged = [...sos.map(soToJob), ...saleQts.map(qtToJob)]
+        .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+      setJobs(merged)
+      const active = soSummary ? (soSummary.in_progress + soSummary.pending_payment + soSummary.pending_pickup) : 0
+      const waiting = soSummary ? (soSummary.draft + soSummary.pending_review + soSummary.pending_quote + soSummary.approved + soSummary.completed) : 0
+      const totalRevenue = paidInvs.reduce((s, i) => s + (Number(i.grand_total) || 0), 0)
+      setSummary({
+        active,
+        waiting,
+        completedToday: paidInvs.length,
+        totalRevenue,
+      })
+    }).finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
-  const filteredJobs = MOCK_JOBS.filter((j) => {
+  const filteredJobs = jobs.filter((j) => {
     if (statusFilter && j.status !== statusFilter) return false
     if (search) {
       const q = search.toLowerCase()
@@ -270,7 +346,13 @@ export function BillingHubPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredJobs.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-500">
+                    กำลังโหลดข้อมูล...
+                  </td>
+                </tr>
+              ) : filteredJobs.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-500">
                     ไม่พบรายการงาน
@@ -280,12 +362,12 @@ export function BillingHubPage() {
                 filteredJobs.map((job) => {
                   const st = JOB_STATUS[job.status]
                   return (
-                    <tr key={job.id} className="group hover:bg-gray-50 transition-colors">
+                    <tr key={job.sourceKey} className="group hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{FLOW_ICONS[job.flowType]}</span>
                           <Link
-                            to={`/billing/jobs/${job.id}`}
+                            to={`/billing/jobs/${job.sourceKey}`}
                             className="font-medium text-blue-600 hover:underline"
                           >
                             {job.jobNumber}
@@ -310,10 +392,10 @@ export function BillingHubPage() {
                           {st.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{job.updatedAt}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{formatRelative(job.updatedAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <Link
-                          to={`/billing/jobs/${job.id}`}
+                          to={`/billing/jobs/${job.sourceKey}`}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-blue-200 text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
                         >
                           <ArrowRightIcon />

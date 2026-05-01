@@ -47,7 +47,7 @@
 ## 11.2 Route การสร้าง Warranty
 
 **จากหน้า SO:**
-- ปุ่มใน Tab "เอกสารที่เกี่ยวข้อง" หรือ Action ใน `/service-orders/{id}`
+- ปุ่มใน Tab "เอกสารที่เกี่ยวข้อง" หรือ Action ใน `/billing/jobs/repair:{id}`
 - `owner_type: "service_order"`, `owner_id: {so_id}`
 
 **จากหน้า Quotation:**

@@ -5,9 +5,11 @@ import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import { serviceOrderService } from '@/api/serviceOrderService'
 import { quotationService } from '@/api/quotationService'
+import { invoiceService } from '@/api/invoiceService'
 import { toast } from 'react-hot-toast'
 import type { ServiceOrder } from '@/types/serviceOrder'
 import type { Quotation } from '@/types/quotation'
+import type { Invoice } from '@/types/invoice'
 
 /* ─── Unified Job Data (passed to StepForms) ─── */
 export interface JobData {
@@ -15,6 +17,7 @@ export interface JobData {
   sourceId: number | null
   serviceOrder?: ServiceOrder | null
   quotation?: Quotation | null
+  invoice?: { id: number; invoice_no?: string } | null
   jobNumber: string
   flowLabel: string
   customerName: string
@@ -179,7 +182,7 @@ import {
 } from './components/StepForms'
 
 /* ─── Step Content — renders the correct form per step ID ─── */
-function StepContent({ step, flowType, jobData, onComplete }: { step: FlowStep; flowType: string; jobData: JobData | null; onComplete: () => void }) {
+function StepContent({ step, flowType, jobData, onComplete }: { step: FlowStep; flowType: string; jobData: JobData | null; onComplete: (meta?: { newId?: number; invoiceId?: number }) => void }) {
   const { permissions } = useAuthStore()
   const canPerform = hasPermission(permissions, step.permission.module, step.permission.action as any)
 
@@ -263,7 +266,7 @@ const QT_STATUS_STEP_SALE: Record<string, number> = {
   draft: 0, sent: 0, approved: 1, rejected: 0,
 }
 
-function buildJobData(so: ServiceOrder | null, qt: Quotation | null, sourceType: 'repair' | 'sale', sourceId: number | null): JobData {
+function buildJobData(so: ServiceOrder | null, qt: Quotation | null, sourceType: 'repair' | 'sale', sourceId: number | null, invoice: Invoice | null = null): JobData {
   const customer = so?.customer || qt?.customer
   const cName = customer ? (customer.type === 'corporate' ? customer.company_name : `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()) : ''
   const branch = so?.branch || qt?.branch
@@ -279,6 +282,7 @@ function buildJobData(so: ServiceOrder | null, qt: Quotation | null, sourceType:
   return {
     sourceType, sourceId,
     serviceOrder: so, quotation: qt,
+    invoice: invoice ? { id: invoice.id, invoice_no: invoice.invoice_no } : null,
     jobNumber: so?.so_number ?? qt?.quotation_no ?? '',
     flowLabel: sourceType === 'repair' ? 'ซ่อมรถ' : 'ขายสินค้า',
     customerName: cName || 'ลูกค้า',
@@ -341,12 +345,24 @@ export function JobFlowPage() {
             const { data: qtRes } = await quotationService.getQuotations({ service_order_id: sourceId, limit: 1 })
             qt = qtRes.data?.[0] ?? null
           } catch { /* no QT yet */ }
-          setJobData(buildJobData(so, qt, 'repair', sourceId))
+          let inv: Invoice | null = null
+          if (qt?.id) {
+            try {
+              const { data: invRes } = await invoiceService.getInvoices({ customer_id: so.customer_id, limit: 50 })
+              inv = invRes.data?.find((i) => i.quotation_id === qt!.id) ?? null
+            } catch { /* no invoice yet */ }
+          }
+          setJobData(buildJobData(so, qt, 'repair', sourceId, inv))
           setCurrentStep(SO_STATUS_STEP[so.status] ?? 0)
         } else {
           const { data: qtRes } = await quotationService.getQuotation(sourceId)
           const qt = qtRes.data
-          setJobData(buildJobData(null, qt, 'sale', sourceId))
+          let inv: Invoice | null = null
+          try {
+            const { data: invRes } = await invoiceService.getInvoices({ customer_id: qt.customer_id, limit: 50 })
+            inv = invRes.data?.find((i) => i.quotation_id === qt.id) ?? null
+          } catch { /* no invoice yet */ }
+          setJobData(buildJobData(null, qt, 'sale', sourceId, inv))
           setCurrentStep(QT_STATUS_STEP_SALE[qt.status] ?? 0)
         }
       } catch (err: any) {
@@ -360,10 +376,13 @@ export function JobFlowPage() {
   }, [sourceType, sourceId, isCreateMode])
 
   // Refresh data after step completion
-  const handleStepComplete = () => {
-    if (isCreateMode && currentStep === 0) {
-      // After creating SO, navigate to the job page
-      toast.success('ดำเนินการสำเร็จ')
+  const handleStepComplete = (meta?: { newId?: number; invoiceId?: number }) => {
+    if (isCreateMode && meta?.newId) {
+      navigate(`/billing/jobs/${sourceType}:${meta.newId}`)
+      return
+    }
+    if (meta?.invoiceId) {
+      setJobData((prev) => prev ? { ...prev, invoice: { id: meta.invoiceId! } } : prev)
     }
     setCurrentStep(Math.min(steps.length - 1, currentStep + 1))
   }
@@ -394,6 +413,7 @@ export function JobFlowPage() {
 
       {/* Back + Header */}
       {!loading && !error && (
+      <>
       <div>
         <button
           onClick={() => navigate('/billing')}

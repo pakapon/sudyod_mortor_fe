@@ -41,6 +41,7 @@ export const ALL_MODULES = [
   'service_orders', 'quotations', 'invoices',
   'loan_applications', 'store_loans',
   'vehicle_inspection_checklists',
+  'audit_logs',
 ] as const
 
 export type ModuleKey = typeof ALL_MODULES[number]
@@ -55,7 +56,7 @@ export const MENU_PERMISSION_MAP: Record<string, ModuleKey | ModuleKey[]> = {
   credit: ['loan_applications', 'store_loans'],
   team: ['employees', 'attendance', 'holidays'],
   settings: ['branches', 'positions', 'work_schedules', 'brands', 'product_categories', 'product_units', 'vendors', 'products', 'vehicle_inspection_checklists'],
-  auditLog: 'branches', // audit_logs ไม่อยู่ใน 22 modules, fallback
+  auditLog: 'audit_logs',
   notification: 'branches', // notifications ไม่ต้อง permission
 }
 

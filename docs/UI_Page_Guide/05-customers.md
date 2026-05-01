@@ -308,7 +308,7 @@
   - Filter (query params): `search` (invoice_no/ชื่อสินค้า), `invoice_type`, `date_from`, `date_to`, `branch_id`
   - Summary card: จำนวน invoice ทั้งหมด + ยอดรวมทุก invoice
   - สถานะการชำระ: `ชำระครบ` (paid) | `ค้างชำระ` (overdue) | `รอชำระ` (issued)
-  - คลิกเลขเอกสาร → navigate ไป `/invoices/{id}` หรือ `/service-orders/{id}`
+  - คลิกเลขเอกสาร → navigate ไป `/billing/documents` (กดที่ row จะพาไป `/billing/jobs/{kind}:{id}`)
 - **ประวัติรับประกัน**: `GET /customers/{id}/warranty-history` → list Warranty ทั้งหมด (เลข WR, สินค้า, วันหมดอายุ)
 - ⚠️ service-history และ warranty-history ไม่ต้อง pagination — return ทั้งหมด
 
@@ -317,9 +317,9 @@
 ## 5.4 Flow เชื่อมต่อ
 
 ```
-หน้าลูกค้า → เลือกรถ → "สร้างใบสั่งซ่อม" → ไป /service-orders/create?customer_id=X&vehicle_id=Y
+หน้าลูกค้า → เลือกรถ → "สร้างใบสั่งซ่อม" → ไป /billing/new/repair?customer_id=X&vehicle_id=Y
 หน้าลูกค้า → "สร้างใบเสนอราคา (ขาย)" → ไป /quotations/create?customer_id=X
-หน้าลูกค้า → Tab ประวัติ → คลิก SO → ไป /service-orders/{id}
+หน้าลูกค้า → Tab ประวัติ → คลิก SO → ไป /billing/jobs/repair:{id}
 ```
 
 ---

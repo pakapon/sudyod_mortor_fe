@@ -24,9 +24,9 @@
 - API: `GET /dashboard/charts?branch_id=1&period=monthly`
 
 **Quick Actions:**
-- ปุ่ม "สร้างใบสั่งซ่อม" → ไป `/service-orders/create`
+- ปุ่ม "สร้างใบสั่งซ่อม" → ไป `/billing/new/repair`
 - ปุ่ม "ขายหน้าร้าน" → ไป `/invoices/create-retail`
-- ปุ่ม "รับรถเข้า" → ไป `/service-orders/create`
+- ปุ่ม "รับรถเข้า" → ไป `/billing/new/repair`
 
 **Recent Activity:**
 - SO ล่าสุด 5 รายการ + status badge

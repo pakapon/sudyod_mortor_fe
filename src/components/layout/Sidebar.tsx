@@ -74,7 +74,6 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { id: 'dashboard', label: 'แดชบอร์ด', icon: 'dashboard', path: '/' },
   { id: 'customer', label: 'ลูกค้า', icon: 'customer', path: '/customers' },
-  { id: 'service', label: 'ใบสั่งซ่อม', icon: 'service', path: '/service-orders' },
   {
     id: 'billing', label: 'บิล/เอกสาร', icon: 'billing',
     children: [

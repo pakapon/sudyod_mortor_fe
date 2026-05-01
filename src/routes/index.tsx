@@ -4,7 +4,8 @@ import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { ProtectedRoute, PermissionGuard } from '@/routes/ProtectedRoute'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { PlaceholderPage } from '@/pages/PlaceholderPage'
+import { NotificationsPage } from '@/pages/NotificationsPage'
+import { AuditLogPage } from '@/pages/audit-logs/AuditLogPage'
 
 import { EmployeeListPage } from '@/pages/hr/EmployeeListPage'
 import { EmployeeFormPage } from '@/pages/hr/EmployeeFormPage'
@@ -28,9 +29,6 @@ import { FinanceCompanyListPage } from '@/pages/settings/FinanceCompanyListPage'
 import { FinanceCompanyFormPage } from '@/pages/settings/FinanceCompanyFormPage'
 import { FinanceCompanyDetailPage } from '@/pages/settings/FinanceCompanyDetailPage'
 import { BrandListPage } from '@/pages/settings/BrandListPage'
-import { ServiceOrderListPage } from '@/pages/service-orders/ServiceOrderListPage'
-import { ServiceOrderFormPage } from '@/pages/service-orders/ServiceOrderFormPage'
-import { ServiceOrderDetailPage } from '@/pages/service-orders/ServiceOrderDetailPage'
 import { QuotationListPage } from '@/pages/quotations/QuotationListPage'
 import { QuotationFormPage } from '@/pages/quotations/QuotationFormPage'
 import { QuotationDetailPage } from '@/pages/quotations/QuotationDetailPage'
@@ -349,21 +347,6 @@ export const router = createBrowserRouter([
           },
         ],
       },
-      {
-        element: <PermissionGuard module="service_orders" />,
-        children: [
-          {
-            element: <AppLayout title="ใบสั่งซ่อม" />,
-            children: [
-              { path: '/service-orders', element: <ServiceOrderListPage /> },
-              { path: '/service-orders/create', element: <ServiceOrderFormPage /> },
-              { path: '/service-orders/:id', element: <ServiceOrderDetailPage /> },
-              { path: '/service-orders/:id/edit', element: <ServiceOrderFormPage /> },
-            ],
-          },
-        ],
-      },
-
       // ─── Quotations ───
       {
         element: <PermissionGuard module="quotations" />,
@@ -460,15 +443,20 @@ export const router = createBrowserRouter([
 
       // ─── Audit & Notification (TODO: determine permission) ───
       {
-        element: <AppLayout title="Audit Log" />,
+        element: <PermissionGuard module="audit_logs" />,
         children: [
-          { path: '/audit-logs', element: <PlaceholderPage title="Audit Log" /> },
+          {
+            element: <AppLayout title="Audit Log" />,
+            children: [
+              { path: '/audit-logs', element: <AuditLogPage /> },
+            ],
+          },
         ],
       },
       {
         element: <AppLayout title="แจ้งเตือน" />,
         children: [
-          { path: '/notifications', element: <PlaceholderPage title="แจ้งเตือน" /> },
+          { path: '/notifications', element: <NotificationsPage /> },
         ],
       },
     ],

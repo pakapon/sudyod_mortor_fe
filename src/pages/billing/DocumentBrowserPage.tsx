@@ -1,6 +1,12 @@
-import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { serviceOrderService } from '@/api/serviceOrderService'
+import { quotationService } from '@/api/quotationService'
+import { invoiceService } from '@/api/invoiceService'
+import type { ServiceOrder } from '@/types/serviceOrder'
+import type { Quotation } from '@/types/quotation'
+import type { Invoice } from '@/types/invoice'
 
 /* ─── Document Type Config ─── */
 const DOC_TYPES = [
@@ -14,9 +20,9 @@ const DOC_TYPES = [
   { id: 'WR', label: 'ใบรับประกัน', color: 'bg-teal-100 text-teal-700' },
 ]
 
-/* ─── Mock Document Data ─── */
+/* ─── Document Item ─── */
 interface DocItem {
-  id: number
+  id: string
   docNumber: string
   type: string
   customerName: string
@@ -24,18 +30,72 @@ interface DocItem {
   status: string
   date: string
   linkedJob: string | null
+  linkPath: string | null
 }
 
-const MOCK_DOCS: DocItem[] = [
-  { id: 1, docNumber: 'SO-2026-0042', type: 'SO', customerName: 'นายสมชาย ใจดี', amount: null, status: 'กำลังซ่อม', date: '28 เม.ย. 2026', linkedJob: 'JOB-2026-0051' },
-  { id: 2, docNumber: 'QT-2026-0038', type: 'QT', customerName: 'นายสมชาย ใจดี', amount: 4885, status: 'อนุมัติแล้ว', date: '28 เม.ย. 2026', linkedJob: 'JOB-2026-0051' },
-  { id: 3, docNumber: 'INV-2026-0035', type: 'INV', customerName: 'น.ส.มาลี สุขใจ', amount: 45000, status: 'รอชำระ', date: '27 เม.ย. 2026', linkedJob: 'JOB-2026-0050' },
-  { id: 4, docNumber: 'RCP-2026-0031', type: 'RCP', customerName: 'นายประสิทธิ์ ดีงาม', amount: 38500, status: 'ชำระแล้ว', date: '27 เม.ย. 2026', linkedJob: 'JOB-2026-0048' },
-  { id: 5, docNumber: 'DP-2026-0005', type: 'DP', customerName: 'น.ส.มาลี สุขใจ', amount: 5000, status: 'รับแล้ว', date: '26 เม.ย. 2026', linkedJob: 'JOB-2026-0050' },
-  { id: 6, docNumber: 'DN-2026-0028', type: 'DN', customerName: 'นายวิชัย มั่นคง', amount: null, status: 'เซ็นแล้ว', date: '26 เม.ย. 2026', linkedJob: 'JOB-2026-0047' },
-  { id: 7, docNumber: 'WR-2026-0021', type: 'WR', customerName: 'นายวิชัย มั่นคง', amount: null, status: 'มีผล', date: '26 เม.ย. 2026', linkedJob: 'JOB-2026-0047' },
-  { id: 8, docNumber: 'INV-2026-0034', type: 'INV', customerName: 'ลูกค้าทั่วไป', amount: 1580, status: 'ชำระแล้ว', date: '26 เม.ย. 2026', linkedJob: null },
-]
+function customerName(c?: { first_name?: string; last_name?: string; company_name?: string; type?: string }) {
+  if (!c) return '—'
+  if (c.type === 'corporate') return c.company_name ?? '—'
+  return `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || '—'
+}
+
+const SO_STATUS_TH: Record<string, string> = {
+  draft: 'ร่าง', pending_review: 'รอตรวจ', pending_quote: 'รอเสนอราคา', approved: 'อนุมัติ',
+  in_progress: 'กำลังซ่อม', completed: 'ซ่อมเสร็จ', pending_payment: 'รอชำระ',
+  pending_pickup: 'รอรับรถ', closed: 'ปิดงาน', cancelled: 'ยกเลิก',
+}
+const QT_STATUS_TH: Record<string, string> = {
+  draft: 'ร่าง', sent: 'รอลูกค้า', approved: 'อนุมัติ', rejected: 'ปฏิเสธ', expired: 'หมดอายุ',
+}
+const INV_STATUS_TH: Record<string, string> = {
+  draft: 'ร่าง', issued: 'รอชำระ', paid: 'ชำระแล้ว', overdue: 'เกินกำหนด', cancelled: 'ยกเลิก',
+}
+
+function soToDoc(so: ServiceOrder): DocItem {
+  return {
+    id: `SO-${so.id}`,
+    docNumber: so.so_number,
+    type: 'SO',
+    customerName: customerName(so.customer),
+    amount: null,
+    status: SO_STATUS_TH[so.status] ?? so.status,
+    date: (so.received_date ?? so.created_at ?? '').slice(0, 10),
+    linkedJob: so.so_number,
+    linkPath: `/billing/jobs/repair:${so.id}`,
+  }
+}
+function qtToDoc(qt: Quotation): DocItem {
+  const linkPath = qt.service_order_id
+    ? `/billing/jobs/repair:${qt.service_order_id}`
+    : qt.type === 'sale' ? `/billing/jobs/sale:${qt.id}` : null
+  return {
+    id: `QT-${qt.id}`,
+    docNumber: qt.quotation_no,
+    type: 'QT',
+    customerName: customerName(qt.customer),
+    amount: Number(qt.grand_total ?? 0) || null,
+    status: QT_STATUS_TH[qt.status] ?? qt.status,
+    date: (qt.created_at ?? '').slice(0, 10),
+    linkedJob: qt.service_order?.so_number ?? qt.service_order?.so_no ?? null,
+    linkPath,
+  }
+}
+function invToDoc(inv: Invoice): DocItem {
+  const linkPath = inv.service_order_id
+    ? `/billing/jobs/repair:${inv.service_order_id}`
+    : inv.quotation_id ? `/billing/jobs/sale:${inv.quotation_id}` : null
+  return {
+    id: `INV-${inv.id}`,
+    docNumber: inv.invoice_no,
+    type: 'INV',
+    customerName: customerName(inv.customer),
+    amount: Number(inv.grand_total ?? 0) || null,
+    status: INV_STATUS_TH[inv.status] ?? inv.status,
+    date: (inv.created_at ?? '').slice(0, 10),
+    linkedJob: null,
+    linkPath,
+  }
+}
 
 /* ─── Icons ─── */
 function SearchIcon() {
@@ -56,13 +116,36 @@ function DocIcon() {
 
 /* ─── Main Component ─── */
 export function DocumentBrowserPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [docs, setDocs] = useState<DocItem[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredDocs = MOCK_DOCS.filter((d) => {
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    Promise.all([
+      serviceOrderService.getServiceOrders({ page: 1, limit: 50, date_from: dateFrom || undefined, date_to: dateTo || undefined })
+        .then((r) => r.data.data ?? []).catch(() => []),
+      quotationService.getQuotations({ page: 1, limit: 50 })
+        .then((r) => r.data.data ?? []).catch(() => []),
+      invoiceService.getInvoices({ page: 1, limit: 50, date_from: dateFrom || undefined, date_to: dateTo || undefined })
+        .then((r) => r.data.data ?? []).catch(() => []),
+    ]).then(([sos, qts, invs]) => {
+      if (cancelled) return
+      const merged: DocItem[] = [
+        ...sos.map(soToDoc),
+        ...qts.map(qtToDoc),
+        ...invs.map(invToDoc),
+      ].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+      setDocs(merged)
+    }).finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [dateFrom, dateTo])
+
+  const filteredDocs = useMemo(() => docs.filter((d) => {
     if (typeFilter && d.type !== typeFilter) return false
     if (search) {
       const q = search.toLowerCase()
@@ -72,7 +155,7 @@ export function DocumentBrowserPage() {
       )
     }
     return true
-  })
+  }), [docs, typeFilter, search])
 
   return (
     <div className="space-y-4">
@@ -154,7 +237,13 @@ export function DocumentBrowserPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filteredDocs.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-500">
+                  กำลังโหลดข้อมูล...
+                </td>
+              </tr>
+            ) : filteredDocs.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-500">
                   ไม่พบเอกสาร
@@ -168,7 +257,13 @@ export function DocumentBrowserPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <DocIcon />
-                        <span className="font-medium text-blue-600 hover:underline cursor-pointer">{doc.docNumber}</span>
+                        {doc.linkPath ? (
+                          <Link to={doc.linkPath} className="font-medium text-blue-600 hover:underline">
+                            {doc.docNumber}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-gray-700">{doc.docNumber}</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -183,10 +278,10 @@ export function DocumentBrowserPage() {
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-600">{doc.status}</span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{doc.date}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{doc.date || '—'}</td>
                     <td className="px-4 py-3">
-                      {doc.linkedJob ? (
-                        <Link to={`/billing/jobs/1`} className="text-xs text-blue-600 hover:underline">
+                      {doc.linkedJob && doc.linkPath ? (
+                        <Link to={doc.linkPath} className="text-xs text-blue-600 hover:underline">
                           {doc.linkedJob}
                         </Link>
                       ) : (
