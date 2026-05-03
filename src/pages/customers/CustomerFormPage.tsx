@@ -11,6 +11,7 @@ import type {
   CustomerGender,
   CustomerPhoneType,
 } from '@/types/customer'
+import { CUSTOMER_GRADE_OPTIONS, CUSTOMER_STATUS_OPTIONS, CUSTOMER_TYPE_OPTIONS } from '@/types/customer'
 import type { Branch } from '@/types/hr'
 import { cn } from '@/lib/utils'
 
@@ -49,7 +50,7 @@ const PHONE_TYPES: { v: CustomerPhoneType; l: string }[] = [
   { v: 'work', l: 'ที่ทำงาน' },
 ]
 const CHANNEL_TYPES = ['LINE', 'Facebook', 'other']
-const ADDR_LABELS = ['Operational', 'Home', 'Work', 'Other']
+const ADDR_LABELS = ['ปกติ', 'บ้าน', 'ที่ทำงาน', 'อื่นๆ']
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const field = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
@@ -189,6 +190,7 @@ export function CustomerFormPage() {
     try {
       const payload: CustomerPayload = {
         type: values.type,
+        customer_code: customerCode || undefined,
         id_card: values.id_card || undefined,
         prefix: values.prefix || undefined,
         first_name: values.first_name || undefined,
@@ -299,10 +301,10 @@ export function CustomerFormPage() {
         <div className={card}>
           {/* ประเภทลูกค้า */}
           <div className="mb-5 flex gap-6">
-            {(['personal', 'corporate'] as CustomerType[]).map((t) => (
-              <label key={t} className="flex cursor-pointer items-center gap-2">
-                <input type="radio" value={t} {...register('type')} className="h-4 w-4 text-blue-600 focus:ring-blue-500" />
-                <span className="text-sm font-medium text-gray-700">{t === 'personal' ? 'บุคคล' : 'นิติบุคคล'}</span>
+            {CUSTOMER_TYPE_OPTIONS.map((o) => (
+              <label key={o.value} className="flex cursor-pointer items-center gap-2">
+                <input type="radio" value={o.value} {...register('type')} className="h-4 w-4 text-blue-600 focus:ring-blue-500" />
+                <span className="text-sm font-medium text-gray-700">{o.label}</span>
               </label>
             ))}
           </div>
@@ -629,11 +631,9 @@ export function CustomerFormPage() {
               <label className={lbl}>เกรด</label>
               <select {...register('grade')} className={field}>
                 <option value="">— ไม่ระบุ —</option>
-                <option value="good">ดี</option>
-                <option value="bad_credit">เครดิตเสีย</option>
-                <option value="poor">แย่</option>
-                <option value="new">ประเมินใหม่</option>
-                <option value="x">X</option>
+                {CUSTOMER_GRADE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -653,9 +653,9 @@ export function CustomerFormPage() {
             <div>
               <label className={lbl}>สถานะ <span className="text-red-500">*</span></label>
               <select {...register('status', { required: true })} className={cn(field, errors.status ? 'border-red-400' : '')}>
-                <option value="active">เปิดใช้งาน</option>
-                <option value="inactive">ปิดใช้งาน</option>
-                <option value="blacklisted">แบล็คลิสต์</option>
+                {CUSTOMER_STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
           </div>

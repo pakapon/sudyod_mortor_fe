@@ -86,8 +86,8 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Show global error modal for all non-401 errors (covers 403, 400, 404, 422, 5xx, etc.)
-    if (error.response?.status !== 401) {
+    // Show global error modal for all non-401 and non-403 errors (403 = permission denied, handled per-page)
+    if (error.response?.status !== 401 && error.response?.status !== 403) {
       const msg =
         (error.response?.data as { message?: string } | undefined)?.message ??
         'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'

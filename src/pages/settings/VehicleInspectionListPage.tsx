@@ -107,7 +107,7 @@ export function VehicleInspectionListPage() {
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 p-4">
+        <div className="border-b border-gray-100 p-5">
           <div className="relative w-full max-w-sm">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <span className="text-gray-400">
@@ -154,7 +154,7 @@ export function VehicleInspectionListPage() {
                 </tr>
               ) : (
                 checklists.map((checklist) => (
-                  <tr key={checklist.id} className="hover:bg-gray-50/50">
+                  <tr key={checklist.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900">{checklist.vehicle_type}</td>
                     <td className="px-6 py-4 text-gray-600">{checklist.brand}</td>
                     <td className="px-6 py-4 text-gray-600">{checklist.model}</td>
@@ -196,14 +196,14 @@ export function VehicleInspectionListPage() {
               <button
                 disabled={page <= 1}
                 onClick={() => setParam('page', String(page - 1))}
-                className="rounded-lg border border-gray-200 px-3 py-1 text-sm disabled:opacity-40 hover:bg-gray-50"
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-sm text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
               >
                 ก่อนหน้า
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setParam('page', String(page + 1))}
-                className="rounded-lg border border-gray-200 px-3 py-1 text-sm disabled:opacity-40 hover:bg-gray-50"
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-sm text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
               >
                 ถัดไป
               </button>

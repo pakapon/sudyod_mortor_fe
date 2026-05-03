@@ -8,7 +8,7 @@ import { ActionIconButton } from '@/components/ui/ActionIconButton'
 import { SortableHeader } from '@/components/ui/SortableHeader'
 
 const STATUS_MAP: Record<AttendanceStatus, { label: string; className: string }> = {
-  normal: { label: 'ปกติ', className: 'bg-emerald-100 text-emerald-800' },
+  normal: { label: 'ปกติ', className: 'bg-green-100 text-green-700' },
   late: { label: 'สาย', className: 'bg-yellow-100 text-yellow-800' },
   absent: { label: 'ขาด', className: 'bg-red-100 text-red-800' },
   holiday: { label: 'วันหยุด', className: 'bg-gray-100 text-gray-600' },
@@ -150,20 +150,20 @@ export function AttendanceListPage() {
         {hasPermission(permissions, 'attendance', 'can_export') && (
           <button
             onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors sm:w-auto"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            <span>Export CSV</span>
+            <span>ส่งออก CSV</span>
           </button>
         )}
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         {/* Filters */}
-        <div className="border-b border-gray-100 p-4 flex flex-wrap gap-4">
-          <div className="relative w-full max-w-xs">
+        <div className="border-b border-gray-100 p-3 sm:p-4 flex flex-wrap items-center gap-3 sm:gap-4">
+          <div className="relative w-full sm:max-w-xs">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -178,28 +178,28 @@ export function AttendanceListPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <input
               type="date"
               value={filterStartDate}
               max={filterEndDate}
               onChange={(e) => setFilterStartDate(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+              className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500 sm:w-auto"
             />
-            <span className="text-sm text-gray-500">ถึง</span>
+            <span className="text-sm text-gray-500 sm:text-center">ถึง</span>
             <input
               type="date"
               value={filterEndDate}
               min={filterStartDate}
               onChange={(e) => setFilterEndDate(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+              className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500 sm:w-auto"
             />
           </div>
 
           <select
             value={filterBranch}
             onChange={(e) => setFilterBranch(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+            className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500 sm:w-auto"
           >
             <option value="">ทุกสาขา</option>
             {branches.map((b) => (
@@ -210,7 +210,7 @@ export function AttendanceListPage() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+            className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500 sm:w-auto"
           >
             <option value="">ทุกสถานะ</option>
             {Object.entries(STATUS_MAP).map(([key, { label }]) => (
@@ -221,7 +221,7 @@ export function AttendanceListPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-500">
+          <table className="w-full min-w-[1120px] text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
                 <SortableHeader label="พนักงาน" sortKey="employee_name" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
@@ -252,7 +252,7 @@ export function AttendanceListPage() {
                 sortedRecords.map((rec) => {
                   const statusInfo = STATUS_MAP[rec.status] || STATUS_MAP.normal
                   return (
-                    <tr key={rec.id} className="hover:bg-gray-50/50">
+                    <tr key={rec.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">
                           {rec.employee ? `${rec.employee.first_name} ${rec.employee.last_name}` : '-'}
@@ -332,16 +332,16 @@ export function AttendanceListPage() {
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row">
               <button
                 onClick={handleEditSave}
-                className="inline-flex items-center rounded-lg bg-red-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+                className="inline-flex w-full items-center justify-center rounded-lg bg-red-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-red-700 transition-colors sm:w-auto"
               >
                 บันทึก
               </button>
               <button
                 onClick={() => setEditingRecord(null)}
-                className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="inline-flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors sm:w-auto"
               >
                 ยกเลิก
               </button>

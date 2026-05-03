@@ -245,7 +245,7 @@ export function StockTransferDetailPage() {
                     <tr key={it.id}>
                       <td className="px-4 py-2 font-mono text-xs text-gray-600">{it.variant?.sku ?? it.product?.sku ?? '—'}</td>
                       <td className="px-4 py-2 text-gray-900">
-                        {it.product?.name ?? it.variant?.name ?? (it.product_variant_id ? `#${it.product_variant_id}` : '—')}
+                        {it.variant?.product?.name ?? it.product?.name ?? it.variant?.name ?? (it.product_variant_id ? `#${it.product_variant_id}` : '—')}
                         {variantText && <span className="ml-1 text-xs text-gray-500">({variantText})</span>}
                       </td>
                       <td className="px-4 py-2 text-right text-gray-900">
@@ -267,13 +267,13 @@ export function StockTransferDetailPage() {
         <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 text-sm">
           <div>
             <dt className="text-xs text-gray-500">สร้างโดย</dt>
-            <dd className="mt-0.5 text-gray-900">{formatPerson(data.created_by)}</dd>
+            <dd className="mt-0.5 text-gray-900">{formatPerson(data.creator)}</dd>
             <dd className="text-xs text-gray-400">{formatDateTime(data.created_at)}</dd>
           </div>
           {data.approved_at && (
             <div>
               <dt className="text-xs text-gray-500">อนุมัติโดย</dt>
-              <dd className="mt-0.5 text-gray-900">{formatPerson(data.approved_by)}</dd>
+              <dd className="mt-0.5 text-gray-900">{formatPerson(data.approver)}</dd>
               <dd className="text-xs text-gray-400">{formatDateTime(data.approved_at)}</dd>
             </div>
           )}
@@ -316,16 +316,41 @@ export function StockTransferDetailPage() {
         onCancel={() => setCompleteOpen(false)}
       />
 
-      <ConfirmModal
-        isOpen={cancelOpen}
-        title="ยืนยันการยกเลิก"
-        message="คุณต้องการยกเลิกใบโอนย้ายสต็อกนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้"
-        confirmLabel="ยกเลิกใบโอนย้าย"
-        variant="danger"
-        isLoading={isCancelling}
-        onConfirm={handleCancel}
-        onCancel={() => { setCancelOpen(false); setCancelReason('') }}
-      />
+      {cancelOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { setCancelOpen(false); setCancelReason('') }} />
+          <div className="relative z-10 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">ยืนยันการยกเลิก</h3>
+            <p className="mb-4 text-sm text-gray-600">คุณต้องการยกเลิกใบโอนย้ายสต็อกนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
+            <label className="mb-1 block text-sm font-medium text-gray-700">เหตุผลการยกเลิก <span className="text-gray-400">(ไม่บังคับ)</span></label>
+            <textarea
+              className="w-full rounded-md border border-gray-300 p-2 text-sm focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+              rows={3}
+              placeholder="ระบุเหตุผล..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => { setCancelOpen(false); setCancelReason('') }}
+                disabled={isCancelling}
+              >
+                ย้อนกลับ
+              </button>
+              <button
+                type="button"
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                onClick={handleCancel}
+                disabled={isCancelling}
+              >
+                {isCancelling ? 'กำลังยกเลิก...' : 'ยกเลิกใบโอนย้าย'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

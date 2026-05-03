@@ -68,6 +68,7 @@ export interface InventoryItem {
 export interface InventoryListParams {
   search?: string
   warehouse_id?: number
+  branch_id?: number
   product_id?: number
   low_stock?: boolean
   page?: number
@@ -224,12 +225,14 @@ export interface StockTransfer {
   total_items?: number
   items?: StockTransferItem[]
   approved_at?: string | null
-  approved_by?: { id: number; first_name: string; last_name: string }
+  approved_by?: number | null
+  approver?: { id: number; first_name: string; last_name: string } | null
   completed_at?: string | null
-  completed_by?: { id: number; first_name: string; last_name: string }
+  completed_by?: number | null
   cancelled_at?: string | null
   created_at?: string
-  created_by?: { id: number; first_name: string; last_name: string }
+  created_by?: number
+  creator?: { id: number; first_name: string; last_name: string }
 }
 
 export interface StockTransferPayload {

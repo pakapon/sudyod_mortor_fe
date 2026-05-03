@@ -118,13 +118,12 @@ const menuItems: MenuItem[] = [
       { label: 'ยี่ห้อ', path: '/settings/brands' },
       { label: 'หมวดสินค้า', path: '/settings/categories' },
       { label: 'หน่วยนับ', path: '/settings/units' },
-      { label: 'Supplier', path: '/settings/vendors' },
+      { label: 'ผู้จัดจำหน่าย', path: '/settings/vendors' },
       { label: 'บริษัทไฟแนนซ์', path: '/settings/finance-companies' },
-      { label: 'ตัวเลือกแบบสินค้า', path: '/settings/product-attributes' },
       { label: 'รายการตรวจสอบสภาพรถ', path: '/settings/vehicle-inspection-checklists' },
     ],
   },
-  { id: 'auditLog', label: 'Audit Log', icon: 'auditLog', path: '/audit-logs' },
+  { id: 'auditLog', label: 'ประวัติการใช้งาน', icon: 'auditLog', path: '/audit-logs' },
   { id: 'notification', label: 'แจ้งเตือน', icon: 'notification', path: '/notifications' },
 ]
 
@@ -191,8 +190,8 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'sidebar fixed left-0 top-0 z-40 flex h-screen flex-col bg-[#DC2626] text-white transition-all duration-300 print:hidden',
-        collapsed ? 'w-16' : 'w-60',
+        'sidebar fixed left-0 top-0 z-40 flex h-screen flex-col bg-[#DC2626] text-white transition-all duration-300 print:hidden shadow-2xl lg:shadow-none',
+        collapsed ? 'w-64 lg:w-16 -translate-x-full lg:translate-x-0' : 'w-64 lg:w-60 translate-x-0',
       )}
     >
       {/* Logo */}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { purchaseOrderService } from '@/api/purchaseOrderService'
 import type { PurchaseOrder, PurchaseOrderStatus } from '@/types/inventory'
 import { ActionIconLink } from '@/components/ui/ActionIconButton'

@@ -13,15 +13,17 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { hrService } from '@/api/hrService'
+import { productService } from '@/api/productService'
 import { vehicleInspectionService } from '@/api/vehicleInspectionService'
-import type { VehicleInspectionChecklistPayload } from '@/types/vehicleInspection'
+import { VEHICLE_TYPE_OPTIONS } from '@/types/vehicleInspection'
+import type { VehicleInspectionChecklist, VehicleInspectionChecklistPayload } from '@/types/vehicleInspection'
 import { toast } from 'react-hot-toast'
 
 const itemSchema = z.object({
@@ -101,6 +103,9 @@ export function VehicleInspectionFormPage() {
   const navigate = useNavigate()
   const isEditing = Boolean(id)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [suggestionRows, setSuggestionRows] = useState<VehicleInspectionChecklist[]>([])
+  const [brandValues, setBrandValues] = useState<string[]>([])
+  const [modelValues, setModelValues] = useState<string[]>([])
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -111,6 +116,7 @@ export function VehicleInspectionFormPage() {
     register,
     handleSubmit,
     reset,
+    watch,
     control,
     formState: { errors },
   } = useForm<FormValues>({
@@ -126,6 +132,8 @@ export function VehicleInspectionFormPage() {
   })
 
   const { fields, append, remove, move } = useFieldArray({ control, name: 'items' })
+  const watchedBrand = watch('brand')
+  const watchedModel = watch('model')
 
   useEffect(() => {
     if (isEditing) {
@@ -146,6 +154,72 @@ export function VehicleInspectionFormPage() {
         .catch(() => navigate('/settings/vehicle-inspection-checklists'))
     }
   }, [isEditing, id, reset, navigate])
+
+  useEffect(() => {
+    vehicleInspectionService
+      .getChecklists({ page: 1, limit: 100 })
+      .then(({ data }) => {
+        setSuggestionRows(data.data || [])
+      })
+      .catch(() => {
+        setSuggestionRows([])
+      })
+  }, [])
+
+  useEffect(() => {
+    const keyword = (watchedBrand || '').trim()
+    if (keyword.length === 0) {
+      setBrandValues([])
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      hrService
+        .getBrands({ page: 1, limit: 20, search: keyword, is_active: true })
+        .then(({ data }) => {
+          const brands = (data.data || [])
+            .map((b) => b.name?.trim())
+            .filter((name): name is string => Boolean(name))
+          setBrandValues(Array.from(new Set(brands)).sort((a, b) => a.localeCompare(b, 'th')))
+        })
+        .catch(() => {
+          setBrandValues([])
+        })
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [watchedBrand])
+
+  useEffect(() => {
+    const keyword = (watchedModel || '').trim()
+    if (keyword.length === 0) {
+      setModelValues([])
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      productService
+        .searchVariants({ search: keyword, limit: 20 })
+        .then(({ data }) => {
+          const models = (data.data || [])
+            .map((v) => v.name?.trim())
+            .filter((name): name is string => Boolean(name))
+          setModelValues(Array.from(new Set(models)).sort((a, b) => a.localeCompare(b, 'th')))
+        })
+        .catch(() => {
+          setModelValues([])
+        })
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [watchedModel])
+
+  const vehicleTypeValues = Array.from(
+    new Set([
+      ...VEHICLE_TYPE_OPTIONS.map((opt) => opt.value),
+      ...suggestionRows.map((row) => row.vehicle_type).filter(Boolean),
+    ]),
+  )
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -216,9 +290,15 @@ export function VehicleInspectionFormPage() {
               </label>
               <input
                 {...register('vehicle_type')}
+                list="vehicle-type-options"
                 className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
                 placeholder="เช่น รถยนต์, รถกระบะ, SUV"
               />
+              <datalist id="vehicle-type-options">
+                {vehicleTypeValues.map((value) => (
+                  <option key={value} value={value} />
+                ))}
+              </datalist>
               {errors.vehicle_type && (
                 <p className="mt-1 text-sm text-red-600">{errors.vehicle_type.message}</p>
               )}
@@ -230,9 +310,15 @@ export function VehicleInspectionFormPage() {
               </label>
               <input
                 {...register('brand')}
+                list="vehicle-brand-options"
                 className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
                 placeholder="เช่น Toyota, Honda, Ford"
               />
+              <datalist id="vehicle-brand-options">
+                {brandValues.map((value) => (
+                  <option key={value} value={value} />
+                ))}
+              </datalist>
               {errors.brand && <p className="mt-1 text-sm text-red-600">{errors.brand.message}</p>}
             </div>
 
@@ -242,9 +328,15 @@ export function VehicleInspectionFormPage() {
               </label>
               <input
                 {...register('model')}
+                list="vehicle-model-options"
                 className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
                 placeholder="เช่น Camry, Civic, Ranger"
               />
+              <datalist id="vehicle-model-options">
+                {modelValues.map((value) => (
+                  <option key={value} value={value} />
+                ))}
+              </datalist>
               {errors.model && <p className="mt-1 text-sm text-red-600">{errors.model.message}</p>}
             </div>
 

@@ -84,7 +84,7 @@ export function FinanceCompanyListPage() {
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 p-4 flex gap-4">
+        <div className="border-b border-gray-100 p-5 flex gap-4">
           <div className="relative w-full max-w-sm">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <span className="text-gray-400">
@@ -133,7 +133,7 @@ export function FinanceCompanyListPage() {
                 filteredCompanies.map((company) => (
                   <tr
                     key={company.id}
-                    className="hover:bg-gray-50/50 cursor-pointer"
+                    className="hover:bg-gray-50 cursor-pointer"
                     onClick={() => navigate(`/settings/finance-companies/${company.id}`)}
                   >
                     <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>

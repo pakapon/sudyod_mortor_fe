@@ -72,7 +72,7 @@ export function HolidayFormPage() {
         </h1>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6 shadow-sm space-y-5">
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700">ชื่อวันหยุด <span className="text-red-500">*</span></label>
           <input
@@ -107,17 +107,17 @@ export function HolidayFormPage() {
           <p className="mt-1 text-xs text-gray-500">เลือก "ทุกสาขา" เพื่อใช้วันหยุดกับทั้งบริษัท หรือเลือกสาขาเฉพาะ</p>
         </div>
 
-        <div className="flex gap-3 pt-4 border-t border-gray-100">
+        <div className="flex flex-col-reverse gap-3 pt-4 border-t border-gray-100 sm:flex-row">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50 sm:w-auto"
           >
             {isSubmitting ? 'กำลังบันทึก...' : isEditing ? 'บันทึกการแก้ไข' : 'สร้างวันหยุด'}
           </button>
           <Link
             to="/hr/holidays"
-            className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            className="inline-flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors sm:w-auto"
           >
             ยกเลิก
           </Link>

@@ -124,7 +124,7 @@ export const hrService = {
   },
 
   updateRole(id: number, payload: Partial<RolePayload>) {
-    return apiClient.put<ApiResponse<Role>>(`/permissions/roles/${id}`, payload)
+    return apiClient.patch<ApiResponse<Role>>(`/permissions/roles/${id}`, payload)
   },
 
   getRolePermissions(id: number) {

@@ -8,6 +8,18 @@ import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
 import type { ServiceOrder, ServiceOrderStatus } from '@/types/serviceOrder'
 import type { Quotation, QuotationStatus } from '@/types/quotation'
+import { 
+  Wrench, 
+  Tag, 
+  ShoppingCart, 
+  Zap, 
+  Clock, 
+  CheckCircle2, 
+  Banknote, 
+  Search, 
+  ArrowRight,
+  FileText
+} from 'lucide-react'
 
 /* ─── Flow Config ─── */
 const FLOW_TYPES = [
@@ -15,8 +27,9 @@ const FLOW_TYPES = [
     id: 'repair',
     label: 'ซ่อมรถ',
     desc: 'รับรถ → ประเมิน → เสนอราคา → ซ่อม → จ่าย → ส่งรถ',
-    icon: '🔧',
+    icon: Wrench,
     color: 'from-blue-500 to-blue-600',
+    iconColor: 'text-blue-500',
     bgLight: 'bg-blue-50 border-blue-200',
     path: '/billing/new/repair',
   },
@@ -24,8 +37,9 @@ const FLOW_TYPES = [
     id: 'sale',
     label: 'ขายสินค้า',
     desc: 'เสนอราคา → ชำระเงิน → ส่งมอบ (มัดจำ optional)',
-    icon: '🏷️',
+    icon: Tag,
     color: 'from-emerald-500 to-emerald-600',
+    iconColor: 'text-emerald-500',
     bgLight: 'bg-emerald-50 border-emerald-200',
     path: '/billing/new/sale',
   },
@@ -33,8 +47,9 @@ const FLOW_TYPES = [
     id: 'pos',
     label: 'ขายหน้าร้าน',
     desc: 'ยิงบาร์โค้ด / ค้นสินค้า → ชำระ → ออกบิล',
-    icon: '🛒',
+    icon: ShoppingCart,
     color: 'from-amber-500 to-amber-600',
+    iconColor: 'text-amber-500',
     bgLight: 'bg-amber-50 border-amber-200',
     path: '/billing/pos',
   },
@@ -44,35 +59,10 @@ const FLOW_TYPES = [
 type JobStatus = 'active' | 'waiting' | 'completed' | 'cancelled'
 
 const JOB_STATUS: Record<JobStatus, { label: string; dot: string; bg: string }> = {
-  active:    { label: 'กำลังดำเนินการ', dot: 'bg-blue-500', bg: 'bg-blue-50 text-blue-700' },
-  waiting:   { label: 'รอดำเนินการ',  dot: 'bg-amber-500', bg: 'bg-amber-50 text-amber-700' },
-  completed: { label: 'เสร็จสิ้น',    dot: 'bg-green-500', bg: 'bg-green-50 text-green-700' },
-  cancelled: { label: 'ยกเลิก',       dot: 'bg-gray-400', bg: 'bg-gray-100 text-gray-500' },
-}
-
-/* ─── Icons ─── */
-function PlusIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  )
-}
-
-function ArrowRightIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  )
+  active:    { label: 'กำลังดำเนินการ', dot: 'bg-blue-500', bg: 'bg-blue-50 text-blue-700 ring-1 ring-blue-500/20' },
+  waiting:   { label: 'รอดำเนินการ',  dot: 'bg-amber-500', bg: 'bg-amber-50 text-amber-700 ring-1 ring-amber-500/20' },
+  completed: { label: 'เสร็จสิ้น',    dot: 'bg-emerald-500', bg: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-500/20' },
+  cancelled: { label: 'ยกเลิก',       dot: 'bg-gray-400', bg: 'bg-gray-50 text-gray-600 ring-1 ring-gray-500/20' },
 }
 
 /* ─── Summary Cards ─── */
@@ -85,48 +75,70 @@ interface SummaryData {
 
 function SummaryCards({ data }: { data: SummaryData }) {
   const cards = [
-    { label: 'กำลังดำเนินการ', value: data.active, color: 'text-blue-600', bg: 'bg-blue-50', icon: '⚡' },
-    { label: 'รอดำเนินการ', value: data.waiting, color: 'text-amber-600', bg: 'bg-amber-50', icon: '⏳' },
-    { label: 'เสร็จวันนี้', value: data.completedToday, color: 'text-green-600', bg: 'bg-green-50', icon: '✅' },
-    { label: 'รายได้วันนี้', value: data.totalRevenue, color: 'text-purple-600', bg: 'bg-purple-50', icon: '💰', isCurrency: true },
+    { label: 'กำลังดำเนินการ', value: data.active, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-100', icon: Zap, gradient: 'from-blue-500 to-cyan-400', glow: 'bg-blue-400' },
+    { label: 'รอดำเนินการ', value: data.waiting, color: 'text-amber-600', bg: 'bg-amber-50', ring: 'ring-amber-100', icon: Clock, gradient: 'from-amber-400 to-orange-400', glow: 'bg-amber-400' },
+    { label: 'เสร็จวันนี้', value: data.completedToday, color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'ring-emerald-100', icon: CheckCircle2, gradient: 'from-emerald-400 to-teal-400', glow: 'bg-emerald-400' },
+    { label: 'รายได้วันนี้', value: data.totalRevenue, color: 'text-violet-600', bg: 'bg-violet-50', ring: 'ring-violet-100', icon: Banknote, isCurrency: true, gradient: 'from-violet-500 to-purple-500', glow: 'bg-violet-400' },
   ]
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {cards.map((c) => (
-        <div key={c.label} className={cn('rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md')}>
-          <div className="flex items-center justify-between">
-            <span className="text-2xl">{c.icon}</span>
-            <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', c.bg, c.color)}>
-              {c.label}
-            </span>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {cards.map((c) => {
+        const Icon = c.icon
+        return (
+          <div key={c.label} className="group relative overflow-hidden rounded-3xl bg-white p-6 shadow-sm ring-1 ring-gray-200 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-gray-200/50 hover:ring-gray-300">
+            {/* Top accent line */}
+            <div className={cn('absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r opacity-80 transition-opacity duration-300 group-hover:opacity-100', c.gradient)} />
+            
+            <div className="flex items-center justify-between relative z-10">
+              <div className={cn('flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 group-hover:scale-110', c.bg, c.ring, c.color)}>
+                <Icon className="h-6 w-6" strokeWidth={2} />
+              </div>
+              <span className={cn("rounded-full px-3 py-1 text-xs font-bold tracking-wide", c.bg, c.color)}>
+                {c.label}
+              </span>
+            </div>
+            
+            <div className="mt-6 flex items-baseline gap-2 relative z-10">
+              <span className="text-4xl font-black tracking-tight text-gray-900">
+                {c.isCurrency ? `฿${c.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : c.value}
+              </span>
+            </div>
+
+            {/* Subtle background glow effect on hover */}
+            <div className={cn("absolute -bottom-10 -right-10 h-40 w-40 rounded-full blur-3xl opacity-0 transition-opacity duration-500 group-hover:opacity-15", c.glow)} />
+            
+            {/* Watermark icon */}
+            <div className="absolute -bottom-6 -right-6 opacity-[0.02] pointer-events-none text-gray-900 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-12">
+              <Icon className="h-36 w-36" strokeWidth={1.5} />
+            </div>
           </div>
-          <div className={cn('mt-3 text-2xl font-bold', c.color)}>
-            {c.isCurrency ? `฿${c.value.toLocaleString()}` : c.value}
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
 
 /* ─── Flow Quick-Action Card ─── */
 function FlowCard({ flow, onClick }: { flow: typeof FLOW_TYPES[number]; onClick: () => void }) {
+  const Icon = flow.icon
   return (
     <button
       onClick={onClick}
-      className="group relative overflow-hidden rounded-xl border border-gray-100 bg-white p-5 text-left shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
+      className="group relative overflow-hidden rounded-2xl bg-white p-6 text-left shadow-sm ring-1 ring-gray-200 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:ring-gray-300"
     >
-      <div className={cn('absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-5', flow.color)} />
+      <div className={cn('absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-[0.03]', flow.color)} />
       <div className="relative">
         <div className="flex items-center justify-between">
-          <span className="text-3xl">{flow.icon}</span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors group-hover:bg-gray-200">
-            สร้างงาน <ArrowRightIcon />
+          <div className={cn('flex h-12 w-12 items-center justify-center rounded-xl bg-gray-50 ring-1 ring-gray-100 transition-transform duration-300 group-hover:scale-110 group-hover:bg-white', flow.iconColor)}>
+            <Icon className="h-6 w-6" />
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors group-hover:bg-gray-100 group-hover:text-gray-900">
+            สร้างงาน <ArrowRight className="h-3 w-3" />
           </span>
         </div>
-        <h3 className="mt-3 text-lg font-semibold text-gray-900">{flow.label}</h3>
-        <p className="mt-1 text-sm text-gray-500">{flow.desc}</p>
+        <h3 className="mt-4 text-xl font-bold text-gray-900">{flow.label}</h3>
+        <p className="mt-2 text-sm leading-relaxed text-gray-500">{flow.desc}</p>
       </div>
     </button>
   )
@@ -187,8 +199,6 @@ function qtToJob(qt: Quotation): JobItem {
     status, updatedAt: qt.updated_at ?? qt.created_at ?? '',
   }
 }
-
-const FLOW_ICONS: Record<string, string> = { repair: '🔧', sale: '🏷️', pos: '🛒' }
 
 function formatRelative(iso: string) {
   if (!iso) return '—'
@@ -258,12 +268,12 @@ export function BillingHubPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-7xl space-y-8 pb-12">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">บิล / เอกสาร</h1>
-          <p className="mt-1 text-sm text-gray-500">จัดการงานซ่อม ขาย และเอกสารทั้งหมดในที่เดียว</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">บิล / เอกสาร</h1>
+          <p className="mt-2 text-sm text-gray-500">จัดการงานซ่อม ขาย และเอกสารทั้งหมดในที่เดียว</p>
         </div>
       </div>
 
@@ -272,10 +282,11 @@ export function BillingHubPage() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="mb-3 text-base font-semibold text-gray-800">สร้างงานใหม่</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold tracking-tight text-gray-900">สร้างงานใหม่</h2>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FLOW_TYPES.map((flow) => {
-            // Check permission for each flow type
             if (flow.id === 'repair' && !canCreateSO) return null
             if (flow.id === 'sale' && !canCreateQT) return null
             if (flow.id === 'pos' && !canCreateINV) return null
@@ -291,114 +302,132 @@ export function BillingHubPage() {
       </div>
 
       {/* Job List */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-800">รายการงาน</h2>
-          <Link to="/billing/documents" className="text-sm text-blue-600 hover:underline">
-            ค้นหาเอกสาร →
-          </Link>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 mb-3">
-          <div className="relative flex-1 min-w-48">
-            <span className="absolute inset-y-0 left-3 flex items-center text-gray-400">
-              <SearchIcon />
-            </span>
-            <input
-              type="text"
-              placeholder="ค้นหาเลขงาน / ชื่อลูกค้า..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+        <div className="flex flex-col gap-4 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-bold tracking-tight text-gray-900">รายการงาน</h2>
+            <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
+            <Link to="/billing/documents" className="group inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700">
+              <FileText className="h-4 w-4" />
+              <span>ค้นหาเอกสารทั้งหมด</span>
+              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
-          <div className="flex gap-1.5">
-            {(['', 'active', 'waiting', 'completed'] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s as JobStatus | '')}
-                className={cn(
-                  'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                  statusFilter === s
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                )}
-              >
-                {s === '' ? 'ทั้งหมด' : JOB_STATUS[s].label}
-              </button>
-            ))}
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 sm:min-w-[240px]">
+              <span className="absolute inset-y-0 left-3 flex items-center text-gray-400">
+                <Search className="h-4 w-4" />
+              </span>
+              <input
+                type="text"
+                placeholder="ค้นหาเลขงาน / ชื่อลูกค้า..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-xl border-0 bg-gray-50 py-2 pl-9 pr-4 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 transition-all placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-inset focus:ring-blue-600"
+              />
+            </div>
+            <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              {(['', 'active', 'waiting', 'completed'] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s as JobStatus | '')}
+                  className={cn(
+                    'whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-semibold transition-all',
+                    statusFilter === s
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'bg-gray-50 text-gray-600 ring-1 ring-inset ring-gray-200 hover:bg-gray-100'
+                  )}
+                >
+                  {s === '' ? 'ทั้งหมด' : JOB_STATUS[s].label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Jobs Table */}
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead className="bg-gray-50/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">งาน</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ลูกค้า / รายละเอียด</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ขั้นตอน</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ตาใคร</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">สถานะ</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">อัปเดต</th>
-                <th className="relative px-4 py-3"><span className="sr-only">Actions</span></th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">งาน</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">ลูกค้า / รายละเอียด</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">ขั้นตอน</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">ผู้รับผิดชอบ</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">สถานะ</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">อัปเดตล่าสุด</th>
+                <th className="relative px-6 py-4"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 bg-white">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-500">
-                    กำลังโหลดข้อมูล...
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <div className="inline-flex items-center gap-2 text-sm text-gray-500">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+                      กำลังโหลดข้อมูล...
+                    </div>
                   </td>
                 </tr>
               ) : filteredJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-500">
-                    ไม่พบรายการงาน
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-50 ring-1 ring-gray-100">
+                        <FileText className="h-6 w-6 text-gray-400" />
+                      </div>
+                      <p className="mt-4 text-sm font-medium text-gray-900">ไม่พบรายการงาน</p>
+                      <p className="mt-1 text-sm text-gray-500">ลองปรับตัวกรองหรือค้นหาด้วยคำอื่น</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 filteredJobs.map((job) => {
                   const st = JOB_STATUS[job.status]
+                  const FlowIcon = FLOW_TYPES.find(f => f.id === job.flowType)?.icon || FileText
                   return (
-                    <tr key={job.sourceKey} className="group hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{FLOW_ICONS[job.flowType]}</span>
+                    <tr key={job.sourceKey} className="group transition-colors hover:bg-blue-50/40">
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={cn('flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 ring-1 ring-gray-100', FLOW_TYPES.find(f => f.id === job.flowType)?.iconColor)}>
+                            <FlowIcon className="h-4 w-4" />
+                          </div>
                           <Link
                             to={`/billing/jobs/${job.sourceKey}`}
-                            className="font-medium text-blue-600 hover:underline"
+                            className="font-semibold text-gray-900 hover:text-blue-600 transition-colors"
                           >
                             {job.jobNumber}
                           </Link>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{job.customerName}</div>
-                        <div className="text-xs text-gray-500">{job.description}</div>
+                        <div className="mt-0.5 text-sm text-gray-500 line-clamp-1">{job.description}</div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="whitespace-nowrap px-6 py-4">
                         <span className="text-sm font-medium text-gray-700">{job.currentStep}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-200">
                           {job.assignedTo}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium', st.bg)}>
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold', st.bg)}>
                           <span className={cn('h-1.5 w-1.5 rounded-full', st.dot)} />
                           {st.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{formatRelative(job.updatedAt)}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-500">
+                        {formatRelative(job.updatedAt)}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-right">
                         <Link
                           to={`/billing/jobs/${job.sourceKey}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-blue-200 text-blue-500 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-blue-100 hover:text-blue-600 transition-all opacity-0 group-hover:opacity-100"
                         >
-                          <ArrowRightIcon />
+                          <ArrowRight className="h-4 w-4" />
                         </Link>
                       </td>
                     </tr>

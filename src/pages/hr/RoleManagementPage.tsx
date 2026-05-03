@@ -177,7 +177,7 @@ export function RoleManagementPage() {
                     <td className="px-6 py-4 text-gray-500">{role.description || <span className="italic text-gray-300">—</span>}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={cn(
-                        'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
+                        'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap',
                         role.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500'
                       )}>
                         {role.is_active ? 'ใช้งาน' : 'ปิดใช้งาน'}

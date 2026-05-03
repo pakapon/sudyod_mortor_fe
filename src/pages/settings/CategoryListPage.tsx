@@ -212,7 +212,7 @@ export function CategoryListPage() {
 
       {/* Table Card */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 p-4">
+        <div className="border-b border-gray-100 p-5">
           <div className="relative w-full max-w-sm">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -257,10 +257,7 @@ export function CategoryListPage() {
                 filteredRows.map(({ cat, depth }) => (
                   <tr
                     key={cat.id}
-                    className={cn(
-                      'hover:bg-gray-50/60 transition-colors',
-                      depth === 0 ? 'bg-white' : depth === 1 ? 'bg-blue-50/20' : 'bg-gray-50/40',
-                    )}
+                    className="bg-white hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-3.5">
                       <div

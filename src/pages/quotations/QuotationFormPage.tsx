@@ -3,10 +3,11 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { quotationService } from '@/api/quotationService'
 import { serviceOrderService } from '@/api/serviceOrderService'
-import { productService } from '@/api/productService'
+import { inventoryService } from '@/api/inventoryService'
+import { useAuthStore } from '@/stores/authStore'
 import type { Quotation, QuotationType, QuotationPricingType } from '@/types/quotation'
 import type { Customer } from '@/types/customer'
-import type { Product } from '@/types/product'
+import type { InventoryItem } from '@/types/inventory'
 import { cn } from '@/lib/utils'
 import { CustomerSearchSelect, getCustomerDisplayName } from '@/components/ui/CustomerSearchSelect'
 
@@ -57,7 +58,7 @@ interface LocalItem {
 interface ProductSearchResult {
   itemTempId: string
   query: string
-  results: Product[]
+  results: InventoryItem[]
   isLoading: boolean
   isOpen: boolean
 }
@@ -71,6 +72,7 @@ export function QuotationFormPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const isEdit = !!id
+  const { employee } = useAuthStore()
 
   const soIdFromParams = searchParams.get('service_order_id')
 
@@ -162,7 +164,7 @@ export function QuotationFormPage() {
       .then(([soRes, itemsRes]) => {
         const so = soRes.data.data
         if (so.customer) setSelectedCustomer(so.customer as Customer)
-        setLinkedSoNo(so.so_number || so.so_no || `SO #${soId}`)
+        setLinkedSoNo(so.so_number || `SO #${soId}`)
 
         const rawItems = Array.isArray(itemsRes.data.data) ? itemsRes.data.data : []
         setLocalItems(
@@ -242,7 +244,7 @@ export function QuotationFormPage() {
       }
       debounceRef.current = setTimeout(async () => {
         try {
-          const res = await productService.getProducts({ search: query, limit: 10 })
+          const res = await inventoryService.getInventory({ search: query, limit: 10, branch_id: employee?.branch_id })
           setProductSearch({ itemTempId: tempId, query, results: res.data.data, isLoading: false, isOpen: true })
         } catch {
           setProductSearch((prev) => prev ? { ...prev, isLoading: false } : null)
@@ -252,12 +254,12 @@ export function QuotationFormPage() {
     [],
   )
 
-  const handleSelectProduct = (p: Product) => {
+  const handleSelectProduct = (p: InventoryItem) => {
     if (!productSearch) return
     updateItem(productSearch.itemTempId, {
-      product_id: p.id,
-      product_name_display: p.name,
-      unit_price: typeof p.selling_price === 'number' ? p.selling_price : Number(p.selling_price ?? 0),
+      product_id: p.product_id,
+      product_name_display: p.variant?.name ?? p.product?.name ?? '',
+      unit_price: Number(p.variant?.selling_price ?? 0),
     })
     setProductSearch(null)
   }
@@ -555,10 +557,12 @@ export function QuotationFormPage() {
                                           }}
                                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
                                         >
-                                          <span className="font-medium text-gray-900">{p.name}</span>
-                                          {p.sku && (
-                                            <span className="ml-auto text-xs text-gray-400">{p.sku}</span>
+                                          <span className="font-medium text-gray-900">{p.variant?.name ?? p.product?.name}</span>
+                                          {p.product?.sku && (
+                                            <span className="ml-auto text-xs text-gray-400">{p.product.sku}</span>
                                           )}
+                                          <span className="text-xs text-green-600">฿{Number(p.variant?.selling_price ?? 0).toLocaleString()}</span>
+                                          <span className="text-xs text-gray-400">คงเหลือ {p.quantity}</span>
                                         </button>
                                       ))
                                     )}

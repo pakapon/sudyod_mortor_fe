@@ -240,7 +240,7 @@ export function LoanSearchPage() {
                       className="group flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-300 hover:shadow-md transition-all"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs text-gray-500">{loan.loan_no}</span>
+                        <span className="font-mono text-xs text-gray-500">{loan.store_loan_no}</span>
                         <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', cfg.className)}>
                           {cfg.label}
                         </span>

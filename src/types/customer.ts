@@ -4,6 +4,24 @@ export type CustomerStatus = 'active' | 'inactive' | 'blacklisted'
 
 export type CustomerGrade = 'good' | 'bad_credit' | 'poor' | 'new' | 'x'
 
+export const CUSTOMER_TYPE_OPTIONS: { value: CustomerType; label: string }[] = [
+  { value: 'personal', label: 'บุคคลธรรมดา' },
+  { value: 'corporate', label: 'นิติบุคคล' },
+]
+
+export const CUSTOMER_STATUS_OPTIONS: { value: CustomerStatus; label: string; color: string }[] = [
+  { value: 'active', label: 'เปิดใช้งาน', color: 'bg-green-100 text-green-700' },
+  { value: 'inactive', label: 'ปิดใช้งาน', color: 'bg-yellow-100 text-yellow-700' },
+  { value: 'blacklisted', label: 'แบล็คลิสต์', color: 'bg-red-100 text-red-700' },
+]
+
+export const CUSTOMER_GRADE_OPTIONS: { value: CustomerGrade; label: string; color: string }[] = [
+  { value: 'good', label: 'ดี', color: 'bg-green-100 text-green-700' },
+  { value: 'bad_credit', label: 'เครดิตเสีย', color: 'bg-yellow-100 text-yellow-700' },
+  { value: 'poor', label: 'แย่', color: 'bg-orange-100 text-orange-700' },
+  { value: 'new', label: 'รอประเมินใหม่', color: 'bg-gray-100 text-gray-600' },
+]
+
 export type CustomerGender = 'male' | 'female' | 'not_specified'
 
 export type CustomerPhoneType = 'mobile' | 'home' | 'work'
@@ -57,6 +75,7 @@ export interface Customer {
 
 export interface CustomerPayload {
   type: CustomerType
+  customer_code?: string
   status?: CustomerStatus
   grade?: CustomerGrade
   gender?: CustomerGender

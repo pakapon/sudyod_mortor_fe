@@ -28,4 +28,5 @@ export interface CreateDeliveryNotePayload {
 
 export interface SignDeliveryNotePayload {
   signed_by: string
+  signed_at?: string
 }

@@ -84,7 +84,7 @@ export function ConfirmModal({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md transform rounded-2xl bg-white shadow-xl transition-all">
+      <div className="relative z-10 w-full max-w-md transform rounded-2xl bg-white shadow-xl transition-all">
         <div className="p-6">
           <div className="flex items-start gap-4">
             {/* Icon */}

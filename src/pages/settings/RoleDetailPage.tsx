@@ -16,7 +16,7 @@ const ALL_MODULES: { key: string; label: string }[] = [
   { key: 'holidays', label: 'วันหยุด' },
   { key: 'customers', label: 'ลูกค้า' },
   { key: 'vehicles', label: 'รถลูกค้า' },
-  { key: 'vendors', label: 'Supplier' },
+  { key: 'vendors', label: 'ผู้จัดจำหน่าย' },
   { key: 'brands', label: 'ยี่ห้อ' },
   { key: 'product_categories', label: 'หมวดสินค้า' },
   { key: 'products', label: 'สินค้า' },
@@ -289,12 +289,12 @@ export function RoleDetailPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {ALL_MODULES.map(({ key, label }, idx) => {
+              {ALL_MODULES.map(({ key, label }) => {
                 const rowValues = matrix[key]
                 const allRowChecked = ACTIONS.every(a => rowValues[a.key as string])
                 const someRowChecked = ACTIONS.some(a => rowValues[a.key as string])
                 return (
-                  <tr key={key} className={cn('hover:bg-gray-50/80 transition-colors', idx % 2 === 0 ? '' : 'bg-gray-50/30')}>
+                  <tr key={key} className="bg-white hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-3 font-medium text-gray-800 border-r border-gray-100 whitespace-nowrap">
                       {label}
                       <div className="text-xs font-mono text-gray-400 mt-0.5">{key}</div>

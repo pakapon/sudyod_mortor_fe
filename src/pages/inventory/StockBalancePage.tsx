@@ -315,7 +315,7 @@ export function StockBalancePage() {
                         {item.variant?.name ?? '—'}
                         {variantText && <span className="ml-1 text-xs font-normal text-gray-500">({variantText})</span>}
                       </td>
-                      <td className="px-4 py-3 text-gray-500">{item.branch?.name ?? '—'}</td>
+                      <td className="px-4 py-3 text-gray-500">{item.warehouse?.branch?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-600">{item.warehouse?.name ?? '—'}</td>
                       <td className={cn('px-4 py-3 text-right font-semibold', item.min_quantity != null && item.quantity < item.min_quantity ? 'text-red-600' : 'text-gray-900')}>
                         {item.quantity.toLocaleString('th-TH')}

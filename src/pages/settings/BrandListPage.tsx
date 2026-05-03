@@ -137,7 +137,7 @@ export function BrandListPage() {
 
       {/* Table Card */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 p-4">
+        <div className="border-b border-gray-100 p-5">
           <div className="relative w-full max-w-sm">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,7 +179,7 @@ export function BrandListPage() {
                 </tr>
               ) : (
                 filtered.map((brand) => (
-                  <tr key={brand.id} className="hover:bg-gray-50/50">
+                  <tr key={brand.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900">{brand.name}</td>
                     <td className="px-6 py-4 font-mono text-gray-600">{brand.code}</td>
                     <td className="px-6 py-4 text-center">

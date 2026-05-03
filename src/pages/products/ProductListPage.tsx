@@ -147,7 +147,7 @@ export function ProductListPage() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
             >
               <DownloadIcon />
-              {isExporting ? 'กำลัง Export...' : 'Export CSV'}
+              {isExporting ? 'กำลังส่งออก...' : 'ส่งออก CSV'}
             </button>
           )}
           {canCreate && (
@@ -233,9 +233,11 @@ export function ProductListPage() {
                     <td className="px-4 py-3 font-mono text-xs text-gray-600">{product.sku}</td>
                     <td className="px-4 py-3 font-medium text-gray-900">{product.name}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLOR[product.type]}`}>
-                        {TYPE_LABEL[product.type]}
-                      </span>
+                      {product.type && (
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLOR[product.type]}`}>
+                          {TYPE_LABEL[product.type]}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{product.brand?.name ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-600">{product.category?.name ?? '—'}</td>

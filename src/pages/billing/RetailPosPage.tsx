@@ -1,11 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 import { inventoryService } from '@/api/inventoryService'
 import { customerService } from '@/api/customerService'
 import { invoiceService } from '@/api/invoiceService'
+import { hrService } from '@/api/hrService'
 import { useAuthStore } from '@/stores/authStore'
 import type { InventoryItem } from '@/types/inventory'
+import type { Branch } from '@/types/hr'
 
 /* ─── POS Product (variant-level) ─── */
 interface Product {
@@ -74,6 +77,15 @@ export function RetailPosPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [lastReceiptNo, setLastReceiptNo] = useState<string | null>(null)
+  const [branchInfo, setBranchInfo] = useState<Branch | null>(null)
+
+  // Load full branch details for receipt header
+  useEffect(() => {
+    if (!employee?.branch_id) return
+    hrService.getBranch(employee.branch_id)
+      .then((r) => setBranchInfo(r.data.data ?? null))
+      .catch(() => {})
+  }, [employee?.branch_id])
 
   // Focus barcode input on mount
   useEffect(() => {
@@ -86,7 +98,7 @@ export function RetailPosPage() {
     setProductsLoading(true)
     const t = setTimeout(() => {
       inventoryService
-        .getInventory({ search: search || undefined, limit: 24 })
+        .getInventory({ search: search || undefined, limit: 24, branch_id: employee?.branch_id })
         .then((r) => {
           if (cancelled) return
           const list = (r.data.data ?? []).map(toPosProduct)
@@ -117,7 +129,7 @@ export function RetailPosPage() {
   // Handle barcode scan (match variant by barcode/SKU server-side)
   const handleBarcodeScan = async (value: string) => {
     try {
-      const res = await inventoryService.getInventory({ search: value, limit: 1 })
+      const res = await inventoryService.getInventory({ search: value, limit: 1, branch_id: employee?.branch_id })
       const first = (res.data.data ?? [])[0]
       if (first) addToCart(toPosProduct(first))
     } catch {
@@ -424,6 +436,7 @@ export function RetailPosPage() {
                         })
                         const rcpRes = await invoiceService.issueReceipt(invId)
                         setLastReceiptNo(rcpRes.data.data.receipt_no ?? null)
+                        toast.success('ชำระเงินสำเร็จ')
                         setTimeout(() => window.print(), 100)
                         setTimeout(() => {
                           setCart([])
@@ -463,9 +476,9 @@ export function RetailPosPage() {
       return (
         <div className="hidden print:block" style={{ fontFamily: 'monospace', fontSize: '12px', color: '#000', maxWidth: '280px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '8px', marginBottom: '8px' }}>
-            <p style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>สุดยอดมอเตอร์</p>
-            <p style={{ fontSize: '10px', margin: '2px 0' }}>88/8 ถ.อุดมสุข กรุงเทพฯ</p>
-            <p style={{ fontSize: '10px', margin: 0 }}>โทร: 02-123-4567</p>
+            <p style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>{branchInfo?.name ?? employee?.branch?.name ?? 'สุดยอดมอเตอร์'}</p>
+            {branchInfo?.address && <p style={{ fontSize: '10px', margin: '2px 0' }}>{branchInfo.address}</p>}
+            {branchInfo?.phone && <p style={{ fontSize: '10px', margin: 0 }}>โทร: {branchInfo.phone}</p>}
           </div>
           <p style={{ fontSize: '11px', margin: '0 0 4px' }}>เลขที่: {rcpNo}</p>
           <p style={{ fontSize: '11px', margin: '0 0 8px' }}>วันที่: {now}</p>

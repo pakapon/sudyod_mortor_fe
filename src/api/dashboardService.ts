@@ -1,29 +1,38 @@
 import { apiClient } from '@/api/client'
 import type { ApiResponse } from '@/types/api'
 import type {
-  DashboardSummary,
-  DashboardStats,
-  Notification,
+  DashboardStatsResponse,
+  DashboardChartsResponse,
+  DashboardActivity,
+  DashboardSoTrackingItem,
+  DashboardReceiptItem,
+  DashboardAtRiskCustomer,
 } from '@/types/dashboard'
 
 export const dashboardService = {
-  getSummary() {
-    return apiClient.get<ApiResponse<DashboardSummary>>('/dashboard/summary')
-  },
-
   getStats() {
-    return apiClient.get<ApiResponse<DashboardStats>>('/dashboard/stats')
+    return apiClient.get<ApiResponse<DashboardStatsResponse>>('/dashboard/stats')
   },
 
-  getNotifications() {
-    return apiClient.get<ApiResponse<Notification[]>>('/notifications')
+  getCharts(period: 'month' | 'year') {
+    return apiClient.get<ApiResponse<DashboardChartsResponse>>('/dashboard/charts', {
+      params: { period },
+    })
   },
 
-  markNotificationRead(id: number) {
-    return apiClient.patch<ApiResponse<null>>(`/notifications/${id}/read`)
+  getActivities() {
+    return apiClient.get<ApiResponse<DashboardActivity[]>>('/dashboard/activities')
   },
 
-  markAllNotificationsRead() {
-    return apiClient.patch<ApiResponse<null>>('/notifications/read-all')
+  getSoTracking() {
+    return apiClient.get<ApiResponse<DashboardSoTrackingItem[]>>('/dashboard/so-tracking')
+  },
+
+  getReceipts() {
+    return apiClient.get<ApiResponse<DashboardReceiptItem[]>>('/dashboard/receipts')
+  },
+
+  getAtRiskCustomers() {
+    return apiClient.get<ApiResponse<DashboardAtRiskCustomer[]>>('/dashboard/at-risk-customers')
   },
 }

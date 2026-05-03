@@ -103,8 +103,8 @@ export function EmployeeListPage() {
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 p-4 flex gap-4">
-          <div className="relative w-full max-w-sm">
+        <div className="border-b border-gray-100 p-3 sm:p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="relative w-full sm:max-w-sm">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <span className="text-gray-400"><SearchIcon /></span>
             </div>
@@ -119,7 +119,7 @@ export function EmployeeListPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-500">
+          <table className="w-full min-w-[920px] text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
                 <SortableHeader label="รหัสพนักงาน" sortKey="employee_code" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
@@ -145,13 +145,24 @@ export function EmployeeListPage() {
                 </tr>
               ) : (
                 filteredEmployees.map((emp) => (
-                  <tr key={emp.id} className="hover:bg-gray-50/50">
+                  <tr key={emp.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900">{emp.employee_code || '-'}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-sm font-semibold text-red-600">
-                          {emp.first_name ? emp.first_name[0] : '?'}
-                        </div>
+                        {emp.avatar_url ? (
+                          <img
+                            src={emp.avatar_url}
+                            alt={`${emp.first_name || ''} ${emp.last_name || ''}`.trim() || 'employee'}
+                            className="h-8 w-8 rounded-full border border-gray-200 object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none'
+                            }}
+                          />
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-sm font-semibold text-red-600">
+                            {emp.first_name ? emp.first_name[0] : '?'}
+                          </div>
+                        )}
                         <div>
                           <div className="font-medium text-gray-900">
                             {emp.first_name} {emp.last_name} {emp.nickname ? `(${emp.nickname})` : ''}
@@ -168,7 +179,7 @@ export function EmployeeListPage() {
                     <td className="px-6 py-4 text-center">
                       <span className={cn(
                         'inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium',
-                        emp.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'
+                        emp.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                       )}>
                         {emp.is_active ? 'ใช้งานปกติ' : 'ปิดการใช้งาน'}
                       </span>

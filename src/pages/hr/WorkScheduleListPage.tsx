@@ -86,9 +86,9 @@ export function WorkScheduleListPage() {
             ) : schedules.length === 0 ? (
               <tr><td colSpan={7} className="px-6 py-4 text-center">ไม่พบข้อมูล</td></tr>
             ) : (
-              sortRows(schedules, sortKey, sortDir).map(row => (
+                sortRows(schedules, sortKey, sortDir).map((row, index) => (
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 font-mono text-gray-500">#{row.id}</td>
+                  <td className="px-6 py-4 font-mono text-gray-500">{index + 1}</td>
                   <td className="px-6 py-4 font-medium text-gray-900">{row.name}</td>
                   <td className="px-6 py-4">
                     <span className={row.owner_type === 'position' ? 'text-blue-600 bg-blue-50 px-2 py-1 rounded text-xs' : 'text-purple-600 bg-purple-50 px-2 py-1 rounded text-xs'}>

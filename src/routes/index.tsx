@@ -43,7 +43,6 @@ import { CategoryListPage } from '@/pages/settings/CategoryListPage'
 import { UnitListPage } from '@/pages/settings/UnitListPage'
 import { VendorListPage } from '@/pages/settings/VendorListPage'
 import { VendorFormPage } from '@/pages/settings/VendorFormPage'
-import { ProductAttributeOptionsPage } from '@/pages/settings/ProductAttributeOptionsPage'
 import { VehicleInspectionListPage } from '@/pages/settings/VehicleInspectionListPage'
 import { VehicleInspectionFormPage } from '@/pages/settings/VehicleInspectionFormPage'
 
@@ -65,6 +64,7 @@ import { BillingHubPage } from '@/pages/billing/BillingHubPage'
 import { JobFlowPage } from '@/pages/billing/JobFlowPage'
 import { RetailPosPage } from '@/pages/billing/RetailPosPage'
 import { DocumentBrowserPage } from '@/pages/billing/DocumentBrowserPage'
+import { InvoiceDetailPage } from '@/pages/billing/InvoiceDetailPage'
 
 export const router = createBrowserRouter([
   {
@@ -258,17 +258,6 @@ export const router = createBrowserRouter([
         element: <PermissionGuard module="products" />,
         children: [
           {
-            element: <AppLayout title="ตัวเลือกแบบสินค้า" />,
-            children: [
-              { path: '/settings/product-attributes', element: <ProductAttributeOptionsPage /> },
-            ],
-          },
-        ],
-      },
-      {
-        element: <PermissionGuard module="products" />,
-        children: [
-          {
             element: <AppLayout title="สินค้า" />,
             children: [
               { path: '/products', element: <ProductListPage /> },
@@ -426,6 +415,7 @@ export const router = createBrowserRouter([
               { path: '/billing/new/sale', element: <JobFlowPage /> },
               { path: '/billing/pos', element: <RetailPosPage /> },
               { path: '/billing/documents', element: <DocumentBrowserPage /> },
+              { path: '/billing/invoices/:id', element: <InvoiceDetailPage /> },
             ],
           },
         ],

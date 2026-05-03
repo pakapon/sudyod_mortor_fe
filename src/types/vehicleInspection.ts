@@ -40,3 +40,12 @@ export interface VehicleInspectionListQuery {
   page?: number
   limit?: number
 }
+
+export const VEHICLE_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'รถยนต์นั่ง', label: 'รถยนต์นั่ง' },
+  { value: 'รถกระบะ', label: 'รถกระบะ' },
+  { value: 'รถตู้', label: 'รถตู้' },
+  { value: 'SUV', label: 'SUV' },
+  { value: 'PPV', label: 'PPV' },
+  { value: 'รถบรรทุก', label: 'รถบรรทุก' },
+]

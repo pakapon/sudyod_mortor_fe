@@ -2,6 +2,7 @@ import type { Employee as BaseEmployee } from './auth'
 
 export interface Employee extends Omit<BaseEmployee, 'status'> {
   nickname?: string
+  avatar_url?: string | null
   is_active: boolean
   status?: string
   role_ids?: number[]
@@ -33,6 +34,7 @@ export interface EmployeePayload {
   first_name: string
   last_name: string
   nickname?: string
+  avatar_url?: string
   email?: string
   phone?: string
   password?: string

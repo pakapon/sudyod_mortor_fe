@@ -12,6 +12,7 @@ import {
 import type { Employee } from '@/types/hr'
 import { useAuthStore } from '@/stores/authStore'
 import { hasPermission } from '@/lib/permissions'
+import { cn } from '@/lib/utils'
 import { AuditLogDetailDrawer } from './AuditLogDetailDrawer'
 
 const LIMIT = 20
@@ -231,7 +232,7 @@ export function AuditLogPage() {
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -252,7 +253,7 @@ export function AuditLogPage() {
       </div>
 
       {/* Sticky filters */}
-      <div className="sticky top-0 z-10 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="sticky top-0 z-10 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-end gap-3">
           {/* Date range */}
           <div className="flex flex-col">
@@ -453,7 +454,7 @@ export function AuditLogPage() {
                   return (
                     <tr
                       key={item.id}
-                      className="cursor-pointer hover:bg-blue-50 transition-colors"
+                      className="cursor-pointer hover:bg-gray-50 transition-colors"
                       onClick={() => setSelected(item)}
                     >
                       <td className="px-4 py-3 whitespace-nowrap" title={formatDateTime(item.created_at)}>
@@ -499,24 +500,62 @@ export function AuditLogPage() {
         </div>
 
         {!isLoading && totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
+          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
             <p className="text-sm text-gray-500">
-              แสดง {rowStart}–{rowEnd} จาก {total.toLocaleString('th-TH')} รายการ
+              {total > 0
+                ? `Showing ${rowStart.toLocaleString()}-${rowEnd.toLocaleString()} of ${total.toLocaleString()}`
+                : 'ไม่พบข้อมูล'}
             </p>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
               <button
+                type="button"
                 disabled={page <= 1}
                 onClick={() => setParam({ page: String(page - 1) })}
-                className="rounded-lg border border-gray-200 px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-40"
+                className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
               >
-                ก่อนหน้า
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
               </button>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                let p: number
+                if (totalPages <= 5) p = i + 1
+                else if (page <= 3) p = i + 1
+                else if (page >= totalPages - 2) p = totalPages - 4 + i
+                else p = page - 2 + i
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setParam({ page: String(p) })}
+                    className={cn(
+                      'min-w-[32px] rounded-lg border px-2.5 py-1 text-sm',
+                      p === page
+                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
+                    )}
+                  >
+                    {p}
+                  </button>
+                )
+              })}
+              {totalPages > 5 && page < totalPages - 2 && (
+                <>
+                  <span className="px-1 text-gray-400">...</span>
+                  <button
+                    type="button"
+                    onClick={() => setParam({ page: String(totalPages) })}
+                    className="min-w-[32px] rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-sm text-gray-600 transition-colors hover:bg-gray-50"
+                  >
+                    {totalPages}
+                  </button>
+                </>
+              )}
               <button
+                type="button"
                 disabled={page >= totalPages}
                 onClick={() => setParam({ page: String(page + 1) })}
-                className="rounded-lg border border-gray-200 px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-40"
+                className="rounded-lg border border-gray-200 bg-white p-1.5 text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
               >
-                ถัดไป
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
               </button>
             </div>
           </div>

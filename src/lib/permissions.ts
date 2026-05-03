@@ -94,6 +94,5 @@ export const ROUTE_PERMISSION_MAP: Record<string, ModuleKey> = {
   '/settings/vendors': 'vendors',
   '/settings/finance-companies': 'vendors',
   '/settings/vehicle-inspection-checklists': 'vehicle_inspection_checklists',
-  // /settings/product-attributes → ไม่ map ใน ROUTE_PERMISSION_MAP เพราะ parent 'settings' ดูแล permission แล้ว
 }
 

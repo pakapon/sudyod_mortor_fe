@@ -25,21 +25,11 @@ function EyeOffIcon({ className }: { className?: string }) {
   )
 }
 
-function CheckCircleIcon() {
-  return (
-    <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-      <circle cx="28" cy="28" r="28" fill="#ECFDF5" />
-      <circle cx="28" cy="28" r="20" fill="#D1FAE5" />
-      <path d="M20 28l5.5 5.5L36 22" stroke="#059669" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
 
 export function LoginPage() {
   const navigate = useNavigate()
   const { login, isLoading, error, clearError } = useAuthStore()
   const [showPassword, setShowPassword] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
 
   const {
     register,
@@ -53,15 +43,10 @@ export function LoginPage() {
     clearError()
     try {
       await login(values)
-      setShowSuccess(true)
+      navigate('/')
     } catch {
       // error is handled by store
     }
-  }
-
-  const handleSuccessConfirm = () => {
-    setShowSuccess(false)
-    navigate('/')
   }
 
   return (
@@ -86,12 +71,12 @@ export function LoginPage() {
             {/* Email / Phone */}
             <div>
               <label htmlFor="login-identifier" className="auth-label">
-                อีเมล
+                อีเมล หรือ เบอร์โทร
               </label>
               <input
                 id="login-identifier"
                 type="text"
-                placeholder="name@example.com"
+                placeholder="อีเมล หรือ เบอร์โทร"
                 autoComplete="email"
                 className={cn('auth-input', errors.identifier && 'error')}
                 {...register('identifier')}
@@ -166,25 +151,7 @@ export function LoginPage() {
         </p>
       </div>
 
-      {/* Success Modal */}
-      {showSuccess && (
-        <div className="modal-overlay" onClick={handleSuccessConfirm}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="flex flex-col items-center gap-4 text-center">
-              <CheckCircleIcon />
-              <p className="text-xl font-bold text-gray-900">
-                เข้าสู่ระบบสำเร็จ
-              </p>
-            </div>
-            <button
-              className="auth-btn mt-6"
-              onClick={handleSuccessConfirm}
-            >
-              ยืนยัน
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Success Modal removed — redirect happens directly in onSubmit */}
     </div>
   )
 }

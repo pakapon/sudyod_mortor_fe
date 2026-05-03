@@ -170,7 +170,7 @@ export function StoreLoanListPage() {
                   const cfg = STATUS_CONFIG[item.status]
                   return (
                     <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.loan_no}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.store_loan_no}</td>
                       <td className="px-4 py-3 text-gray-900 font-medium">{item.customer_name}</td>
                       <td className="px-4 py-3 text-right text-gray-900">{formatMoney(item.total_amount)} ฿</td>
                       <td className="px-4 py-3 text-center text-gray-600">{item.term_months}</td>

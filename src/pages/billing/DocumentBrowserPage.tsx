@@ -4,9 +4,13 @@ import { cn } from '@/lib/utils'
 import { serviceOrderService } from '@/api/serviceOrderService'
 import { quotationService } from '@/api/quotationService'
 import { invoiceService } from '@/api/invoiceService'
+import { depositService } from '@/api/depositService'
+import { warrantyService } from '@/api/warrantyService'
 import type { ServiceOrder } from '@/types/serviceOrder'
 import type { Quotation } from '@/types/quotation'
 import type { Invoice } from '@/types/invoice'
+import type { Deposit } from '@/types/deposit'
+import type { Warranty } from '@/types/warranty'
 
 /* ─── Document Type Config ─── */
 const DOC_TYPES = [
@@ -67,7 +71,7 @@ function soToDoc(so: ServiceOrder): DocItem {
 function qtToDoc(qt: Quotation): DocItem {
   const linkPath = qt.service_order_id
     ? `/billing/jobs/repair:${qt.service_order_id}`
-    : qt.type === 'sale' ? `/billing/jobs/sale:${qt.id}` : null
+    : `/quotations/${qt.id}`
   return {
     id: `QT-${qt.id}`,
     docNumber: qt.quotation_no,
@@ -83,7 +87,7 @@ function qtToDoc(qt: Quotation): DocItem {
 function invToDoc(inv: Invoice): DocItem {
   const linkPath = inv.service_order_id
     ? `/billing/jobs/repair:${inv.service_order_id}`
-    : inv.quotation_id ? `/billing/jobs/sale:${inv.quotation_id}` : null
+    : inv.quotation_id ? `/billing/jobs/sale:${inv.quotation_id}` : `/billing/invoices/${inv.id}`
   return {
     id: `INV-${inv.id}`,
     docNumber: inv.invoice_no,
@@ -92,6 +96,51 @@ function invToDoc(inv: Invoice): DocItem {
     amount: Number(inv.grand_total ?? 0) || null,
     status: INV_STATUS_TH[inv.status] ?? inv.status,
     date: (inv.created_at ?? '').slice(0, 10),
+    linkedJob: null,
+    linkPath,
+  }
+}
+function rcpToDoc(inv: Invoice): DocItem {
+  const linkPath = inv.service_order_id
+    ? `/billing/jobs/repair:${inv.service_order_id}`
+    : inv.quotation_id ? `/billing/jobs/sale:${inv.quotation_id}` : `/billing/invoices/${inv.id}`
+  return {
+    id: `RCP-${inv.id}`,
+    docNumber: inv.receipt?.receipt_no ?? `RCP-${inv.id}`,
+    type: 'RCP',
+    customerName: customerName(inv.customer),
+    amount: Number(inv.grand_total ?? 0) || null,
+    status: 'ออกแล้ว',
+    date: (inv.updated_at ?? inv.created_at ?? '').slice(0, 10),
+    linkedJob: null,
+    linkPath,
+  }
+}
+function dpToDoc(dp: Deposit): DocItem {
+  return {
+    id: `DP-${dp.id}`,
+    docNumber: dp.deposit_no,
+    type: 'DP',
+    customerName: '—',
+    amount: Number(dp.amount ?? 0) || null,
+    status: dp.status === 'collected' ? 'รับแล้ว' : 'คืนแล้ว',
+    date: (dp.created_at ?? '').slice(0, 10),
+    linkedJob: null,
+    linkPath: dp.quotation_id ? `/billing/jobs/sale:${dp.quotation_id}` : null,
+  }
+}
+function wrToDoc(wr: Warranty): DocItem {
+  const linkPath = wr.owner_type === 'service_order'
+    ? `/billing/jobs/repair:${wr.owner_id}`
+    : `/billing/jobs/sale:${wr.owner_id}`
+  return {
+    id: `WR-${wr.id}`,
+    docNumber: wr.warranty_no,
+    type: 'WR',
+    customerName: '—',
+    amount: null,
+    status: `${wr.warranty_months ?? '—'} เดือน`,
+    date: (wr.start_date ?? wr.created_at ?? '').slice(0, 10),
     linkedJob: null,
     linkPath,
   }
@@ -133,12 +182,20 @@ export function DocumentBrowserPage() {
         .then((r) => r.data.data ?? []).catch(() => []),
       invoiceService.getInvoices({ page: 1, limit: 50, date_from: dateFrom || undefined, date_to: dateTo || undefined })
         .then((r) => r.data.data ?? []).catch(() => []),
-    ]).then(([sos, qts, invs]) => {
+      depositService.getDeposits({ page: 1, limit: 50 })
+        .then((r) => r.data.data ?? []).catch(() => []),
+      warrantyService.getWarranties({ page: 1, limit: 50 })
+        .then((r) => r.data.data ?? []).catch(() => []),
+    ]).then(([sos, qts, invs, dps, wrs]) => {
       if (cancelled) return
+      const paidInvoices = invs.filter((i) => i.status === 'paid' && i.receipt?.receipt_no)
       const merged: DocItem[] = [
         ...sos.map(soToDoc),
         ...qts.map(qtToDoc),
         ...invs.map(invToDoc),
+        ...paidInvoices.map(rcpToDoc),
+        ...dps.map(dpToDoc),
+        ...wrs.map(wrToDoc),
       ].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
       setDocs(merged)
     }).finally(() => { if (!cancelled) setLoading(false) })

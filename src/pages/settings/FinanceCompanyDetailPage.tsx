@@ -399,7 +399,7 @@ export function FinanceCompanyDetailPage() {
       {/* ── Tab 2: เอกสาร ── */}
       {activeTab === 'documents' && (
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-100 p-4 flex items-center justify-between">
+          <div className="border-b border-gray-100 p-5 flex items-center justify-between">
             <p className="text-sm text-gray-500">เอกสารสัญญา, ตารางอัตราดอกเบี้ย, และเอกสารอื่นๆ</p>
             {hasPermission(permissions, 'finance_companies', 'can_edit') && (
               <button
@@ -436,7 +436,7 @@ export function FinanceCompanyDetailPage() {
                   </tr>
                 ) : (
                   documents.map((doc) => (
-                    <tr key={doc.id} className="hover:bg-gray-50/50">
+                    <tr key={doc.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <a
                           href={doc.file_url}

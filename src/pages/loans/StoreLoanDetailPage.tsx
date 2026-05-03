@@ -184,6 +184,7 @@ export function StoreLoanDetailPage() {
       })
       setPaymentForm({ amount: '', method: 'cash', reference_no: '', paid_at: '', note: '' })
       load()
+      loadPayments()
     } catch {
       //
     } finally {
@@ -266,7 +267,7 @@ export function StoreLoanDetailPage() {
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-gray-900">{loan.loan_no}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{loan.store_loan_no}</h1>
               <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium', statusCfg.className)}>
                 {statusCfg.label}
               </span>

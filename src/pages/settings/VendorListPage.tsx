@@ -86,7 +86,7 @@ export function VendorListPage() {
 
       {/* Table Card */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center">
           <div className="relative flex-1 max-w-sm">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,7 +139,7 @@ export function VendorListPage() {
                 </tr>
               ) : (
                 filtered.map((vendor) => (
-                  <tr key={vendor.id} className="hover:bg-gray-50/50">
+                  <tr key={vendor.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{vendor.name}</div>
                       {vendor.email && (

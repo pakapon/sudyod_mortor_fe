@@ -13,12 +13,12 @@ const ALL_MODULES = [
 ]
 
 const ACTIONS = [
-  { key: 'can_view', label: 'View' },
-  { key: 'can_create', label: 'Create' },
-  { key: 'can_edit', label: 'Edit' },
-  { key: 'can_delete', label: 'Delete' },
-  { key: 'can_approve', label: 'Approve' },
-  { key: 'can_export', label: 'Export' },
+  { key: 'can_view', label: 'ดู' },
+  { key: 'can_create', label: 'สร้าง' },
+  { key: 'can_edit', label: 'แก้ไข' },
+  { key: 'can_delete', label: 'ลบ' },
+  { key: 'can_approve', label: 'อนุมัติ' },
+  { key: 'can_export', label: 'ส่งออก' },
 ] as const
 
 const mockRoles: Role[] = [
@@ -156,7 +156,7 @@ export function PermissionMatrixPage() {
       <div className="flex flex-1 gap-6 overflow-hidden">
         {/* Left Sidebar: Roles List */}
         <div className="w-64 shrink-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-          <div className="p-4 border-b border-gray-100 bg-gray-50 font-medium text-gray-700">ลือกตำแหน่ง (Role)</div>
+          <div className="p-5 border-b border-gray-100 bg-gray-50 font-medium text-gray-700">เลือกตำแหน่ง (Role)</div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {isLoading ? (
               <div className="p-4 text-center text-sm text-gray-500">กำลังโหลด...</div>
@@ -181,7 +181,7 @@ export function PermissionMatrixPage() {
 
         {/* Right Section: PBAC Matrix Table */}
         <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col min-w-0 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-gray-50">
+          <div className="p-5 border-b border-gray-100 bg-gray-50">
             <h3 className="font-medium text-gray-800">
               สิทธิ์ของ: <span className="text-red-600 font-bold ml-1">{selectedRole?.name || '-'}</span>
             </h3>

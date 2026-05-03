@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { toast } from 'react-hot-toast'
 import { goodsReceiptService } from '@/api/goodsReceiptService'
 import type { GoodsReceipt, GoodsReceiptDocument, GoodsReceiptDocumentType, GoodsReceiptStatus } from '@/types/inventory'
 import { useAuthStore } from '@/stores/authStore'
@@ -139,6 +140,11 @@ export function GoodsReceiptDetailPage() {
   }, [id, navigate])
 
   const handleApprove = async () => {
+    const hasZeroQty = data?.items?.some((item) => (item.quantity_received ?? 0) <= 0)
+    if (hasZeroQty) {
+      toast.error('ไม่สามารถอนุมัติได้: มีรายการที่ยังไม่ระบุจำนวนรับจริง')
+      return
+    }
     setIsApproving(true)
     try {
       await goodsReceiptService.approveGoodsReceipt(Number(id))
@@ -219,7 +225,7 @@ export function GoodsReceiptDetailPage() {
   const statusCfg = STATUS_CONFIG[data.status] ?? FALLBACK_STATUS
   const isDraft = data.status === 'draft'
   const totalAmount = (data.items ?? []).reduce(
-    (sum, it) => sum + (Number(it.quantity_received ?? it.quantity_ordered ?? it.qty) || 0) * (Number(it.unit_cost ?? it.cost_price) || 0),
+    (sum, it) => sum + (Number(it.quantity_received || it.quantity_ordered || it.qty) || 0) * (Number(it.unit_cost ?? it.cost_price) || 0),
     0,
   )
 
@@ -347,7 +353,7 @@ export function GoodsReceiptDetailPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {data.items.map((it) => {
-                  const quantity = Number(it.quantity_received ?? it.quantity_ordered ?? it.qty) || 0
+                  const quantity = Number(it.quantity_received || it.quantity_ordered || it.qty) || 0
                   const unitCost = Number(it.unit_cost ?? it.cost_price) || 0
                   const sub = quantity * unitCost
                   const variantText = formatVariantText(it.variant?.color, it.variant?.year)
@@ -355,7 +361,7 @@ export function GoodsReceiptDetailPage() {
                     <tr key={it.id}>
                       <td className="px-4 py-2 font-mono text-xs text-gray-600">{it.variant?.sku ?? it.product?.sku ?? '—'}</td>
                       <td className="px-4 py-2 text-gray-900">
-                        {it.product?.name ?? it.variant?.name ?? (it.product_variant_id ? `#${it.product_variant_id}` : '—')}
+                        {it.variant?.product?.name ?? it.product?.name ?? it.variant?.name ?? (it.product_variant_id ? `#${it.product_variant_id}` : '—')}
                         {variantText && <span className="ml-1 text-xs text-gray-500">({variantText})</span>}
                       </td>
                       <td className="px-4 py-2 text-right text-gray-900">

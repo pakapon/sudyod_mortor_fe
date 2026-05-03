@@ -115,7 +115,7 @@ export function NotificationsPage() {
   const rowEnd = Math.min(page * LIMIT, total)
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -134,7 +134,7 @@ export function NotificationsPage() {
       </div>
 
       {/* Filters */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={readFilter}
@@ -201,7 +201,7 @@ export function NotificationsPage() {
                     <tr
                       key={item.id}
                       onClick={() => handleRowClick(item)}
-                      className={`cursor-pointer transition-colors hover:bg-blue-50 ${
+                      className={`cursor-pointer transition-colors hover:bg-gray-50 ${
                         isUnread ? 'bg-blue-50/30' : ''
                       }`}
                     >
@@ -274,8 +274,8 @@ export function NotificationsPage() {
                     onClick={() => setParam('page', String(p))}
                     className={`min-w-[32px] rounded-lg border px-2.5 py-1 text-sm ${
                       p === page
-                        ? 'border-blue-500 bg-blue-500 text-white'
-                        : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     {p}

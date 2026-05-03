@@ -9,10 +9,15 @@ export function FinanceCompanyFormPage() {
   const navigate = useNavigate()
   const isEditing = Boolean(id)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState('')
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FinanceCompanyPayload>({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FinanceCompanyPayload>({
     defaultValues: { name: '', logo_url: '', contact_person: '', phone: '', email: '', address: '', commission_rate: '', note: '', is_active: true },
   })
+
+  const watchedLogoUrl = watch('logo_url')
+  const displayLogoUrl = logoPreviewUrl || watchedLogoUrl || ''
 
   useEffect(() => {
     if (isEditing) {
@@ -29,18 +34,35 @@ export function FinanceCompanyFormPage() {
             note: data.data.note || '',
             is_active: data.data.is_active,
           })
+          setLogoPreviewUrl(data.data.logo_url || '')
         })
         .catch(() => navigate('/settings/finance-companies'))
     }
   }, [isEditing, id, reset, navigate])
 
+  useEffect(() => {
+    return () => {
+      if (logoPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(logoPreviewUrl)
+      }
+    }
+  }, [logoPreviewUrl])
+
   const onSubmit = async (payload: FinanceCompanyPayload) => {
     setIsSubmitting(true)
     try {
       if (isEditing) {
-        await hrService.updateFinanceCompany(Number(id), payload)
+        const targetId = Number(id)
+        await hrService.updateFinanceCompany(targetId, payload)
+        if (logoFile) {
+          await hrService.uploadFinanceCompanyLogo(targetId, logoFile)
+        }
       } else {
-        await hrService.createFinanceCompany(payload)
+        const created = await hrService.createFinanceCompany(payload)
+        const createdId = created.data.data.id
+        if (logoFile && createdId) {
+          await hrService.uploadFinanceCompanyLogo(createdId, logoFile)
+        }
       }
       navigate('/settings/finance-companies')
     } catch {
@@ -75,13 +97,57 @@ export function FinanceCompanyFormPage() {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">URL โลโก้</label>
-          <input
-            {...register('logo_url')}
-            className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
-            placeholder="https://spaces.example.com/finance-companies/logos/..."
-          />
-          <p className="mt-1 text-xs text-gray-500">วาง URL ของรูปโลโก้ที่อัปโหลดไว้บน DO Spaces (ถ้ามี)</p>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">โลโก้บริษัท</label>
+          <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+              <div className="h-[120px] w-[120px] overflow-hidden rounded-lg border border-gray-200 bg-white">
+                {displayLogoUrl ? (
+                  <img
+                    src={displayLogoUrl}
+                    alt="ตัวอย่างโลโก้"
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                    ยังไม่มีโลโก้
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">วางลิงก์รูป</p>
+                  <input
+                    {...register('logo_url')}
+                    className="block w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+                    placeholder="https://spaces.example.com/finance-companies/logos/..."
+                  />
+                </div>
+
+                <div className="border-t border-dashed border-gray-300 pt-3">
+                  <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">หรืออัปโหลดไฟล์</p>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null
+                      setLogoFile(file)
+                      if (file) {
+                        if (logoPreviewUrl.startsWith('blob:')) {
+                          URL.revokeObjectURL(logoPreviewUrl)
+                        }
+                        setLogoPreviewUrl(URL.createObjectURL(file))
+                      }
+                    }}
+                    className="block w-full rounded-lg border border-gray-300 bg-white p-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-red-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-red-700 hover:file:bg-red-100"
+                  />
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    {logoFile ? `ไฟล์ที่เลือก: ${logoFile.name}` : 'รองรับ JPG, PNG, WebP, GIF'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div>

@@ -88,7 +88,7 @@ export function HolidayListPage() {
         {hasPermission(permissions, 'holidays', 'can_create') && (
           <Link
             to="/hr/holidays/create"
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors sm:w-auto"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -100,11 +100,11 @@ export function HolidayListPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         {/* Filters */}
-        <div className="border-b border-gray-100 p-4 flex flex-wrap gap-4">
+        <div className="border-b border-gray-100 p-3 sm:p-4 flex flex-wrap gap-3 sm:gap-4">
           <select
             value={filterYear}
             onChange={(e) => setFilterYear(Number(e.target.value))}
-            className="rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+            className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500 sm:w-auto"
           >
             {yearOptions.map((y) => (
               <option key={y} value={y}>ปี {y + 543}</option>
@@ -114,7 +114,7 @@ export function HolidayListPage() {
           <select
             value={filterBranch}
             onChange={(e) => setFilterBranch(e.target.value)}
-            className="rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
+            className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500 sm:w-auto"
           >
             <option value="">ทุกสาขา</option>
             {branches.map((b) => (
@@ -125,7 +125,7 @@ export function HolidayListPage() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-500">
+          <table className="w-full min-w-[760px] text-left text-sm text-gray-500">
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
                 <SortableHeader label="วันที่" sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
@@ -149,12 +149,12 @@ export function HolidayListPage() {
                 </tr>
               ) : (
                 sortedHolidays.map((h) => (
-                  <tr key={h.id} className="hover:bg-gray-50/50">
+                  <tr key={h.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900">{formatDate(h.date)}</td>
                     <td className="px-6 py-4 text-gray-900">{h.name}</td>
                     <td className="px-6 py-4">
                       <span className={h.branch_id === null
-                        ? 'inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800'
+                        ? 'inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700'
                         : 'inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700'
                       }>
                         {getBranchLabel(h.branch_id)}

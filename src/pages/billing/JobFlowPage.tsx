@@ -6,7 +6,11 @@ import { hasPermission } from '@/lib/permissions'
 import { serviceOrderService } from '@/api/serviceOrderService'
 import { quotationService } from '@/api/quotationService'
 import { invoiceService } from '@/api/invoiceService'
+import { depositService } from '@/api/depositService'
 import { toast } from 'react-hot-toast'
+import {
+  Car, Search, FileText, CheckCircle, Receipt, Wrench, CreditCard, Flag, Package, BadgeDollarSign, Check, Printer, ShoppingCart, ArrowLeft, ArrowRight, PenTool
+} from 'lucide-react'
 import type { ServiceOrder } from '@/types/serviceOrder'
 import type { Quotation } from '@/types/quotation'
 import type { Invoice } from '@/types/invoice'
@@ -17,7 +21,7 @@ export interface JobData {
   sourceId: number | null
   serviceOrder?: ServiceOrder | null
   quotation?: Quotation | null
-  invoice?: { id: number; invoice_no?: string } | null
+  invoice?: { id: number; invoice_no?: string; status?: string } | null
   jobNumber: string
   flowLabel: string
   customerName: string
@@ -40,33 +44,33 @@ export interface FlowStep {
   label: string
   role: string
   permission: { module: string; action: string }
-  icon: string
+  icon: React.ReactNode
   description: string
 }
 
 export const FLOW_STEPS: Record<string, FlowStep[]> = {
   repair: [
-    { id: 'receive',    label: 'รับรถ',        role: 'หน้าร้าน / เซล / ช่าง', permission: { module: 'service_orders', action: 'can_create' }, icon: '🚗', description: 'กรอกข้อมูลลูกค้า + รถ + อาการ' },
-    { id: 'assess',     label: 'ประเมิน',      role: 'ช่าง',                  permission: { module: 'service_orders', action: 'can_edit' },   icon: '🔍', description: 'ถ่ายรูปจุดเสีย + ลิสต์รายการ' },
-    { id: 'quote',      label: 'เสนอราคา',     role: 'หน้าร้าน / บัญชี',      permission: { module: 'quotations', action: 'can_create' },     icon: '📋', description: 'สร้างใบเสนอราคา' },
-    { id: 'approve',    label: 'อนุมัติ',      role: 'หน้าร้าน',              permission: { module: 'quotations', action: 'can_approve' },    icon: '✅', description: 'ลูกค้าดู ปรับ → OK' },
-    { id: 'invoice',    label: 'ออกบิล',       role: 'บัญชี',                 permission: { module: 'invoices', action: 'can_create' },       icon: '🧾', description: 'สร้างใบแจ้งหนี้' },
-    { id: 'repair_wk',  label: 'ซ่อม',         role: 'ช่าง',                  permission: { module: 'service_orders', action: 'can_edit' },   icon: '🔧', description: 'มอบหมาย → ซ่อม → เสร็จ' },
-    { id: 'payment',    label: 'จ่ายเงิน',     role: 'บัญชี / หน้าร้าน',      permission: { module: 'invoices', action: 'can_edit' },        icon: '💳', description: 'ลูกค้าจ่าย → ออกใบเสร็จ' },
-    { id: 'deliver',    label: 'ส่งรถ',        role: 'ช่าง',                  permission: { module: 'invoices', action: 'can_create' },       icon: '🏁', description: 'DN + เซ็น + WR + ปิดงาน' },
+    { id: 'receive',    label: 'รับรถ',        role: 'หน้าร้าน / เซล / ช่าง', permission: { module: 'service_orders', action: 'can_create' }, icon: <Car className="w-5 h-5" />, description: 'กรอกข้อมูลลูกค้า + รถ + อาการ' },
+    { id: 'assess',     label: 'ประเมิน',      role: 'ช่าง',                  permission: { module: 'service_orders', action: 'can_edit' },   icon: <Search className="w-5 h-5" />, description: 'ถ่ายรูปจุดเสีย + ลิสต์รายการ' },
+    { id: 'quote',      label: 'เสนอราคา',     role: 'หน้าร้าน / บัญชี',      permission: { module: 'quotations', action: 'can_create' },     icon: <FileText className="w-5 h-5" />, description: 'สร้างใบเสนอราคา' },
+    { id: 'approve',    label: 'อนุมัติ',      role: 'หน้าร้าน',              permission: { module: 'quotations', action: 'can_approve' },    icon: <CheckCircle className="w-5 h-5" />, description: 'ลูกค้าดู ปรับ → OK' },
+    { id: 'invoice',    label: 'ออกบิล',       role: 'บัญชี',                 permission: { module: 'invoices', action: 'can_create' },       icon: <Receipt className="w-5 h-5" />, description: 'สร้างใบแจ้งหนี้' },
+    { id: 'repair_wk',  label: 'ซ่อม',         role: 'ช่าง',                  permission: { module: 'service_orders', action: 'can_edit' },   icon: <Wrench className="w-5 h-5" />, description: 'มอบหมาย → ซ่อม → เสร็จ' },
+    { id: 'payment',    label: 'จ่ายเงิน',     role: 'บัญชี / หน้าร้าน',      permission: { module: 'invoices', action: 'can_edit' },        icon: <CreditCard className="w-5 h-5" />, description: 'ลูกค้าจ่าย → ออกใบเสร็จ' },
+    { id: 'deliver',    label: 'ส่งรถ',        role: 'ช่าง',                  permission: { module: 'invoices', action: 'can_create' },       icon: <Flag className="w-5 h-5" />, description: 'DN + เซ็น + WR + ปิดงาน' },
   ],
   sale_no_deposit: [
-    { id: 'quote',     label: 'เสนอราคา',     role: 'หน้าร้าน / เซล', permission: { module: 'quotations', action: 'can_create' },  icon: '📋', description: 'เลือกลูกค้า + สินค้า' },
-    { id: 'approve',   label: 'อนุมัติ',      role: 'หน้าร้าน',       permission: { module: 'quotations', action: 'can_approve' }, icon: '✅', description: 'ลูกค้า OK' },
-    { id: 'payment',   label: 'ชำระเงิน',     role: 'บัญชี',          permission: { module: 'invoices', action: 'can_create' },    icon: '💳', description: 'INV + ชำระ + RCP' },
-    { id: 'deliver',   label: 'ส่งมอบ',       role: 'หน้าร้าน',       permission: { module: 'invoices', action: 'can_create' },    icon: '📦', description: 'DN + WR (optional)' },
+    { id: 'quote',     label: 'เสนอราคา',     role: 'หน้าร้าน / เซล', permission: { module: 'quotations', action: 'can_create' },  icon: <FileText className="w-5 h-5" />, description: 'เลือกลูกค้า + สินค้า' },
+    { id: 'approve',   label: 'อนุมัติ',      role: 'หน้าร้าน',       permission: { module: 'quotations', action: 'can_approve' }, icon: <CheckCircle className="w-5 h-5" />, description: 'ลูกค้า OK' },
+    { id: 'payment',   label: 'ชำระเงิน',     role: 'บัญชี',          permission: { module: 'invoices', action: 'can_create' },    icon: <CreditCard className="w-5 h-5" />, description: 'INV + ชำระ + RCP' },
+    { id: 'deliver',   label: 'ส่งมอบ',       role: 'หน้าร้าน',       permission: { module: 'invoices', action: 'can_create' },    icon: <Package className="w-5 h-5" />, description: 'DN + WR (optional)' },
   ],
   sale_deposit: [
-    { id: 'quote',     label: 'เสนอราคา',     role: 'หน้าร้าน / เซล', permission: { module: 'quotations', action: 'can_create' },  icon: '📋', description: 'QT ระบุสินค้า + ราคามัดจำ' },
-    { id: 'deposit',   label: 'รับมัดจำ',     role: 'บัญชี',          permission: { module: 'invoices', action: 'can_create' },    icon: '💰', description: 'DP + ใบเสร็จมัดจำ' },
-    { id: 'invoice',   label: 'ออกบิล',       role: 'บัญชี',          permission: { module: 'invoices', action: 'can_create' },    icon: '🧾', description: 'INV หักมัดจำ + RCP' },
-    { id: 'payment',   label: 'ชำระ',         role: 'บัญชี',          permission: { module: 'invoices', action: 'can_edit' },      icon: '💳', description: 'จ่ายส่วนที่เหลือ + ใบเสร็จ' },
-    { id: 'deliver',   label: 'ส่งมอบ',       role: 'หน้าร้าน',       permission: { module: 'invoices', action: 'can_create' },    icon: '📦', description: 'DN + ถ่ายรูป + WR + ปิดงาน' },
+    { id: 'quote',     label: 'เสนอราคา',     role: 'หน้าร้าน / เซล', permission: { module: 'quotations', action: 'can_create' },  icon: <FileText className="w-5 h-5" />, description: 'QT ระบุสินค้า + ราคามัดจำ' },
+    { id: 'deposit',   label: 'รับมัดจำ',     role: 'บัญชี',          permission: { module: 'invoices', action: 'can_create' },    icon: <BadgeDollarSign className="w-5 h-5" />, description: 'DP + ใบเสร็จมัดจำ' },
+    { id: 'invoice',   label: 'ออกบิล',       role: 'บัญชี',          permission: { module: 'invoices', action: 'can_create' },    icon: <Receipt className="w-5 h-5" />, description: 'INV หักมัดจำ + RCP' },
+    { id: 'payment',   label: 'ชำระ',         role: 'บัญชี',          permission: { module: 'invoices', action: 'can_edit' },      icon: <CreditCard className="w-5 h-5" />, description: 'จ่ายส่วนที่เหลือ + ใบเสร็จ' },
+    { id: 'deliver',   label: 'ส่งมอบ',       role: 'หน้าร้าน',       permission: { module: 'invoices', action: 'can_create' },    icon: <Package className="w-5 h-5" />, description: 'DN + ถ่ายรูป + WR + ปิดงาน' },
   ],
 }
 
@@ -78,8 +82,6 @@ interface FlowStepperProps {
 }
 
 export function FlowStepper({ steps, currentStep, onStepClick }: FlowStepperProps) {
-  const { permissions } = useAuthStore()
-
   return (
     <div className="relative">
       {/* Desktop Stepper */}
@@ -88,43 +90,47 @@ export function FlowStepper({ steps, currentStep, onStepClick }: FlowStepperProp
           const isCompleted = i < currentStep
           const isCurrent = i === currentStep
           const isFuture = i > currentStep
-          const canPerform = hasPermission(permissions, step.permission.module, step.permission.action as any)
 
           return (
-            <div key={step.id} className="flex flex-1 items-start">
+            <div key={step.id} className="flex flex-1 items-start group">
               {/* Step Node */}
               <div className="flex flex-col items-center w-full">
-                <button
-                  onClick={() => onStepClick?.(i)}
-                  disabled={isFuture}
-                  className={cn(
-                    'relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition-all duration-300',
-                    isCompleted && 'border-green-500 bg-green-500 text-white shadow-md shadow-green-200',
-                    isCurrent && 'border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-200 ring-4 ring-blue-100 scale-110',
-                    isFuture && 'border-gray-200 bg-gray-50 text-gray-400',
-                    !isFuture && 'cursor-pointer hover:scale-105',
+                <div className="relative">
+                  {/* Glowing effect for current step */}
+                  {isCurrent && (
+                    <div className="absolute inset-0 rounded-full bg-blue-400/30 blur-xl animate-pulse" />
                   )}
-                >
-                  {isCompleted ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  ) : (
-                    <span>{step.icon}</span>
-                  )}
-                </button>
+                  <button
+                    onClick={() => onStepClick?.(i)}
+                    disabled={isFuture}
+                    className={cn(
+                      'relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl text-sm font-semibold transition-all duration-500',
+                      isCompleted && 'bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-indigo-400',
+                      isCurrent && 'bg-gradient-to-br from-blue-500 to-sky-500 text-white shadow-xl shadow-blue-500/40 ring-4 ring-blue-500/20 scale-110',
+                      isFuture && 'bg-gray-50/80 border border-gray-200 text-gray-400 backdrop-blur-sm',
+                      !isFuture && 'cursor-pointer hover:scale-105 hover:shadow-lg',
+                    )}
+                  >
+                    {isCompleted ? (
+                      <Check className="w-6 h-6 animate-in zoom-in" />
+                    ) : (
+                      <span className={cn('transition-transform duration-300', isCurrent && 'scale-110')}>{step.icon}</span>
+                    )}
+                  </button>
+                </div>
 
                 {/* Label */}
-                <div className="mt-2 text-center">
+                <div className="mt-4 text-center">
                   <div className={cn(
-                    'text-xs font-medium',
-                    isCurrent ? 'text-blue-700' : isCompleted ? 'text-green-700' : 'text-gray-400',
+                    'text-[13px] font-semibold transition-colors duration-300',
+                    isCurrent ? 'text-blue-700' : isCompleted ? 'text-indigo-800' : 'text-gray-400',
                   )}>
                     {step.label}
                   </div>
                   {isCurrent && (
-                    <div className="mt-0.5 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
-                      ตา: {step.role}
+                    <div className="mt-1.5 inline-flex items-center rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 px-2.5 py-0.5 text-[10px] font-medium text-blue-700 border border-blue-100/50 shadow-sm animate-in slide-in-from-bottom-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 animate-pulse" />
+                      {step.role}
                     </div>
                   )}
                 </div>
@@ -132,45 +138,45 @@ export function FlowStepper({ steps, currentStep, onStepClick }: FlowStepperProp
 
               {/* Connector Line */}
               {i < steps.length - 1 && (
-                <div className={cn(
-                  'mt-5 h-0.5 flex-1 -mx-1 transition-colors duration-500',
-                  i < currentStep ? 'bg-green-400' : 'bg-gray-200',
-                )} />
+                <div className="relative mt-7 h-1 flex-1 -mx-4 rounded-full bg-gray-100 overflow-hidden">
+                  <div className={cn(
+                    'absolute inset-y-0 left-0 transition-all duration-700 ease-out rounded-full',
+                    i < currentStep ? 'w-full bg-gradient-to-r from-indigo-500 to-blue-500' : 'w-0'
+                  )} />
+                </div>
               )}
             </div>
           )
         })}
       </div>
 
-      {/* Mobile Stepper (vertical) */}
-      <div className="lg:hidden space-y-1">
-        {steps.map((step, i) => {
-          const isCompleted = i < currentStep
-          const isCurrent = i === currentStep
-          return (
-            <div key={step.id} className="flex items-center gap-3">
-              <div className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs',
-                isCompleted && 'bg-green-500 text-white',
-                isCurrent && 'bg-blue-500 text-white ring-2 ring-blue-200',
-                !isCompleted && !isCurrent && 'bg-gray-100 text-gray-400',
-              )}>
-                {isCompleted ? '✓' : step.icon}
-              </div>
-              <div className="flex-1">
-                <span className={cn(
-                  'text-sm font-medium',
-                  isCurrent ? 'text-blue-700' : isCompleted ? 'text-green-700' : 'text-gray-400',
-                )}>
-                  {step.label}
-                </span>
-                {isCurrent && (
-                  <span className="ml-2 text-[10px] text-blue-600">← ตา: {step.role}</span>
-                )}
-              </div>
+      {/* Mobile Stepper (vertical - Current Step Only) */}
+      <div className="lg:hidden">
+        <div className="flex items-center gap-4 relative">
+          <div className="relative z-10">
+            <div className="absolute inset-0 rounded-full bg-blue-400/30 blur-md animate-pulse" />
+            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xs transition-all duration-300 bg-gradient-to-br from-blue-500 to-sky-500 text-white shadow-lg shadow-blue-500/30 ring-4 ring-blue-500/20">
+              {steps[currentStep].icon}
             </div>
-          )
-        })}
+          </div>
+          <div className="flex-1 bg-white p-4 rounded-xl border border-blue-100 shadow-sm">
+            <div className="flex justify-between items-start">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold text-blue-500 mb-1 uppercase tracking-wider">
+                  ขั้นตอนที่ {currentStep + 1} / {steps.length}
+                </span>
+                <span className="text-base text-blue-700 font-bold">
+                  {steps[currentStep].label}
+                </span>
+              </div>
+              <span className="inline-flex items-center rounded-full bg-blue-50 border border-blue-100 px-2 py-1 text-[10px] text-blue-700 font-medium shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 animate-pulse" />
+                {steps[currentStep].role}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1.5">{steps[currentStep].description}</p>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -199,30 +205,48 @@ function StepContent({ step, flowType, jobData, onComplete }: { step: FlowStep; 
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">{step.icon}</span>
+    <div className="relative rounded-3xl border border-gray-200/50 bg-white/70 backdrop-blur-xl p-6 sm:p-10 shadow-[0_8px_40px_rgb(0,0,0,0.04)] overflow-hidden">
+      {/* Decorative gradient blur */}
+      <div className="absolute top-0 right-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-blue-500/5 blur-3xl" />
+      <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-indigo-500/5 blur-3xl" />
+      
+      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between mb-10 pb-6 border-b border-gray-100/80 gap-4">
+        <div className="flex items-center gap-5">
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl text-blue-600 border border-blue-100/50 shadow-sm ring-1 ring-white/50">
+            {step.icon}
+          </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">{step.label}</h3>
-            <p className="text-sm text-gray-500">{step.description}</p>
+            <h3 className="text-2xl font-bold bg-gradient-to-br from-gray-900 to-gray-600 bg-clip-text text-transparent tracking-tight">{step.label}</h3>
+            <p className="text-sm text-gray-500 mt-1 font-medium">{step.description}</p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-          ตา: {step.role}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">ผู้รับผิดชอบ</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/50 px-3.5 py-1.5 text-xs font-semibold text-blue-700 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            {step.role}
+          </span>
+        </div>
       </div>
 
-      {!canPerform ? (
-        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-center">
-          <p className="text-sm text-amber-700">
-            🔒 ขั้นตอนนี้ต้องรอ <strong>{step.role}</strong> ดำเนินการ
-          </p>
-          <p className="mt-1 text-xs text-amber-600">คุณไม่มีสิทธิ์ทำขั้นตอนนี้</p>
-        </div>
-      ) : (
-        STEP_FORMS[step.id] || <p className="text-sm text-gray-400 text-center py-8">ไม่พบฟอร์ม</p>
-      )}
+      <div className="relative z-10">
+        {!canPerform ? (
+          <div className="rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/50 p-8 text-center shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-amber-400" />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-100/50 text-amber-600 mb-3">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <p className="text-base font-semibold text-amber-800">
+              รอ <strong>{step.role}</strong> ดำเนินการ
+            </p>
+            <p className="mt-1.5 text-sm text-amber-600/80">คุณไม่มีสิทธิ์ในการจัดการขั้นตอนนี้</p>
+          </div>
+        ) : (
+          STEP_FORMS[step.id] || <p className="text-sm text-gray-400 text-center py-8">ไม่พบฟอร์ม</p>
+        )}
+      </div>
     </div>
   )
 }
@@ -233,16 +257,6 @@ const formatDate = (s?: string | null) =>
 
 const formatCurrency = (n?: number | null) =>
   n != null ? n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'
-
-function PrintIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="6 9 6 2 18 2 18 9" />
-      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-      <rect x="6" y="14" width="12" height="8" />
-    </svg>
-  )
-}
 
 /* ─── Document type config for print ─── */
 const STEP_DOC_CONFIG: Record<string, { title: string; noPrefix: string; noField: string }> = {
@@ -272,7 +286,7 @@ function buildJobData(so: ServiceOrder | null, qt: Quotation | null, sourceType:
   const branch = so?.branch || qt?.branch
   const items = (qt?.items ?? so?.items ?? []).map((it, i) => ({
     id: ('id' in it ? it.id : i) as number,
-    name: ('product_name' in it ? it.product_name : it.custom_name ?? it.product?.name) ?? '',
+    name: ('product_name' in it ? it.product_name : (it as any).custom_name ?? (it as any).product?.name) ?? '',
     qty: ('quantity' in it ? it.quantity : 1),
     unit_price: ('unit_price' in it ? it.unit_price : 0),
     discount: ('discount' in it ? (it.discount ?? 0) : 0),
@@ -282,7 +296,7 @@ function buildJobData(so: ServiceOrder | null, qt: Quotation | null, sourceType:
   return {
     sourceType, sourceId,
     serviceOrder: so, quotation: qt,
-    invoice: invoice ? { id: invoice.id, invoice_no: invoice.invoice_no } : null,
+    invoice: invoice ? { id: invoice.id, invoice_no: invoice.invoice_no, status: invoice.status } : null,
     jobNumber: so?.so_number ?? qt?.quotation_no ?? '',
     flowLabel: sourceType === 'repair' ? 'ซ่อมรถ' : 'ขายสินค้า',
     customerName: cName || 'ลูกค้า',
@@ -290,7 +304,7 @@ function buildJobData(so: ServiceOrder | null, qt: Quotation | null, sourceType:
     customerAddress: (customer as any)?.address ?? '',
     description: so ? `${so.vehicle?.brand ?? ''} ${so.vehicle?.model ?? ''} ${so.vehicle?.plate_number ?? ''} / ${so.symptom}`.trim() : (qt?.note ?? ''),
     createdAt: so?.created_at ?? qt?.created_at ?? new Date().toISOString(),
-    branch: { name: branch?.name ?? '', address: branch?.address ?? '', phone: branch?.phone ?? '', tax_id: branch?.tax_id ?? '' },
+    branch: { name: branch?.name ?? '', address: (branch as any)?.address ?? '', phone: (branch as any)?.phone ?? '', tax_id: (branch as any)?.tax_id ?? '' },
     items,
     subtotal: qt?.subtotal ?? items.reduce((s, i) => s + i.subtotal, 0),
     vat_percent: qt?.vat_percent ?? 7,
@@ -319,9 +333,10 @@ export function JobFlowPage() {
   const [loading, setLoading] = useState(!isCreateMode)
   const [error, setError] = useState<string | null>(null)
   const [currentStep, setCurrentStep] = useState(0)
+  const [flowType, setFlowType] = useState<string>(sourceType === 'repair' ? 'repair' : 'sale_no_deposit')
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   // Determine flow type for stepper
-  const flowType = sourceType === 'repair' ? 'repair' : 'sale_no_deposit'
   const steps = FLOW_STEPS[flowType] ?? FLOW_STEPS.repair
 
   // Fetch real data
@@ -331,6 +346,7 @@ export function JobFlowPage() {
       setCurrentStep(0)
       return
     }
+    if (id && !id.includes(':')) { setError('URL ไม่ถูกต้อง: กรุณาระบุประเภทงาน เช่น repair:23 หรือ sale:23'); setLoading(false); return }
     if (!sourceId) { setError('ไม่พบรหัสงาน'); setLoading(false); return }
 
     const fetchData = async () => {
@@ -362,6 +378,13 @@ export function JobFlowPage() {
             const { data: invRes } = await invoiceService.getInvoices({ customer_id: qt.customer_id, limit: 50 })
             inv = invRes.data?.find((i) => i.quotation_id === qt.id) ?? null
           } catch { /* no invoice yet */ }
+          // detect if deposit exists to determine sale_deposit vs sale_no_deposit flow
+          let hasDeposit = false
+          try {
+            const { data: dpRes } = await depositService.getDeposits({ quotation_id: qt.id, limit: 1 })
+            hasDeposit = (dpRes.data?.length ?? 0) > 0
+          } catch { /* no deposits */ }
+          setFlowType(hasDeposit ? 'sale_deposit' : 'sale_no_deposit')
           setJobData(buildJobData(null, qt, 'sale', sourceId, inv))
           setCurrentStep(QT_STATUS_STEP_SALE[qt.status] ?? 0)
         }
@@ -373,7 +396,7 @@ export function JobFlowPage() {
       }
     }
     fetchData()
-  }, [sourceType, sourceId, isCreateMode])
+  }, [sourceType, sourceId, isCreateMode, refreshTrigger])
 
   // Refresh data after step completion
   const handleStepComplete = (meta?: { newId?: number; invoiceId?: number }) => {
@@ -383,6 +406,9 @@ export function JobFlowPage() {
     }
     if (meta?.invoiceId) {
       setJobData((prev) => prev ? { ...prev, invoice: { id: meta.invoiceId! } } : prev)
+    }
+    if (!isCreateMode) {
+      setRefreshTrigger((t) => t + 1)
     }
     setCurrentStep(Math.min(steps.length - 1, currentStep + 1))
   }
@@ -414,48 +440,68 @@ export function JobFlowPage() {
       {/* Back + Header */}
       {!loading && !error && (
       <>
-      <div>
+      <div className="relative">
+        {/* Background ambient glow */}
+        <div className="absolute top-0 left-1/4 -ml-20 -mt-20 h-40 w-96 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+        
         <button
           onClick={() => navigate('/billing')}
-          className="mb-3 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+          className="group mb-5 inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          กลับ
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm group-hover:border-gray-300 group-hover:shadow transition-all">
+            <ArrowLeft className="h-3.5 w-3.5" />
+          </div>
+          กลับไปหน้าภาพรวม
         </button>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">{sourceType === 'repair' ? '🔧' : '🛒'}</span>
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 text-white shadow-lg shadow-gray-900/20 ring-1 ring-white/10">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-blue-500/20 to-transparent opacity-50" />
+              {sourceType === 'repair' ? <PenTool className="h-6 w-6" /> : <ShoppingCart className="h-6 w-6" />}
+            </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">
-                {isCreateMode ? 'สร้างงานใหม่' : (jobData?.jobNumber ?? '')}
-                <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                  {jobData?.flowLabel ?? (sourceType === 'repair' ? 'ซ่อมรถ' : 'ขาย')}
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                  {isCreateMode ? 'สร้างรายการใหม่' : (jobData?.jobNumber ?? '')}
+                </h1>
+                <span className="inline-flex items-center rounded-full bg-blue-50/80 border border-blue-200/50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 shadow-sm backdrop-blur-sm">
+                  {jobData?.flowLabel ?? (sourceType === 'repair' ? 'ซ่อมรถ' : 'ขายสินค้า')}
                 </span>
-              </h1>
-              <p className="text-sm text-gray-500">
-                {jobData?.customerName}{jobData?.description ? ` · ${jobData.description}` : ''}
+              </div>
+              <p className="text-sm text-gray-500 font-medium mt-1 flex items-center gap-2">
+                <span className="text-gray-700">{jobData?.customerName}</span>
+                {jobData?.description && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-gray-300" />
+                    <span>{jobData.description}</span>
+                  </>
+                )}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {jobData?.createdAt && (
+              <div className="hidden sm:flex flex-col text-right mr-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">วันที่สร้าง</span>
+                <span className="text-xs font-medium text-gray-600">{formatDate(jobData.createdAt)}</span>
+              </div>
+            )}
             {!isCreateMode && (
               <button
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                onClick={() => { toast.success('เปิดหน้าต่างพิมพ์'); window.print() }}
+                className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 hover:bg-gray-50 transition-all hover:shadow"
               >
-                <PrintIcon />
-                ปริ้น
+                <Printer className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
+                <span>พิมพ์เอกสาร</span>
               </button>
             )}
-            {jobData?.createdAt && <span className="text-sm text-gray-400">สร้าง: {formatDate(jobData.createdAt)}</span>}
           </div>
         </div>
       </div>
 
       {/* Stepper */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <div className="rounded-3xl border border-gray-200/60 bg-white/60 backdrop-blur-md p-6 sm:px-8 shadow-sm">
         <FlowStepper
           steps={steps}
           currentStep={currentStep}
@@ -472,23 +518,33 @@ export function JobFlowPage() {
       />
 
       {/* Navigation Buttons */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pt-4 pb-12">
         <button
           onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
           disabled={currentStep === 0}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          className="group inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 hover:text-gray-900 disabled:opacity-40 disabled:hover:bg-white transition-all"
         >
-          ← ย้อนกลับ
+          <ArrowLeft className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+          ย้อนกลับ
         </button>
-        <div className="text-sm text-gray-400">
-          ขั้นตอน {currentStep + 1} / {steps.length}
+        <div className="flex items-center gap-2">
+          {steps.map((_, idx) => (
+            <div 
+              key={idx} 
+              className={cn(
+                "h-1.5 rounded-full transition-all duration-300",
+                idx === currentStep ? "w-6 bg-blue-600" : idx < currentStep ? "w-1.5 bg-indigo-300" : "w-1.5 bg-gray-200"
+              )} 
+            />
+          ))}
         </div>
         <button
           onClick={() => setCurrentStep(Math.min(steps.length - 1, currentStep + 1))}
           disabled={currentStep === steps.length - 1}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40"
+          className="group inline-flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-gray-900/20 hover:bg-gray-800 hover:shadow-lg hover:shadow-gray-900/30 disabled:opacity-40 transition-all"
         >
-          ถัดไป →
+          ถัดไป
+          <ArrowRight className="h-4 w-4 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
         </button>
       </div>
       </>

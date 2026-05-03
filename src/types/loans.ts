@@ -119,7 +119,7 @@ export interface ApproveLoanPayload {
 // ── Store Loan ────────────────────────────────────────────────────────────────
 export interface StoreLoan {
   id: number
-  loan_no: string
+  store_loan_no: string
   status: StoreLoanStatus
   branch_id: number
   branch?: { id: number; name: string } | null
