@@ -118,7 +118,7 @@ export function VehicleInspectionListPage() {
             </div>
             <input
               type="text"
-              placeholder="ค้นหาประเภทรถ แบรนด์ หรือรุ่น..."
+              placeholder="ค้นหาประเภทรถ ยี่ห้อ หรือรุ่น..."
               value={search}
               onChange={(e) => setParam('search', e.target.value)}
               className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 pl-10 text-sm text-gray-900 focus:border-red-500 focus:ring-red-500"
@@ -131,7 +131,7 @@ export function VehicleInspectionListPage() {
             <thead className="bg-gray-50 text-xs uppercase text-gray-700">
               <tr>
                 <SortableHeader label="ประเภทรถ" sortKey="vehicle_type" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                <SortableHeader label="แบรนด์" sortKey="brand" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="ยี่ห้อ" sortKey="brand" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <SortableHeader label="รุ่น" sortKey="model" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <SortableHeader label="ปี" sortKey="year" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-6 py-4 font-semibold text-center">จำนวนรายการ</th>

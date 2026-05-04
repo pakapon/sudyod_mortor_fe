@@ -33,7 +33,7 @@ const itemSchema = z.object({
 
 const schema = z.object({
   vehicle_type: z.string().min(1, 'กรุณากรอกประเภทรถ'),
-  brand: z.string().min(1, 'กรุณากรอกแบรนด์'),
+  brand: z.string().min(1, 'กรุณากรอกยี่ห้อ'),
   model: z.string().min(1, 'กรุณากรอกรุ่น'),
   year: z.union([z.number().int().min(1900).max(2100), z.null()]).optional(),
   is_active: z.boolean(),
@@ -306,7 +306,7 @@ export function VehicleInspectionFormPage() {
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                แบรนด์ <span className="text-red-500">*</span>
+                ยี่ห้อ <span className="text-red-500">*</span>
               </label>
               <input
                 {...register('brand')}

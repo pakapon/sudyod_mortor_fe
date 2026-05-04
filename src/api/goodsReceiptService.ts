@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { uploadService } from '@/api/uploadService'
 import type { ApiResponse, PaginatedResponse } from '@/types/api'
 import type {
   GoodsReceipt,
@@ -47,16 +48,17 @@ export const goodsReceiptService = {
     file: File,
     options?: { file_type?: GoodsReceiptDocumentType; file_name?: string; note?: string },
   ) {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('file_type', options?.file_type ?? 'other')
-    if (options?.file_name) formData.append('file_name', options.file_name)
-    if (options?.note) formData.append('note', options.note)
-    return apiClient.post<ApiResponse<GoodsReceiptDocument>>(
-      `/goods-receipts/${id}/documents`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    )
+    return uploadService.uploadFile<GoodsReceiptDocument>({
+      file,
+      module: 'goods_receipts',
+      entity_id: id,
+      category: 'document',
+      metadata: {
+        file_type: options?.file_type ?? 'other',
+        file_name: options?.file_name,
+        note: options?.note,
+      },
+    })
   },
 
   deleteDocument(receiptId: number, documentId: number) {

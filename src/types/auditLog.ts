@@ -51,7 +51,7 @@ export const AUDIT_LOG_ENTITY_LABEL: Record<string, string> = {
   holidays: 'วันหยุด',
   customers: 'ลูกค้า',
   vendors: 'ผู้ขาย',
-  brands: 'แบรนด์',
+  brands: 'ยี่ห้อ',
   product_categories: 'หมวดสินค้า',
   product_units: 'หน่วยสินค้า',
   products: 'สินค้า',

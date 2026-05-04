@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 import {
@@ -16,9 +16,13 @@ import { depositService } from '@/api/depositService'
 import { deliveryNoteService } from '@/api/deliveryNoteService'
 import { warrantyService } from '@/api/warrantyService'
 import { inventoryService } from '@/api/inventoryService'
-import type { JobData } from '../JobFlowPage'
+import { vehicleInspectionService } from '@/api/vehicleInspectionService'
+import { hrService } from '@/api/hrService'
+import type { JobData, QuotationDraft } from '../JobFlowPage'
 import type { PaymentMethod } from '@/types/invoice'
 import type { InventoryItem } from '@/types/inventory'
+import type { VehicleInspectionChecklist } from '@/types/vehicleInspection'
+import { INSPECTION_STATUS_OPTIONS } from '@/types/vehicleInspection'
 
 type QItemMode = 'product' | 'custom'
 interface QItem {
@@ -33,7 +37,11 @@ interface QItem {
 }
 
 type StepCompleteMeta = { newId?: number; invoiceId?: number }
-type FormProps = { onComplete: (meta?: StepCompleteMeta) => void; jobData?: JobData | null }
+type FormProps = {
+  onComplete: (meta?: StepCompleteMeta) => void
+  jobData?: JobData | null
+  onDraftChange?: (draft: QuotationDraft | null) => void
+}
 
 /* ─── Receive Vehicle Step ─── */
 export function ReceiveVehicleForm({ onComplete, jobData }: FormProps) {
@@ -51,12 +59,131 @@ export function ReceiveVehicleForm({ onComplete, jobData }: FormProps) {
   })
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }))
 
+  // Customer search autocomplete
+  const [customerResults, setCustomerResults] = useState<Array<{ id: number; full_name: string; phone: string | null }>>([])
+  const [pickedCustomerId, setPickedCustomerId] = useState<number | null>(null)
+  const customerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [brandResults, setBrandResults] = useState<Array<{ id: number; name: string }>>([])
+  const [pickedBrandId, setPickedBrandId] = useState<number | null>(null)
+  const brandDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [inspectionTemplates, setInspectionTemplates] = useState<VehicleInspectionChecklist[]>([])
+  const [selectedChecklistId, setSelectedChecklistId] = useState<number | null>(null)
+  const [selectedChecklist, setSelectedChecklist] = useState<VehicleInspectionChecklist | null>(null)
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
+
+  useEffect(() => {
+    const loadTemplates = async () => {
+      setIsLoadingTemplates(true)
+      try {
+        const { data } = await vehicleInspectionService.getChecklists({ page: 1, limit: 100, is_active: true })
+        setInspectionTemplates(data.data ?? [])
+      } catch {
+        setInspectionTemplates([])
+      } finally {
+        setIsLoadingTemplates(false)
+      }
+    }
+    loadTemplates()
+  }, [])
+
+  useEffect(() => {
+    if (!selectedChecklistId) {
+      setSelectedChecklist(null)
+      return
+    }
+    const loadChecklist = async () => {
+      try {
+        const { data } = await vehicleInspectionService.getChecklist(selectedChecklistId)
+        setSelectedChecklist(data.data)
+      } catch {
+        setSelectedChecklist(null)
+      }
+    }
+    loadChecklist()
+  }, [selectedChecklistId])
+
+  const buildChecklistNote = () => {
+    if (!selectedChecklist) return ''
+    const items = selectedChecklist.items ?? []
+    const checklistTitle = [selectedChecklist.vehicle_type, selectedChecklist.brand, selectedChecklist.model, selectedChecklist.year ? String(selectedChecklist.year) : null]
+      .filter(Boolean)
+      .join(' / ')
+    const itemLines = items.length > 0
+      ? items.map((it, idx) => `${idx + 1}. ${it.name}`).join('\n')
+      : '-'
+    return [
+      '[CHECKLIST_TEMPLATE_START]',
+      `แม่แบบตรวจสอบรถ: ${checklistTitle}`,
+      'รายการตรวจสอบ:',
+      itemLines,
+      '[CHECKLIST_TEMPLATE_END]',
+    ].join('\n')
+  }
+
+  const mergeChecklistToNote = (original?: string | null) => {
+    const clean = (original ?? '').replace(/\n?\[CHECKLIST_TEMPLATE_START\][\s\S]*?\[CHECKLIST_TEMPLATE_END\]\n?/g, '').trim()
+    const checklistNote = buildChecklistNote()
+    if (!checklistNote) return clean
+    return clean ? `${clean}\n\n${checklistNote}` : checklistNote
+  }
+
+  const searchCustomers = (q: string) => {
+    set('customerName', q)
+    setPickedCustomerId(null)
+    if (customerDebounceRef.current) clearTimeout(customerDebounceRef.current)
+    if (q.trim().length < 2) { setCustomerResults([]); return }
+    customerDebounceRef.current = setTimeout(async () => {
+      try {
+        const { data } = await customerService.getCustomers({ search: q, limit: 10 })
+        setCustomerResults(data.data.map((c: any) => ({
+          id: c.id,
+          full_name: c.full_name ?? c.company_name ?? `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() ?? `#${c.id}`,
+          phone: c.phones?.[0]?.number ?? c.phone ?? null,
+        })))
+      } catch { setCustomerResults([]) }
+    }, 300)
+  }
+
+  const pickCustomer = (c: { id: number; full_name: string; phone: string | null }) => {
+    setForm((p) => ({ ...p, customerName: c.full_name, customerPhone: c.phone ?? p.customerPhone }))
+    setPickedCustomerId(c.id)
+    setCustomerResults([])
+  }
+
+  const searchBrands = (q: string) => {
+    set('brand', q)
+    setPickedBrandId(null)
+    if (brandDebounceRef.current) clearTimeout(brandDebounceRef.current)
+    if (q.trim().length < 1) { setBrandResults([]); return }
+    brandDebounceRef.current = setTimeout(async () => {
+      try {
+        const { data } = await hrService.getBrands({ search: q, limit: 10, is_active: true })
+        setBrandResults((data.data ?? []).map((b) => ({ id: b.id, name: b.name })))
+      } catch {
+        setBrandResults([])
+      }
+    }, 300)
+  }
+
+  const pickBrand = (b: { id: number; name: string }) => {
+    set('brand', b.name)
+    setPickedBrandId(b.id)
+    setBrandResults([])
+  }
+
   const handleSubmit = async () => {
     if (isSubmitting) return
     setIsSubmitting(true)
     try {
+      if (!selectedChecklistId) {
+        toast.error('กรุณาเลือกแม่แบบรายการตรวจสอบรถ')
+        return
+      }
       if (so?.id) {
-        await serviceOrderService.transition(so.id, { target_status: 'pending_review' })
+        await serviceOrderService.updateServiceOrder(so.id, {
+          internal_note: mergeChecklistToNote(so.internal_note),
+        })
+        await serviceOrderService.transition(so.id, { status: 'pending_review' })
         toast.success('ยืนยันรับรถเรียบร้อย')
         onComplete()
         return
@@ -65,8 +192,8 @@ export function ReceiveVehicleForm({ onComplete, jobData }: FormProps) {
         toast.error('กรุณากรอกชื่อลูกค้า, ทะเบียน และอาการ')
         return
       }
-      let customerId: number | null = null
-      if (form.customerPhone.trim()) {
+      let customerId: number | null = pickedCustomerId
+      if (!customerId && form.customerPhone.trim()) {
         try {
           const { data: res } = await customerService.getCustomers({ search: form.customerPhone, limit: 1 })
           if (res.data?.[0]) customerId = res.data[0].id
@@ -102,6 +229,9 @@ export function ReceiveVehicleForm({ onComplete, jobData }: FormProps) {
         symptom: form.symptom,
         received_date: new Date().toISOString().split('T')[0],
       })
+      await serviceOrderService.updateServiceOrder(soRes.data.id, {
+        internal_note: mergeChecklistToNote(''),
+      })
       toast.success('รับรถเรียบร้อย')
       onComplete({ newId: soRes.data.id })
     } catch (err: any) {
@@ -116,15 +246,119 @@ export function ReceiveVehicleForm({ onComplete, jobData }: FormProps) {
       <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
         <ClipboardList className="h-24 w-24" />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-        <Field label="ชื่อลูกค้า" value={form.customerName} onChange={(v) => set('customerName', v)} placeholder="นายสมชาย ใจดี" disabled={!!so} icon={<User className="h-4 w-4 text-gray-400" />} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-40">
+        <div className="relative z-50 flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">ชื่อลูกค้า</label>
+          <div className="relative">
+            <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input
+              value={form.customerName}
+              onChange={(e) => searchCustomers(e.target.value)}
+              placeholder="ค้นหาหรือพิมพ์ชื่อลูกค้า"
+              disabled={!!so}
+              className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all disabled:bg-gray-50 disabled:text-gray-500"
+            />
+            {pickedCustomerId && (
+              <button
+                type="button"
+                onClick={() => { setPickedCustomerId(null); setForm((p) => ({ ...p, customerName: '', customerPhone: '' })) }}
+                className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            {customerResults.length > 0 && (
+              <ul className="absolute left-0 top-full z-[300] mt-1 w-full max-h-48 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl text-sm divide-y divide-gray-100">
+                {customerResults.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => pickCustomer(c)}
+                      className="flex items-center w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="font-medium text-gray-800">{c.full_name}</span>
+                      {c.phone && <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{c.phone}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
         <Field label="เบอร์โทร" value={form.customerPhone} onChange={(v) => set('customerPhone', v)} placeholder="089-xxx-xxxx" disabled={!!so} icon={<Phone className="h-4 w-4 text-gray-400" />} />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 relative z-30">
         <Field label="ทะเบียน" value={form.plate} onChange={(v) => set('plate', v)} placeholder="กข-1234" disabled={!!so} icon={<Hash className="h-4 w-4 text-gray-400" />} />
-        <Field label="ยี่ห้อ" value={form.brand} onChange={(v) => set('brand', v)} placeholder="Toyota" disabled={!!so} icon={<Car className="h-4 w-4 text-gray-400" />} />
+        <div className="relative z-40 flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">ยี่ห้อ</label>
+          <div className="relative">
+            <Car className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input
+              value={form.brand}
+              onChange={(e) => searchBrands(e.target.value)}
+              placeholder="ค้นหาหรือพิมพ์ยี่ห้อ"
+              disabled={!!so}
+              className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all disabled:bg-gray-50 disabled:text-gray-500"
+            />
+            {pickedBrandId && !so && (
+              <button
+                type="button"
+                onClick={() => { setPickedBrandId(null); set('brand', '') }}
+                className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            {brandResults.length > 0 && !so && (
+              <ul className="absolute left-0 top-full z-[400] mt-1 w-full max-h-48 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl text-sm divide-y divide-gray-100">
+                {brandResults.map((b) => (
+                  <li key={b.id}>
+                    <button
+                      type="button"
+                      onClick={() => pickBrand(b)}
+                      className="flex items-center w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="font-medium text-gray-800">{b.name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
         <Field label="รุ่น" value={form.model} onChange={(v) => set('model', v)} placeholder="Camry" disabled={!!so} icon={<Car className="h-4 w-4 text-gray-400" />} />
         <Field label="สี" value={form.color} onChange={(v) => set('color', v)} placeholder="ขาว" disabled={!!so} icon={<Palette className="h-4 w-4 text-gray-400" />} />
+      </div>
+      <div className="rounded-xl border border-gray-200 bg-white/70 p-4 relative z-10 space-y-3">
+        <label className="text-sm font-semibold text-gray-700">แม่แบบรายการตรวจสอบรถ</label>
+        <div className="relative">
+          <ClipboardList className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+          <select
+            value={selectedChecklistId ?? ''}
+            onChange={(e) => setSelectedChecklistId(e.target.value ? Number(e.target.value) : null)}
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+          >
+            <option value="">{isLoadingTemplates ? 'กำลังโหลดแม่แบบ...' : 'เลือกแม่แบบสำหรับช่าง'}</option>
+            {inspectionTemplates.map((tpl) => {
+              const label = [tpl.vehicle_type, tpl.brand, tpl.model, tpl.year ? String(tpl.year) : null].filter(Boolean).join(' / ')
+              const count = tpl.items_count ?? tpl.items?.length ?? 0
+              return <option key={tpl.id} value={tpl.id}>{`${label} (${count} รายการ)`}</option>
+            })}
+          </select>
+        </div>
+        {selectedChecklist?.items?.length ? (
+          <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3">
+            <p className="text-xs font-semibold text-blue-700 mb-1">รายการที่ช่างต้องเช็ค</p>
+            <ul className="space-y-1">
+              {selectedChecklist.items.slice(0, 8).map((it) => (
+                <li key={it.id} className="text-xs text-blue-900">• {it.name}</li>
+              ))}
+              {selectedChecklist.items.length > 8 && (
+                <li className="text-xs text-blue-700">... และอีก {selectedChecklist.items.length - 8} รายการ</li>
+              )}
+            </ul>
+          </div>
+        ) : null}
       </div>
       <div className="relative z-10">
         <Field label="อาการ / หมายเหตุ" value={form.symptom} onChange={(v) => set('symptom', v)} placeholder="เปลี่ยนหม้อน้ำ, น้ำมันรั่ว..." multiline />
@@ -139,29 +373,254 @@ export function ReceiveVehicleForm({ onComplete, jobData }: FormProps) {
 }
 
 /* ─── Assessment Step ─── */
+type ChecklistResultItem = { name: string; checked: boolean; status: string; reason: string }
+type AssessItem = { id?: number; name: string; issue: string; qty: number; unit_price?: number; product_id?: number; product_variant_id?: number }
+type PersistedAssessPhoto = { id: number; url: string }
+
+function parseChecklistFromNote(note?: string | null): ChecklistResultItem[] {
+  if (!note) return []
+  const resultMatch = note.match(/\[CHECKLIST_RESULT_START\]([\s\S]*?)\[CHECKLIST_RESULT_END\]/)
+  if (resultMatch) {
+    const items: ChecklistResultItem[] = []
+    for (const line of resultMatch[1].split('\n')) {
+      const m = line.match(/^\d+\.\s+\[(✓|○)\]\s+(.+?)\s+:\s+([^—\n]+?)(?:\s+—\s+(.*))?$/)
+      if (m) {
+        items.push({
+          checked: m[1] === '✓',
+          name: m[2].trim(),
+          status: m[3].trim(),
+          reason: m[4]?.trim() ?? '',
+        })
+      }
+    }
+    if (items.length > 0) return items
+  }
+  const match = note.match(/\[CHECKLIST_TEMPLATE_START\]([\s\S]*?)\[CHECKLIST_TEMPLATE_END\]/)
+  if (!match) return []
+  const items: ChecklistResultItem[] = []
+  for (const line of match[1].split('\n')) {
+    const m = line.match(/^\d+\.\s+(.+)$/)
+    if (m) items.push({ name: m[1].trim(), checked: false, status: 'ปกติ', reason: '' })
+  }
+  return items
+}
+
+function buildChecklistResultNote(checkItems: ChecklistResultItem[], original?: string | null): string {
+  const clean = (original ?? '')
+    .replace(/\n?\[CHECKLIST_RESULT_START\][\s\S]*?\[CHECKLIST_RESULT_END\]\n?/g, '')
+    .trim()
+  if (!checkItems.length) return clean
+  const lines = checkItems
+    .map((it, i) => `${i + 1}. [${it.checked ? '✓' : '○'}] ${it.name} : ${it.status}${it.reason.trim() ? ` — ${it.reason.trim()}` : ''}`)
+    .join('\n')
+  const block = `[CHECKLIST_RESULT_START]\nผลตรวจสภาพรถ:\n${lines}\n[CHECKLIST_RESULT_END]`
+  return clean ? `${clean}\n\n${block}` : block
+}
+
 export function AssessmentForm({ onComplete, jobData }: FormProps) {
+  const { employee } = useAuthStore()
+  const serviceOrderItems = jobData?.serviceOrder?.items ?? []
+  const persistedItems = serviceOrderItems.length > 0 ? serviceOrderItems : (jobData?.items ?? [])
+  const mapPersistedAssessItem = (it: any): AssessItem => ({
+    id: it.id,
+    name: it.variant?.name ?? it.product?.name ?? it.name ?? it.custom_name ?? '',
+    issue: it.issue ?? it.notes ?? '',
+    qty: it.qty ?? it.quantity ?? 1,
+    unit_price: Number(it.unit_price ?? 0),
+    product_id: it.product_id,
+    product_variant_id: it.product_variant_id,
+  })
+  const initialPersistedPhotos: PersistedAssessPhoto[] = (((jobData?.serviceOrder as any)?.gpsPhotos ?? (jobData?.serviceOrder as any)?.gps_photos ?? []) as any[])
+      .map((photo: any) => ({ id: Number(photo.id), url: photo.photo_url ?? photo.file_url ?? '' }))
+    .filter((photo) => photo.id > 0 && photo.url)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [items, setItems] = useState(
-    jobData?.items.length
-      ? jobData.items.map((it) => ({ name: it.name, issue: '', qty: it.qty }))
-      : [{ name: 'หม้อน้ำ', issue: 'แตก / รั่ว', qty: 1 }],
+  const [items, setItems] = useState<AssessItem[]>(
+    persistedItems.length
+      ? persistedItems.map(mapPersistedAssessItem)
+      : [{ name: '', issue: '', qty: 1 }],
   )
   const [note, setNote] = useState(jobData?.note ?? '')
   const [photos, setPhotos] = useState<File[]>([])
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([])
+  const [persistedPhotos, setPersistedPhotos] = useState<PersistedAssessPhoto[]>(initialPersistedPhotos)
+  const [deletingPhotoIds, setDeletingPhotoIds] = useState<number[]>([])
+  const photoPreviewUrlsRef = useRef<string[]>([])
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const [checklistItems, setChecklistItems] = useState<ChecklistResultItem[]>(() =>
+    parseChecklistFromNote(jobData?.serviceOrder?.internal_note),
+  )
+
+  const setCheckItem = (i: number, patch: Partial<ChecklistResultItem>) =>
+    setChecklistItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)))
+
+  // ── Inventory search per row (repair items table) ──
+  const [invSearch, setInvSearch] = useState<string[]>(items.map((it) => it.name))
+  const [invResults, setInvResults] = useState<InventoryItem[][]>(items.map(() => []))
+  const [activeInvRow, setActiveInvRow] = useState<number | null>(null)
+  const invDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleInvSearch = (rowIdx: number, q: string) => {
+    const ns = [...invSearch]; ns[rowIdx] = q; setInvSearch(ns)
+    const ni = [...items]; ni[rowIdx] = { ...ni[rowIdx], name: q, product_id: undefined, product_variant_id: undefined }; setItems(ni)
+    setActiveInvRow(rowIdx)
+    if (invDebounceRef.current) clearTimeout(invDebounceRef.current)
+    if (!q.trim()) { const nr = [...invResults]; nr[rowIdx] = []; setInvResults(nr); return }
+    invDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await inventoryService.getInventory({ search: q, limit: 10, branch_id: employee?.branch_id })
+        const nr = [...invResults]; nr[rowIdx] = res.data.data ?? []; setInvResults(nr)
+      } catch { const nr = [...invResults]; nr[rowIdx] = []; setInvResults(nr) }
+    }, 300)
+  }
+
+  const handleSelectInvItem = (rowIdx: number, inv: InventoryItem) => {
+    const n = [...items]
+    n[rowIdx] = {
+      ...n[rowIdx],
+      product_id: inv.product_id,
+      product_variant_id: inv.product_variant_id,
+      name: inv.variant?.name ?? inv.product?.name ?? '',
+      unit_price: Number(inv.variant?.selling_price ?? 0),
+    }
+    setItems(n)
+    const ns = [...invSearch]; ns[rowIdx] = n[rowIdx].name; setInvSearch(ns)
+    const nr = [...invResults]; nr[rowIdx] = []; setInvResults(nr)
+    setActiveInvRow(null)
+  }
+
+  const addRepairItem = () => {
+    setItems((prev) => [...prev, { name: '', issue: '', qty: 1 }])
+    setInvSearch((prev) => [...prev, ''])
+    setInvResults((prev) => [...prev, []])
+  }
+
+  const removeRepairItem = (i: number) => {
+    setItems((prev) => prev.filter((_, j) => j !== i))
+    setInvSearch((prev) => prev.filter((_, j) => j !== i))
+    setInvResults((prev) => prev.filter((_, j) => j !== i))
+  }
+
+  const resizeNoteTextarea = (el: HTMLTextAreaElement | null) => {
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }
+
+  const handlePhotoChange = (files: File[]) => {
+    photoPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+    const nextUrls = files.map((file) => URL.createObjectURL(file))
+    photoPreviewUrlsRef.current = nextUrls
+    setPhotoPreviewUrls(nextUrls)
+    setPhotos(files)
+  }
+
+  const removeSelectedPhoto = (idx: number) => {
+    const nextPhotos = photos.filter((_, photoIdx) => photoIdx !== idx)
+    handlePhotoChange(nextPhotos)
+  }
+
+  const removePersistedPhoto = async (photoId: number) => {
+    const soId = jobData?.serviceOrder?.id
+    if (!soId) return
+    setDeletingPhotoIds((prev) => [...prev, photoId])
+    try {
+      await serviceOrderService.deleteGpsPhoto(soId, photoId)
+      setPersistedPhotos((prev) => prev.filter((photo) => photo.id !== photoId))
+      toast.success('ลบรูปเรียบร้อย')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'ลบรูปไม่สำเร็จ')
+    } finally {
+      setDeletingPhotoIds((prev) => prev.filter((id) => id !== photoId))
+    }
+  }
+
+  useEffect(() => () => {
+    photoPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+  }, [])
+
+  useEffect(() => {
+    resizeNoteTextarea(noteTextareaRef.current)
+  }, [note])
+
+  useEffect(() => {
+    setChecklistItems(parseChecklistFromNote(jobData?.serviceOrder?.internal_note))
+    setNote(jobData?.note ?? '')
+    setPersistedPhotos(initialPersistedPhotos)
+    const nextItems = persistedItems.length
+      ? persistedItems.map(mapPersistedAssessItem)
+      : [{ name: '', issue: '', qty: 1 }]
+    setItems(nextItems)
+    setInvSearch(nextItems.map((it) => it.name))
+    setInvResults(nextItems.map(() => []))
+  }, [jobData?.note, jobData?.serviceOrder?.internal_note, JSON.stringify(persistedItems), JSON.stringify(initialPersistedPhotos)])
+
 
   const handleSubmit = async () => {
     if (isSubmitting) return
     const soId = jobData?.serviceOrder?.id
     if (!soId) { toast.error('ไม่พบข้อมูลใบสั่งซ่อม'); return }
+
+    const emptyChecklistName = checklistItems.some((it) => !it.name.trim())
+    if (emptyChecklistName) {
+      toast.error('กรุณากรอกชื่อรายการตรวจให้ครบทุกข้อ')
+      return
+    }
+
+    const uncheckedChecklist = checklistItems.some((it) => !it.checked)
+    if (uncheckedChecklist) {
+      toast.error('กรุณาตรวจเช็กรายการตรวจสภาพรถให้ครบทุกข้อก่อนส่งประเมิน')
+      return
+    }
+
+    const invalidRepairItem = items.find((it) => it.name.trim() && !it.product_id)
+    if (invalidRepairItem) {
+      toast.error('กรุณาเลือกรายการซ่อมจากสินค้าในรายการค้นหาให้ครบก่อนส่งประเมิน')
+      return
+    }
+
     setIsSubmitting(true)
     try {
-      for (const item of items.filter((it) => it.name.trim())) {
-        await serviceOrderService.addItem(soId, { item_type: 'service', custom_name: item.name, quantity: item.qty, unit_price: 0 })
+      if (checklistItems.length > 0) {
+        const newNote = buildChecklistResultNote(checklistItems, jobData?.serviceOrder?.internal_note)
+        await serviceOrderService.updateServiceOrder(soId, { internal_note: newNote })
       }
-      
-      // Upload damage spot photos
+      const savedIds: { product_id?: number; product_variant_id?: number; newId: number }[] = []
+      for (const item of items.filter((it) => it.name.trim() && !it.id)) {
+        const res = await serviceOrderService.addItem(soId, {
+          item_type: 'product',
+          product_id: item.product_id,
+          product_variant_id: item.product_variant_id,
+          quantity: item.qty,
+          unit_price: Number(item.unit_price ?? 0),
+          pricing_type: 'part',
+          notes: item.issue || undefined,
+        })
+        if (res.data.data?.id) {
+          savedIds.push({ product_id: item.product_id, product_variant_id: item.product_variant_id, newId: res.data.data.id })
+        }
+      }
+      if (savedIds.length > 0) {
+        setItems((prev) => prev.map((item) => {
+          if (item.id) return item
+          const match = savedIds.find(
+            (s) => s.product_id === item.product_id && (s.product_variant_id ?? null) === (item.product_variant_id ?? null),
+          )
+          return match ? { ...item, id: match.newId } : item
+        }))
+      }
       if (photos.length > 0) {
-        // Try to get geolocation, if fails use default (Bangkok)
+        const status = jobData?.serviceOrder?.status
+        const gpsTypeByStatus: Record<string, string> = {
+          draft: 'pre_intake',
+          pending_review: 'damage_spot',
+          pending_quote: 'damage_spot',
+          approved: 'pre_repair',
+          in_progress: 'pre_repair',
+          completed: 'pre_delivery',
+          pending_pickup: 'delivery',
+        }
+        const gpsPhotoType = gpsTypeByStatus[status ?? ''] ?? 'damage_spot'
+
         let lat = 13.7563309
         let lng = 100.5017651
         try {
@@ -173,27 +632,31 @@ export function AssessmentForm({ onComplete, jobData }: FormProps) {
         } catch (e) {
           console.warn('Geolocation failed, used default coordinates')
         }
-
-        // Format taken_at to ICT without Z (e.g., 2026-05-03T15:30:22)
         const formatICT = () => {
           const d = new Date()
-          return new Date(d.getTime() + (7 * 60 * 60 * 1000)).toISOString().slice(0, 19)
+          return new Date(d.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 19)
         }
-
         for (const file of photos) {
           const formData = new FormData()
           formData.append('photo', file)
-          formData.append('type', 'damage_spot')
+          formData.append('type', gpsPhotoType)
           formData.append('latitude', lat.toString())
           formData.append('longitude', lng.toString())
           formData.append('taken_at', formatICT())
-          
           await serviceOrderService.uploadGpsPhoto(soId, formData)
         }
       }
-
-      await serviceOrderService.transition(soId, { target_status: 'pending_quote', note: note || undefined })
-      toast.success('ส่งประเมินรูปภาพและเอกสารเรียบร้อย')
+      const currentStatus = jobData?.serviceOrder?.status
+      if (currentStatus === 'draft') {
+        await serviceOrderService.transition(soId, { status: 'pending_review' })
+        await serviceOrderService.transition(soId, { status: 'pending_quote' })
+      } else if (currentStatus === 'pending_review') {
+        await serviceOrderService.transition(soId, { status: 'pending_quote' })
+      } else if (currentStatus !== 'pending_quote') {
+        toast.error('สถานะใบงานไม่ถูกต้องสำหรับการส่งประเมิน')
+        return
+      }
+      toast.success('ส่งประเมินเรียบร้อย')
       onComplete()
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? 'เกิดข้อผิดพลาดในการบันทึกข้อมูล/อัปโหลดรูป')
@@ -204,9 +667,158 @@ export function AssessmentForm({ onComplete, jobData }: FormProps) {
 
   return (
     <div className="space-y-6">
-      {/* Mobile view items using cards, Desktop view using table */}
-      <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm bg-white">
-        <div className="hidden md:block overflow-x-auto">
+      {/* Checklist Section */}
+      {/* Checklist Section */}
+      <div className="rounded-xl border border-gray-200 overflow-visible shadow-sm bg-white">
+        <div className="flex flex-col gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50/60 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
+            <ClipboardList className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-semibold text-gray-700">รายการตรวจสภาพรถ</span>
+            {checklistItems.length > 0 && (
+              <span className="text-xs text-gray-400">({checklistItems.filter((it) => it.checked).length}/{checklistItems.length} รายการ)</span>
+            )}
+          </div>
+        </div>
+        {checklistItems.length === 0 && (
+          <div className="py-6 text-center text-sm text-gray-400">ยังไม่มีรายการ — กด &ldquo;เพิ่มรายการตรวจ&rdquo; เพื่อเริ่มต้น</div>
+        )}
+        {/* Desktop */}
+        {checklistItems.length > 0 && (
+          <div className="hidden md:block overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50/80 border-b border-gray-200">
+                <tr>
+                  <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 w-10">✓</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">รายการ</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold text-gray-600 w-36">สถานะ</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-600">สาเหตุ / เหตุผล</th>
+                  <th className="w-10" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {checklistItems.map((it, i) => {
+                  const statusOpt = INSPECTION_STATUS_OPTIONS.find((o) => o.value === it.status)
+                  return (
+                    <tr key={i} className={cn('group transition-colors', it.checked ? 'bg-white' : 'bg-gray-50/40')}>
+                      <td className="px-3 py-2.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={it.checked}
+                          onChange={(e) => setCheckItem(i, { checked: e.target.checked })}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="text"
+                          value={it.name}
+                          onChange={(e) => setCheckItem(i, { name: e.target.value })}
+                          placeholder="ชื่อรายการ"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <select
+                          value={it.status}
+                          onChange={(e) => setCheckItem(i, { status: e.target.value })}
+                          className={cn('w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20', statusOpt?.color ?? 'bg-white text-gray-700')}
+                        >
+                          {INSPECTION_STATUS_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="text"
+                          value={it.reason}
+                          onChange={(e) => setCheckItem(i, { reason: e.target.value })}
+                          placeholder="ระบุสาเหตุ (ถ้ามี)"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                        />
+                      </td>
+                      <td className="px-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setChecklistItems((prev) => prev.filter((_, j) => j !== i))}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {/* Mobile */}
+        {checklistItems.length > 0 && (
+          <div className="md:hidden divide-y divide-gray-100">
+            {checklistItems.map((it, i) => {
+              const statusOpt = INSPECTION_STATUS_OPTIONS.find((o) => o.value === it.status)
+              return (
+                <div key={i} className={cn('p-3 space-y-2.5', it.checked ? 'bg-white' : 'bg-gray-50/40')}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-500">รายการตรวจ {i + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => setChecklistItems((prev) => prev.filter((_, j) => j !== i))}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+                      title="ลบรายการ"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-[auto,1fr] items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={it.checked}
+                      onChange={(e) => setCheckItem(i, { checked: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                    />
+                    <input
+                      type="text"
+                      value={it.name}
+                      onChange={(e) => setCheckItem(i, { name: e.target.value })}
+                      placeholder="ชื่อรายการ"
+                      className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm font-medium text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    />
+                  </div>
+                  <select
+                    value={it.status}
+                    onChange={(e) => setCheckItem(i, { status: e.target.value })}
+                    className={cn('w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium focus:outline-none', statusOpt?.color ?? 'bg-white')}
+                  >
+                    {INSPECTION_STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={it.reason}
+                    onChange={(e) => setCheckItem(i, { reason: e.target.value })}
+                    placeholder="สาเหตุ / เหตุผล (ถ้ามี)"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  />
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setChecklistItems((prev) => [...prev, { name: '', checked: false, status: 'ปกติ', reason: '' }])}
+          className="flex w-full items-center justify-center gap-1.5 border-t border-gray-200 bg-gray-50/50 px-4 py-3 text-xs font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+        >
+          <Plus className="h-4 w-4" /> เพิ่มรายการตรวจ
+        </button>
+      </div>
+
+      {/* Repair Items Table */}
+      <div className="rounded-xl border border-gray-200 overflow-visible shadow-sm bg-white">
+        <div className="hidden md:block">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50/80 border-b border-gray-200"><tr>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">รายการ</th>
@@ -217,10 +829,32 @@ export function AssessmentForm({ onComplete, jobData }: FormProps) {
             <tbody className="divide-y divide-gray-100">
               {items.map((it, i) => (
                 <tr key={i} className="group hover:bg-gray-50/50 transition-colors">
-                  <td className="px-4 py-3">
+                  <td className={cn('px-4 py-3', activeInvRow === i && 'relative z-20')}>
                     <div className="relative">
-                      <Wrench className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                      <input className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" value={it.name} onChange={(e) => { const n = [...items]; n[i].name = e.target.value; setItems(n) }} placeholder="เช่น หม้อน้ำ" />
+                      <Wrench className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
+                      <input
+                        className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                        value={invSearch[i] || it.name}
+                        onChange={(e) => handleInvSearch(i, e.target.value)}
+                        onFocus={() => setActiveInvRow(i)}
+                        onBlur={() => setTimeout(() => { if (activeInvRow === i) setActiveInvRow(null) }, 150)}
+                        placeholder="พิมพ์ค้นหาสินค้า..."
+                        autoComplete="off"
+                      />
+                      {activeInvRow === i && invResults[i]?.length > 0 && (
+                        <ul className="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg max-h-52 overflow-y-auto">
+                          {invResults[i].map((inv) => (
+                            <li
+                              key={`${inv.product_id}-${inv.product_variant_id}`}
+                              onMouseDown={() => handleSelectInvItem(i, inv)}
+                              className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 transition-colors"
+                            >
+                              <span className="font-medium text-gray-800">{inv.variant?.name ?? inv.product?.name}</span>
+                              <span className="text-xs text-gray-400 ml-2 shrink-0">คงเหลือ {inv.quantity}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -231,7 +865,7 @@ export function AssessmentForm({ onComplete, jobData }: FormProps) {
                   </td>
                   <td className="px-4 py-3 text-center"><input type="number" className="w-16 rounded-lg border border-gray-200 px-2 py-2 text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" value={it.qty} onChange={(e) => { const n = [...items]; n[i].qty = Number(e.target.value); setItems(n) }} /></td>
                   <td className="px-2 text-center">
-                    <button onClick={() => setItems(items.filter((_, j) => j !== i))} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors md:opacity-0 md:group-hover:opacity-100">
+                    <button onClick={() => removeRepairItem(i)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors md:opacity-0 md:group-hover:opacity-100">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </td>
@@ -242,20 +876,47 @@ export function AssessmentForm({ onComplete, jobData }: FormProps) {
         </div>
         <div className="md:hidden divide-y divide-gray-100">
           {items.map((it, i) => (
-            <div key={i} className="p-4 space-y-3 relative group">
-              <div className="absolute top-2 right-2">
-                <button onClick={() => setItems(items.filter((_, j) => j !== i))} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="space-y-1 pr-8">
-                <label className="text-xs font-semibold text-gray-500">รายการ</label>
+            <div key={i} className="p-4 space-y-3">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-gray-500">รายการ</label>
+                  <button
+                    type="button"
+                    onClick={() => removeRepairItem(i)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+                    title="ลบรายการ"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
                 <div className="relative">
-                  <Wrench className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                  <input className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" value={it.name} onChange={(e) => { const n = [...items]; n[i].name = e.target.value; setItems(n) }} placeholder="เช่น หม้อน้ำ" />
+                  <Wrench className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
+                  <input
+                    className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    value={invSearch[i] || it.name}
+                    onChange={(e) => handleInvSearch(i, e.target.value)}
+                    onFocus={() => setActiveInvRow(i)}
+                    onBlur={() => setTimeout(() => { if (activeInvRow === i) setActiveInvRow(null) }, 150)}
+                    placeholder="พิมพ์ค้นหาสินค้า..."
+                    autoComplete="off"
+                  />
+                  {activeInvRow === i && invResults[i]?.length > 0 && (
+                    <ul className="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                      {invResults[i].map((inv) => (
+                        <li
+                          key={`${inv.product_id}-${inv.product_variant_id}`}
+                          onMouseDown={() => handleSelectInvItem(i, inv)}
+                          className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 transition-colors"
+                        >
+                          <span className="font-medium text-gray-800">{inv.variant?.name ?? inv.product?.name}</span>
+                          <span className="text-xs text-gray-400 ml-2 shrink-0">คงเหลือ {inv.quantity}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
-              <div className="grid grid-cols-[1fr,auto] gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr,96px]">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-gray-500">อาการ</label>
                   <div className="relative">
@@ -265,39 +926,83 @@ export function AssessmentForm({ onComplete, jobData }: FormProps) {
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-gray-500">จำนวน</label>
-                  <input type="number" className="w-20 w-full rounded-lg border border-gray-200 px-2 py-2 text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" value={it.qty} onChange={(e) => { const n = [...items]; n[i].qty = Number(e.target.value); setItems(n) }} />
+                  <input type="number" className="w-full rounded-lg border border-gray-200 px-2 py-2 text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" value={it.qty} onChange={(e) => { const n = [...items]; n[i].qty = Number(e.target.value); setItems(n) }} />
                 </div>
               </div>
             </div>
           ))}
         </div>
-        <button onClick={() => setItems([...items, { name: '', issue: '', qty: 1 }])} className="flex w-full items-center justify-center gap-1.5 border-t border-gray-200 bg-gray-50/50 px-4 py-3 text-xs font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors">
-          <Plus className="h-4 w-4" /> เพิ่มรายการประเมิน
+        <button onClick={addRepairItem} className="flex w-full items-center justify-center gap-1.5 border-t border-gray-200 bg-gray-50/50 px-4 py-3 text-xs font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+          <Plus className="h-4 w-4" /> เพิ่มรายการซ่อม
         </button>
       </div>
-      
-      <div className="flex items-center gap-3">
-        <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/30 py-6 text-sm font-medium text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition-all cursor-pointer w-full group">
+
+      <div className="flex flex-col gap-2">
+        <label className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/30 px-3 py-6 text-center text-sm font-medium text-blue-600 transition-all hover:border-blue-400 hover:bg-blue-50 group">
           <div className="p-3 bg-blue-100 text-blue-500 rounded-full group-hover:scale-110 group-hover:bg-blue-500 group-hover:text-white transition-all">
             <Camera className="h-6 w-6" />
           </div>
-          <span>
+          <span className="leading-relaxed">
             ถ่ายรูปจุดเสีย / แนบไฟล์อ้างอิง
             {photos.length > 0 && <span className="text-emerald-600 font-bold ml-1">({photos.length} รูป)</span>}
           </span>
-          <input 
-            type="file" 
-            multiple 
-            accept="image/*" 
-            capture="environment" 
-            className="hidden" 
-            onChange={(e) => setPhotos(Array.from(e.target.files ?? []))}
+          <input
+            type="file"
+            multiple
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => handlePhotoChange(Array.from(e.target.files ?? []))}
           />
         </label>
+        {(photoPreviewUrls.length > 0 || persistedPhotos.length > 0) && (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {persistedPhotos.map((photo, idx) => (
+              <div key={`persisted-${photo.id}`} className="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-1">
+                <button
+                  type="button"
+                  onClick={() => void removePersistedPhoto(photo.id)}
+                  disabled={deletingPhotoIds.includes(photo.id)}
+                  className="absolute right-2 top-2 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-gray-500 shadow-sm ring-1 ring-gray-200 transition-colors hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deletingPhotoIds.includes(photo.id) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                </button>
+                <img src={photo.url} alt={`persisted-preview-${idx + 1}`} className="h-20 w-full rounded object-contain bg-gray-50" />
+              </div>
+            ))}
+            {photoPreviewUrls.map((url, idx) => (
+              <div key={`local-${url}-${idx}`} className="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-1">
+                <button
+                  type="button"
+                  onClick={() => removeSelectedPhoto(idx)}
+                  className="absolute right-2 top-2 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-gray-500 shadow-sm ring-1 ring-gray-200 transition-colors hover:bg-red-50 hover:text-red-500"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <img src={url} alt={`preview-${idx + 1}`} className="h-20 w-full rounded object-contain bg-gray-50" />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-      
-      <Field label="หมายเหตุช่าง" value={note} onChange={setNote} placeholder="รายละเอียดเพิ่มเติมที่พบ..." multiline />
-      
+
+      <div className="space-y-1.5">
+        <label className="text-sm font-semibold text-gray-700">หมายเหตุช่าง</label>
+        <div className="relative">
+          <textarea
+            ref={noteTextareaRef}
+            value={note}
+            onChange={(e) => {
+              setNote(e.target.value)
+              resizeNoteTextarea(e.currentTarget)
+            }}
+            placeholder="รายละเอียดเพิ่มเติมที่พบ..."
+            rows={3}
+            className="w-full rounded-xl border border-gray-200 bg-white/50 px-4 py-2.5 text-sm transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 resize-none overflow-hidden shadow-sm"
+          />
+        </div>
+      </div>
+
       <div className="pt-4">
         <ActionButton onClick={handleSubmit} loading={isSubmitting}>
           <ClipboardList className="h-5 w-5" /> ส่งประเมินเรียบร้อย <ArrowRight className="h-4 w-4 ml-1 opacity-70" /> เสนอราคา
@@ -308,13 +1013,21 @@ export function AssessmentForm({ onComplete, jobData }: FormProps) {
 }
 
 /* ─── Quotation Step ─── */
-export function QuotationForm({ onComplete, jobData }: FormProps) {
+export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps) {
   const { employee } = useAuthStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [items, setItems] = useState<QItem[]>(
     jobData?.items.length
-      ? jobData.items.map((it) => ({ mode: 'custom' as QItemMode, name: it.name, price: it.unit_price, qty: it.qty, pricing_type: 'part' as const }))
-      : [{ mode: 'custom' as QItemMode, name: '', price: 0, qty: 1, pricing_type: 'part' as const }],
+      ? jobData.items.map((it) => ({
+          mode: it.product_id ? ('product' as QItemMode) : ('custom' as QItemMode),
+          product_id: it.product_id,
+          product_variant_id: it.product_variant_id,
+          name: it.name,
+          price: it.unit_price,
+          qty: it.qty,
+          pricing_type: it.product_id ? it.pricing_type : 'labor',
+        }))
+      : [{ mode: 'custom' as QItemMode, name: '', price: 0, qty: 1, pricing_type: 'labor' as const }],
   )
   const [discount, setDiscount] = useState(0)
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
@@ -327,9 +1040,10 @@ export function QuotationForm({ onComplete, jobData }: FormProps) {
   const [pickedCustomer, setPickedCustomer] = useState<{ id: number; full_name: string } | null>(null)
 
   // inventory search state per row
-  const [invSearch, setInvSearch] = useState<string[]>(items.map(() => ''))
+  const [invSearch, setInvSearch] = useState<string[]>(items.map((it) => (it.mode === 'product' ? it.name : '')))
   const [invResults, setInvResults] = useState<InventoryItem[][]>(items.map(() => []))
   const [activeInvRow, setActiveInvRow] = useState<number | null>(null)
+  const [priceInputs, setPriceInputs] = useState<string[]>(items.map((it) => String(it.price ?? 0)))
   const invDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const searchCustomers = async (q: string) => {
@@ -371,22 +1085,60 @@ export function QuotationForm({ onComplete, jobData }: FormProps) {
       stock: Number(inv.quantity ?? 0),
     }
     setItems(n)
+    const np = [...priceInputs]
+    np[rowIdx] = String(Number(inv.variant?.selling_price ?? 0))
+    setPriceInputs(np)
     const ns = [...invSearch]; ns[rowIdx] = n[rowIdx].name; setInvSearch(ns)
     const nr = [...invResults]; nr[rowIdx] = []; setInvResults(nr)
     setActiveInvRow(null)
   }
 
   const addItem = () => {
-    setItems([...items, { mode: 'custom', name: '', price: 0, qty: 1, pricing_type: 'part' }])
+    setItems([...items, { mode: 'custom', name: '', price: 0, qty: 1, pricing_type: 'labor' }])
+    setPriceInputs([...priceInputs, '0'])
     setInvSearch([...invSearch, ''])
     setInvResults([...invResults, []])
   }
 
   const removeItem = (i: number) => {
     setItems(items.filter((_, j) => j !== i))
+    setPriceInputs(priceInputs.filter((_, j) => j !== i))
     setInvSearch(invSearch.filter((_, j) => j !== i))
     setInvResults(invResults.filter((_, j) => j !== i))
   }
+
+  useEffect(() => {
+    if (!onDraftChange) return
+    const mappedItems = items
+      .filter((it) => it.name.trim())
+      .map((it, idx) => ({
+        id: idx,
+        name: it.name,
+        qty: Number(it.qty ?? 0),
+        unit_price: Number(it.price ?? 0),
+        discount: 0,
+        subtotal: Number(it.qty ?? 0) * Number(it.price ?? 0),
+        pricing_type: (it.mode === 'product' ? 'part' : 'labor') as 'part' | 'labor',
+        product_id: it.mode === 'product' ? it.product_id : undefined,
+        product_variant_id: it.mode === 'product' ? it.product_variant_id : undefined,
+      }))
+
+    onDraftChange({
+      items: mappedItems,
+      subtotal,
+      discount,
+      vatPercent: 7,
+      vatAmount: vat,
+      grandTotal: total,
+      note: jobData?.note ?? '',
+    })
+  }, [items, discount, subtotal, vat, total, jobData?.note, onDraftChange])
+
+  useEffect(() => {
+    return () => {
+      onDraftChange?.(null)
+    }
+  }, [onDraftChange])
 
   const handleSubmit = async () => {
     if (isSubmitting) return
@@ -401,9 +1153,9 @@ export function QuotationForm({ onComplete, jobData }: FormProps) {
         validity_days: 30,
         vat_percent: 7,
         items: items.filter((it) => it.name.trim()).map((it) => ({
-          quantity: it.qty,
-          unit_price: it.price,
-          pricing_type: it.pricing_type,
+          quantity: Number(it.qty ?? 0),
+          unit_price: Number(it.price ?? 0),
+          pricing_type: it.mode === 'product' ? 'part' : 'labor',
           product_id: it.mode === 'product' ? (it.product_id ?? null) : null,
           product_variant_id: it.mode === 'product' ? (it.product_variant_id ?? null) : null,
           description: it.name,
@@ -412,6 +1164,7 @@ export function QuotationForm({ onComplete, jobData }: FormProps) {
       })
       await quotationService.send(qtRes.data.id)
       toast.success('ส่งใบเสนอราคาเรียบร้อย')
+      onDraftChange?.(null)
       onComplete(jobData?.sourceType === 'sale' && !jobData.sourceId ? { newId: qtRes.data.id } : undefined)
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? 'เกิดข้อผิดพลาด')
@@ -480,9 +1233,22 @@ export function QuotationForm({ onComplete, jobData }: FormProps) {
                       <select
                         value={it.mode}
                         onChange={(e) => {
+                          const nextMode = e.target.value as QItemMode
                           const n = [...items]
-                          n[i] = { ...n[i], mode: e.target.value as QItemMode, product_id: undefined, product_variant_id: undefined, name: '', price: 0, stock: undefined }
+                          n[i] = {
+                            ...n[i],
+                            mode: nextMode,
+                            product_id: undefined,
+                            product_variant_id: undefined,
+                            name: '',
+                            price: 0,
+                            stock: undefined,
+                            pricing_type: nextMode === 'product' ? 'part' : 'labor',
+                          }
                           setItems(n)
+                          const np = [...priceInputs]
+                          np[i] = '0'
+                          setPriceInputs(np)
                           const ns = [...invSearch]; ns[i] = ''; setInvSearch(ns)
                           const nr = [...invResults]; nr[i] = []; setInvResults(nr)
                         }}
@@ -502,7 +1268,7 @@ export function QuotationForm({ onComplete, jobData }: FormProps) {
                           <input
                             className="w-full rounded-lg border border-gray-200 pl-8 pr-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                             placeholder="ค้นหาสินค้าจาก catalog..."
-                            value={invSearch[i] ?? ''}
+                            value={invSearch[i] || it.name}
                             onChange={(e) => handleInvSearch(i, e.target.value)}
                             onFocus={() => setActiveInvRow(i)}
                           />
@@ -542,7 +1308,32 @@ export function QuotationForm({ onComplete, jobData }: FormProps) {
                       />
                     )}
                   </td>
-                  <td className="px-4 py-2.5 align-top"><input type="number" className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-right focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" value={it.price} onChange={(e) => { const n = [...items]; n[i] = { ...n[i], price: Number(e.target.value) }; setItems(n) }} /></td>
+                  <td className="px-4 py-2.5 align-top"><input type="number" className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-right focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" value={priceInputs[i] ?? ''} onChange={(e) => {
+                    const raw = e.target.value
+                    const np = [...priceInputs]
+                    np[i] = raw
+                    setPriceInputs(np)
+
+                    if (raw === '') {
+                      const n = [...items]
+                      n[i] = { ...n[i], price: 0 }
+                      setItems(n)
+                      return
+                    }
+
+                    if (raw === '-' || raw === '.' || raw === '-.') {
+                      return
+                    }
+
+                    const parsed = Number(raw)
+                    if (!Number.isFinite(parsed)) {
+                      return
+                    }
+
+                    const n = [...items]
+                    n[i] = { ...n[i], price: parsed }
+                    setItems(n)
+                  }} /></td>
                   <td className="px-4 py-2.5 align-top text-center"><input type="number" className="w-16 mx-auto rounded-lg border border-gray-200 px-2 py-1.5 text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" value={it.qty} onChange={(e) => { const n = [...items]; n[i] = { ...n[i], qty: Number(e.target.value) }; setItems(n) }} /></td>
                   <td className="px-4 py-2.5 align-top text-right font-medium text-gray-800 pt-3">฿{(it.price * it.qty).toLocaleString()}</td>
                   <td className="px-2 align-top pt-2"><button onClick={() => removeItem(i)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"><Trash2 className="h-4 w-4" /></button></td>
@@ -631,12 +1422,20 @@ export function ApproveForm({ onComplete, jobData }: FormProps) {
         </h4>
         <div className="space-y-2.5 text-sm text-gray-700 relative z-10">
           {items.length > 0 ? (
-            items.map((it, i) => (
-              <div key={i} className="flex justify-between items-start">
-                <span className="font-medium pr-4">{'name' in it ? it.name : (it.product_name ?? it.description ?? '')} <span className="text-gray-400 font-normal">× {'qty' in it ? it.qty : it.quantity}</span></span>
-                <span className="whitespace-nowrap font-medium text-gray-900">฿{('subtotal' in it ? it.subtotal : 0)?.toLocaleString()}</span>
-              </div>
-            ))
+            items.map((it, i) => {
+              const lineName = ('name' in it ? it.name : (it.product_name ?? it.description ?? '')) || '—'
+              const lineQty = Number('qty' in it ? it.qty : it.quantity)
+              const lineUnitPrice = Number(('unit_price' in it ? (it as any).unit_price : 0) ?? 0)
+              const lineDiscount = Number(((it as any).discount ?? 0))
+              const lineAmountRaw = ('subtotal' in it ? it.subtotal : ((it as any).total ?? (lineQty * lineUnitPrice - lineDiscount))) as number | string
+              const lineAmount = Number(lineAmountRaw)
+              return (
+                <div key={i} className="flex justify-between items-start">
+                  <span className="font-medium pr-4">{lineName} <span className="text-gray-400 font-normal">× {Number.isFinite(lineQty) ? lineQty : 0}</span></span>
+                  <span className="whitespace-nowrap font-medium text-gray-900">฿{(Number.isFinite(lineAmount) ? lineAmount : (lineQty * lineUnitPrice - lineDiscount)).toLocaleString()}</span>
+                </div>
+              )
+            })
           ) : (
             <p className="text-gray-500 text-xs italic">ไม่มีรายการ</p>
           )}
@@ -692,7 +1491,34 @@ export function ApproveForm({ onComplete, jobData }: FormProps) {
 export function InvoiceForm({ onComplete, jobData }: FormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const qt = jobData?.quotation
-  const grandTotal = qt?.grand_total ?? jobData?.grand_total ?? 0
+  const quoteItems = (qt?.items?.length
+    ? qt.items.map((it, idx) => ({
+        id: it.id ?? idx,
+        name: it.description ?? it.product_name ?? it.variant?.name ?? '-',
+        qty: Number(it.quantity ?? 0),
+        unitPrice: Number(it.unit_price ?? 0),
+        discount: Number(it.discount ?? 0),
+        lineTotal: Number(it.subtotal ?? (Number(it.quantity ?? 0) * Number(it.unit_price ?? 0) - Number(it.discount ?? 0))),
+        pricingType: it.pricing_type,
+      }))
+    : (jobData?.items ?? []).map((it) => ({
+        id: it.id,
+        name: it.name,
+        qty: Number(it.qty ?? 0),
+        unitPrice: Number(it.unit_price ?? 0),
+        discount: Number(it.discount ?? 0),
+        lineTotal: Number(it.subtotal ?? (Number(it.qty ?? 0) * Number(it.unit_price ?? 0) - Number(it.discount ?? 0))),
+        pricingType: it.pricing_type,
+      })))
+  const itemsSubtotal = quoteItems.reduce((sum, it) => sum + it.qty * it.unitPrice, 0)
+  const itemsDiscount = quoteItems.reduce((sum, it) => sum + it.discount, 0)
+  const beforeVat = quoteItems.reduce((sum, it) => sum + it.lineTotal, 0)
+  const vatPercent = Number(qt?.vat_percent ?? jobData?.vat_percent ?? 7)
+  const vatAmount = Number(qt?.vat_amount ?? jobData?.vat_amount ?? Math.round(beforeVat * (vatPercent / 100)))
+  const grandTotal = Number(qt?.grand_total ?? jobData?.grand_total ?? (beforeVat + vatAmount))
+  const vehicle = [jobData?.serviceOrder?.vehicle?.brand, jobData?.serviceOrder?.vehicle?.model].filter(Boolean).join(' / ')
+  const plateNo = jobData?.serviceOrder?.vehicle?.plate_number ?? '—'
+  const quoteDate = qt?.created_at ?? jobData?.createdAt
 
   const handleSubmit = async () => {
     if (isSubmitting) return
@@ -719,10 +1545,71 @@ export function InvoiceForm({ onComplete, jobData }: FormProps) {
         <h4 className="text-sm font-semibold text-indigo-800 mb-4 flex items-center gap-2">
           <Receipt className="h-4 w-4" /> สรุปก่อนออกใบแจ้งหนี้
         </h4>
-        <div className="space-y-3 text-sm relative z-10">
-          <div className="flex justify-between items-center"><span className="text-gray-500">อ้างอิง QT</span><span className="font-semibold text-gray-900 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs">{qt?.quotation_no ?? '—'}</span></div>
-          <div className="flex justify-between items-center"><span className="text-gray-500">ลูกค้า</span><span className="font-medium text-gray-900">{jobData?.customerName ?? '—'}</span></div>
-          <div className="flex justify-between items-center border-t border-indigo-200 pt-3 mt-1 text-base font-bold"><span>ยอดใบแจ้งหนี้สุทธิ</span><span className="text-indigo-600 text-lg">฿{grandTotal.toLocaleString()}</span></div>
+        <div className="relative z-10 space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-indigo-100 bg-white/80 p-3 text-sm">
+              <div className="text-xs text-indigo-600 font-semibold mb-2">ข้อมูลเอกสาร</div>
+              <div className="space-y-1.5 text-gray-700">
+                <div className="flex items-center justify-between"><span className="text-gray-500">อ้างอิง QT</span><span className="font-semibold text-gray-900 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs">{qt?.quotation_no ?? '—'}</span></div>
+                <div className="flex items-center justify-between"><span className="text-gray-500">เลขที่งาน</span><span className="font-medium text-gray-900">{jobData?.jobNumber || '—'}</span></div>
+                <div className="flex items-center justify-between"><span className="text-gray-500">วันที่เอกสาร</span><span className="font-medium text-gray-900">{quoteDate ? new Date(quoteDate).toLocaleDateString('th-TH') : '—'}</span></div>
+              </div>
+            </div>
+            <div className="rounded-lg border border-indigo-100 bg-white/80 p-3 text-sm">
+              <div className="text-xs text-indigo-600 font-semibold mb-2">ข้อมูลลูกค้า / รถ</div>
+              <div className="space-y-1.5 text-gray-700">
+                <div className="flex items-center justify-between gap-2"><span className="text-gray-500">ลูกค้า</span><span className="font-medium text-gray-900 text-right">{jobData?.customerName ?? '—'}</span></div>
+                <div className="flex items-center justify-between"><span className="text-gray-500">เบอร์โทร</span><span className="font-medium text-gray-900">{jobData?.customerPhone || '—'}</span></div>
+                <div className="flex items-center justify-between gap-2"><span className="text-gray-500">รถ</span><span className="font-medium text-gray-900 text-right">{vehicle || '—'}</span></div>
+                <div className="flex items-center justify-between"><span className="text-gray-500">ทะเบียน</span><span className="font-medium text-gray-900">{plateNo}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-indigo-100 bg-white/90 overflow-hidden">
+            <div className="px-3 py-2 bg-indigo-50/80 border-b border-indigo-100 flex items-center justify-between">
+              <span className="text-xs font-semibold text-indigo-700">รายการที่ใช้สร้างใบแจ้งหนี้</span>
+              <span className="text-xs text-indigo-600">{quoteItems.length} รายการ</span>
+            </div>
+            <div>
+              <table className="w-full text-xs">
+                <thead className="bg-white sticky top-0 z-10">
+                  <tr className="text-gray-500 border-b border-indigo-100">
+                    <th className="px-3 py-2 text-left font-semibold">รายการ</th>
+                    <th className="px-2 py-2 text-center font-semibold w-16">จำนวน</th>
+                    <th className="px-2 py-2 text-right font-semibold w-24">ราคา/หน่วย</th>
+                    <th className="px-2 py-2 text-right font-semibold w-24">มูลค่า</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quoteItems.map((item) => (
+                    <tr key={item.id} className="border-b border-indigo-50 last:border-b-0">
+                      <td className="px-3 py-2.5">
+                        <div className="font-medium text-gray-800">{item.name}</div>
+                        <div className="text-[11px] text-gray-500">{item.pricingType === 'labor' ? 'ค่าแรง' : 'อะไหล่/สินค้า'}</div>
+                      </td>
+                      <td className="px-2 py-2.5 text-center text-gray-700">{item.qty.toLocaleString()}</td>
+                      <td className="px-2 py-2.5 text-right text-gray-700">฿{item.unitPrice.toLocaleString()}</td>
+                      <td className="px-2 py-2.5 text-right font-semibold text-gray-900">฿{item.lineTotal.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                  {quoteItems.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-6 text-center text-gray-500">ไม่พบรายการจากใบเสนอราคา</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="ml-auto w-full max-w-sm rounded-lg border border-indigo-200 bg-white p-3 text-sm space-y-1.5">
+            <div className="flex items-center justify-between text-gray-600"><span>ยอดรวมรายการ</span><span>฿{itemsSubtotal.toLocaleString()}</span></div>
+            <div className="flex items-center justify-between text-gray-600"><span>ส่วนลดรวม</span><span>฿{itemsDiscount.toLocaleString()}</span></div>
+            <div className="flex items-center justify-between text-gray-700"><span>ยอดก่อน VAT</span><span className="font-medium">฿{beforeVat.toLocaleString()}</span></div>
+            <div className="flex items-center justify-between text-gray-700"><span>VAT {vatPercent}%</span><span className="font-medium">฿{vatAmount.toLocaleString()}</span></div>
+            <div className="flex justify-between items-center border-t border-indigo-200 pt-2 mt-1 text-base font-bold"><span>ยอดใบแจ้งหนี้สุทธิ</span><span className="text-indigo-600 text-lg">฿{grandTotal.toLocaleString()}</span></div>
+          </div>
         </div>
       </div>
       <ActionButton onClick={handleSubmit} loading={isSubmitting} variant="primary">
@@ -734,15 +1621,71 @@ export function InvoiceForm({ onComplete, jobData }: FormProps) {
 
 /* ─── Repair Work Step ─── */
 export function RepairWorkForm({ onComplete, jobData }: FormProps) {
+  const { employee } = useAuthStore()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
-  const [tasks, setTasks] = useState([
-    { name: 'ถอดหม้อน้ำเก่า', done: false },
-    { name: 'ติดตั้งหม้อน้ำใหม่', done: false },
-    { name: 'เติมน้ำยาหล่อเย็น', done: false },
-    { name: 'ทดสอบระบบ', done: false },
-  ])
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([])
+  const photoPreviewUrlsRef = useRef<string[]>([])
+  type RepairTask = { name: string; reason: string; done: boolean }
+  type UsedPart = { name: string; symptom: string; qty: number }
+
+  const buildRepairTasksFromAssessment = () => {
+    const checklist = parseChecklistFromNote(jobData?.serviceOrder?.internal_note)
+    const mapped = checklist.map((cl) => ({
+      name: cl.name,
+      reason: cl.reason.trim(),
+      done: false,
+    }))
+
+    return mapped
+  }
+
+  const buildUsedPartsFromAssessment = () => {
+    const sourceItems = (jobData?.serviceOrder?.items?.length
+      ? jobData.serviceOrder.items
+      : (jobData?.items ?? [])) as Array<any>
+
+    return sourceItems
+      .map((it) => {
+        const name = (it.variant?.name ?? it.product?.name ?? it.name ?? it.custom_name ?? '').trim()
+        const symptom = (it.issue ?? it.notes ?? '').trim()
+        const qty = Number(it.quantity ?? it.qty ?? 1)
+        if (!name) return null
+        return {
+          name,
+          symptom,
+          qty,
+        }
+      })
+      .filter((it): it is UsedPart => Boolean(it))
+  }
+
+  const [tasks, setTasks] = useState<RepairTask[]>(buildRepairTasksFromAssessment)
+  const [usedParts, setUsedParts] = useState<UsedPart[]>(buildUsedPartsFromAssessment)
+
+  useEffect(() => {
+    setTasks(buildRepairTasksFromAssessment())
+    setUsedParts(buildUsedPartsFromAssessment())
+  }, [JSON.stringify(jobData?.serviceOrder?.items ?? []), JSON.stringify(jobData?.items ?? []), jobData?.serviceOrder?.internal_note])
+
   const allDone = tasks.every((t) => t.done)
+
+  const handlePhotoChange = (files: File[]) => {
+    photoPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+    const nextUrls = files.map((file) => URL.createObjectURL(file))
+    photoPreviewUrlsRef.current = nextUrls
+    setPhotoPreviewUrls(nextUrls)
+    setPhotos(files)
+  }
+
+  const removeSelectedPhoto = (idx: number) => {
+    const nextPhotos = photos.filter((_, photoIdx) => photoIdx !== idx)
+    handlePhotoChange(nextPhotos)
+  }
+
+  useEffect(() => () => {
+    photoPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+  }, [])
 
   const handleSubmit = async () => {
     if (isSubmitting) return
@@ -750,12 +1693,48 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
     if (!soId) { toast.error('ไม่พบข้อมูลใบสั่งซ่อม'); return }
     setIsSubmitting(true)
     try {
-      if (jobData?.serviceOrder?.status === 'approved') {
-        await serviceOrderService.transition(soId, { target_status: 'in_progress' })
+      const soDetail = await serviceOrderService.getServiceOrder(soId)
+      let currentStatus = soDetail.data.data.status
+      let technicianId = soDetail.data.data.technician_id
+
+      if (currentStatus === 'pending_quote') {
+        if (jobData?.quotation?.status !== 'approved') {
+          toast.error('ใบเสนอราคายังไม่อนุมัติ ไม่สามารถเริ่มงานซ่อมได้')
+          return
+        }
+        await serviceOrderService.transition(soId, { status: 'approved' })
+        const afterApprove = await serviceOrderService.getServiceOrder(soId)
+        currentStatus = afterApprove.data.data.status
+        technicianId = afterApprove.data.data.technician_id
+      }
+
+      if (currentStatus === 'approved') {
+        if (!technicianId) {
+          if (!employee?.id) {
+            toast.error('ไม่พบข้อมูลช่างผู้รับผิดชอบ กรุณาเข้าสู่ระบบใหม่')
+            return
+          }
+          await serviceOrderService.assign(soId, { technician_id: employee.id })
+          technicianId = employee.id
+        }
+        await serviceOrderService.transition(soId, { status: 'in_progress' })
+        currentStatus = 'in_progress'
+      }
+
+      if (currentStatus !== 'in_progress' && currentStatus !== 'completed') {
+        toast.error('สถานะใบงานยังไม่พร้อมสำหรับการปิดงานซ่อม')
+        return
       }
       
       // Upload repair photos
       if (photos.length > 0) {
+        const gpsPhotoTypeByStatus: Record<string, string> = {
+          in_progress: 'pre_repair',
+          completed: 'pre_delivery',
+          pending_pickup: 'delivery',
+        }
+        const gpsPhotoType = gpsPhotoTypeByStatus[currentStatus ?? ''] ?? 'pre_repair'
+
         let lat = 13.7563309
         let lng = 100.5017651
         try {
@@ -774,9 +1753,7 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
         for (const file of photos) {
           const formData = new FormData()
           formData.append('photo', file)
-          // Using pre_delivery for completed OR pre_repair for in_progress
-          // We will use pre_repair since this takes place before completed status
-          formData.append('type', 'pre_repair')
+          formData.append('type', gpsPhotoType)
           formData.append('latitude', lat.toString())
           formData.append('longitude', lng.toString())
           formData.append('taken_at', formatICT())
@@ -785,7 +1762,9 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
         }
       }
 
-      await serviceOrderService.transition(soId, { target_status: 'completed' })
+      if (currentStatus === 'in_progress') {
+        await serviceOrderService.transition(soId, { status: 'completed' })
+      }
       toast.success('ซ่อมเสร็จเรียบร้อย')
       onComplete()
     } catch (err: any) {
@@ -801,15 +1780,68 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
         <div className="bg-gray-50/80 px-4 py-3 border-b border-gray-200 flex items-center gap-2 text-sm font-semibold text-gray-700">
           <Wrench className="h-4 w-4 text-gray-500" /> รายการซ่อม
         </div>
-        {tasks.map((t, i) => (
-          <label key={i} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 cursor-pointer transition-colors group">
-            <div className="relative flex items-center justify-center">
-              <input type="checkbox" checked={t.done} onChange={(e) => { const n = [...tasks]; n[i].done = e.target.checked; setTasks(n) }}
-                className="peer h-5 w-5 rounded-md border-gray-300 text-blue-600 focus:ring-blue-500 transition-all" />
-            </div>
-            <span className={cn('text-sm font-medium transition-colors', t.done ? 'line-through text-gray-400' : 'text-gray-700 group-hover:text-gray-900')}>{t.name}</span>
-          </label>
-        ))}
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50/70 text-gray-600">
+              <tr>
+                <th className="w-12 px-4 py-2.5 text-left">✓</th>
+                <th className="px-4 py-2.5 text-left">รายการซ่อม</th>
+                <th className="px-4 py-2.5 text-left">สาเหตุ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map((t, i) => (
+                <tr key={i} className="border-t border-gray-100 hover:bg-gray-50/60">
+                  <td className="px-4 py-3 align-middle">
+                    <input
+                      type="checkbox"
+                      checked={t.done}
+                      onChange={(e) => {
+                        const n = [...tasks]
+                        n[i].done = e.target.checked
+                        setTasks(n)
+                      }}
+                      className="h-5 w-5 rounded-md border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </td>
+                  <td className={cn('px-4 py-3 font-medium', t.done ? 'line-through text-gray-400' : 'text-gray-800')}>{t.name}</td>
+                  <td className={cn('px-4 py-3', t.done ? 'text-gray-400' : 'text-gray-700')}>{t.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
+        <div className="bg-gray-50/80 px-4 py-3 border-b border-gray-200 flex items-center gap-2 text-sm font-semibold text-gray-700">
+          <Wrench className="h-4 w-4 text-gray-500" /> ของที่ใช้ซ่อม
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50/70 text-gray-600">
+              <tr>
+                <th className="px-4 py-2.5 text-left">รายการ</th>
+                <th className="px-4 py-2.5 text-left">อาการ</th>
+                <th className="w-24 px-4 py-2.5 text-right">จำนวน</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usedParts.map((item, i) => (
+                <tr key={i} className="border-t border-gray-100 hover:bg-gray-50/60">
+                  <td className="px-4 py-3 text-gray-800">{item.name}</td>
+                  <td className="px-4 py-3 text-gray-700">{item.symptom}</td>
+                  <td className="px-4 py-3 text-right font-medium text-gray-800">{item.qty}</td>
+                </tr>
+              ))}
+              {usedParts.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-6 text-center text-gray-500">ยังไม่มีรายการของที่ใช้ซ่อม</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
       
       <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/50 py-6 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:border-gray-400 hover:text-gray-700 transition-all cursor-pointer w-full group">
@@ -826,9 +1858,26 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
           accept="image/*" 
           capture="environment" 
           className="hidden" 
-          onChange={(e) => setPhotos(Array.from(e.target.files ?? []))}
+          onChange={(e) => handlePhotoChange(Array.from(e.target.files ?? []))}
         />
       </label>
+
+      {photoPreviewUrls.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          {photoPreviewUrls.map((url, idx) => (
+            <div key={`${url}-${idx}`} className="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => removeSelectedPhoto(idx)}
+                className="absolute right-2 top-2 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-gray-500 shadow-sm ring-1 ring-gray-200 transition-colors hover:bg-red-50 hover:text-red-500"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+              <img src={url} alt={`repair-preview-${idx + 1}`} className="h-20 w-full rounded object-contain bg-gray-50" />
+            </div>
+          ))}
+        </div>
+      )}
       
       <div className="pt-2">
         <ActionButton onClick={handleSubmit} loading={isSubmitting} disabled={!allDone}>
@@ -1005,7 +2054,7 @@ export function DeliverForm({ onComplete, jobData, type = 'repair' }: FormProps 
         })
       }
       if (isRepair && soId) {
-        await serviceOrderService.transition(soId, { target_status: 'closed' })
+        await serviceOrderService.transition(soId, { status: 'closed' })
       }
       toast.success('ปิดงานเรียบร้อย')
       onComplete()

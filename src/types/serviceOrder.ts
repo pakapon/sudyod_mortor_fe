@@ -19,20 +19,24 @@ export interface ServiceOrderItem {
   service_order_id: number
   item_type: ServiceOrderItemType
   product_id?: number
+  product_variant_id?: number
   product?: { id: number; name: string; sku?: string }
+  variant?: { id: number; name: string; sku?: string }
   custom_name?: string
   quantity: number
   unit_price: number
   discount?: number
   total_price: number
+  total?: number
+  notes?: string
   is_additional?: boolean
 }
 
 export interface ServiceOrderGpsPhoto {
   id: number
   service_order_id: number
-  photo_type: GpsPhotoType
-  file_url: string
+  type: GpsPhotoType
+  photo_url: string
   latitude?: number
   longitude?: number
   taken_at?: string
@@ -128,14 +132,18 @@ export interface UpdateServiceOrderPayload {
 export interface ServiceOrderItemPayload {
   item_type: ServiceOrderItemType
   product_id?: number
+  product_variant_id?: number
   custom_name?: string
   quantity: number
   unit_price: number
   discount?: number
+  pricing_type?: 'labor' | 'part' | 'service'
+  notes?: string
 }
 
 export interface TransitionPayload {
-  target_status: ServiceOrderStatus
+  status?: ServiceOrderStatus
+  target_status?: ServiceOrderStatus
   note?: string
 }
 

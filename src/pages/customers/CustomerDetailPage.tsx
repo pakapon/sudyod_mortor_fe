@@ -482,6 +482,15 @@ export function CustomerDetailPage() {
               <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
             </svg>
           </Link>
+          {customer.photo_url ? (
+            <img src={customer.photo_url} alt={displayName} className="h-12 w-12 rounded-full object-cover border border-gray-200 flex-shrink-0" />
+          ) : (
+            <div className="h-12 w-12 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+              </svg>
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>

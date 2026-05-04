@@ -9,11 +9,13 @@ import { invoiceService } from '@/api/invoiceService'
 import { depositService } from '@/api/depositService'
 import { toast } from 'react-hot-toast'
 import {
-  Car, Search, FileText, CheckCircle, Receipt, Wrench, CreditCard, Flag, Package, BadgeDollarSign, Check, Printer, ShoppingCart, ArrowLeft, ArrowRight, PenTool
+  Car, Search, FileText, CheckCircle, Receipt, Wrench, CreditCard, Flag, Package, BadgeDollarSign, Check, Printer, ShoppingCart, ArrowLeft, ArrowRight, PenTool, Eye, Download, Link2
 } from 'lucide-react'
 import type { ServiceOrder } from '@/types/serviceOrder'
 import type { Quotation } from '@/types/quotation'
 import type { Invoice } from '@/types/invoice'
+import { DocumentOutputModal } from '@/components/ui/DocumentOutputModal'
+import { jsPDF } from 'jspdf'
 
 /* ─── Unified Job Data (passed to StepForms) ─── */
 export interface JobData {
@@ -30,12 +32,22 @@ export interface JobData {
   description: string
   createdAt: string
   branch: { name: string; address: string; phone: string; tax_id: string }
-  items: Array<{ id: number; name: string; qty: number; unit_price: number; discount: number; subtotal: number; pricing_type: 'part' | 'labor' }>
+  items: Array<{ id: number; name: string; qty: number; unit_price: number; discount: number; subtotal: number; pricing_type: 'part' | 'labor'; product_id?: number; product_variant_id?: number }>
   subtotal: number
   vat_percent: number
   vat_amount: number
   grand_total: number
   note: string
+}
+
+export interface QuotationDraft {
+  items: JobData['items']
+  subtotal: number
+  discount: number
+  vatPercent: number
+  vatAmount: number
+  grandTotal: number
+  note?: string
 }
 
 /* ─── Flow Step Definitions ─── */
@@ -78,18 +90,19 @@ export const FLOW_STEPS: Record<string, FlowStep[]> = {
 interface FlowStepperProps {
   steps: FlowStep[]
   currentStep: number
+  maxStep: number
   onStepClick?: (index: number) => void
 }
 
-export function FlowStepper({ steps, currentStep, onStepClick }: FlowStepperProps) {
+export function FlowStepper({ steps, currentStep, maxStep, onStepClick }: FlowStepperProps) {
   return (
     <div className="relative">
       {/* Desktop Stepper */}
       <div className="hidden lg:flex items-start">
         {steps.map((step, i) => {
-          const isCompleted = i < currentStep
+          const isCompleted = i < maxStep
           const isCurrent = i === currentStep
-          const isFuture = i > currentStep
+          const isFuture = i > maxStep
 
           return (
             <div key={step.id} className="flex flex-1 items-start group">
@@ -102,7 +115,7 @@ export function FlowStepper({ steps, currentStep, onStepClick }: FlowStepperProp
                   )}
                   <button
                     onClick={() => onStepClick?.(i)}
-                    disabled={isFuture}
+                    disabled={i > maxStep}
                     className={cn(
                       'relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl text-sm font-semibold transition-all duration-500',
                       isCompleted && 'bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-indigo-400',
@@ -141,7 +154,7 @@ export function FlowStepper({ steps, currentStep, onStepClick }: FlowStepperProp
                 <div className="relative mt-7 h-1 flex-1 -mx-4 rounded-full bg-gray-100 overflow-hidden">
                   <div className={cn(
                     'absolute inset-y-0 left-0 transition-all duration-700 ease-out rounded-full',
-                    i < currentStep ? 'w-full bg-gradient-to-r from-indigo-500 to-blue-500' : 'w-0'
+                    i < maxStep ? 'w-full bg-gradient-to-r from-indigo-500 to-blue-500' : 'w-0'
                   )} />
                 </div>
               )}
@@ -188,14 +201,24 @@ import {
 } from './components/StepForms'
 
 /* ─── Step Content — renders the correct form per step ID ─── */
-function StepContent({ step, flowType, jobData, onComplete }: { step: FlowStep; flowType: string; jobData: JobData | null; onComplete: (meta?: { newId?: number; invoiceId?: number }) => void }) {
+function StepContent({ step, flowType, jobData, onComplete, isPastStep, onGoToStep, onQuoteDraftChange }: {
+  step: FlowStep
+  flowType: string
+  jobData: JobData | null
+  onComplete: (meta?: { newId?: number; invoiceId?: number }) => void
+  isPastStep: boolean
+  onGoToStep: (stepId: string) => void
+  onQuoteDraftChange: (draft: QuotationDraft | null) => void
+}) {
+  const navigate = useNavigate()
   const { permissions } = useAuthStore()
   const canPerform = hasPermission(permissions, step.permission.module, step.permission.action as any)
+  const canApproveQt = hasPermission(permissions, 'quotations', 'can_approve')
 
   const STEP_FORMS: Record<string, React.ReactNode> = {
     receive:    <ReceiveVehicleForm onComplete={onComplete} jobData={jobData} />,
     assess:     <AssessmentForm onComplete={onComplete} jobData={jobData} />,
-    quote:      <QuotationForm onComplete={onComplete} jobData={jobData} />,
+    quote:      <QuotationForm onComplete={onComplete} jobData={jobData} onDraftChange={onQuoteDraftChange} />,
     approve:    <ApproveForm onComplete={onComplete} jobData={jobData} />,
     invoice:    <InvoiceForm onComplete={onComplete} jobData={jobData} />,
     repair_wk:  <RepairWorkForm onComplete={onComplete} jobData={jobData} />,
@@ -205,7 +228,7 @@ function StepContent({ step, flowType, jobData, onComplete }: { step: FlowStep; 
   }
 
   return (
-    <div className="relative rounded-3xl border border-gray-200/50 bg-white/70 backdrop-blur-xl p-6 sm:p-10 shadow-[0_8px_40px_rgb(0,0,0,0.04)] overflow-hidden">
+    <div className="relative rounded-3xl border border-gray-200/50 bg-white/70 backdrop-blur-xl p-6 sm:p-10 shadow-[0_8px_40px_rgb(0,0,0,0.04)]">
       {/* Decorative gradient blur */}
       <div className="absolute top-0 right-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-blue-500/5 blur-3xl" />
       <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-indigo-500/5 blur-3xl" />
@@ -243,6 +266,52 @@ function StepContent({ step, flowType, jobData, onComplete }: { step: FlowStep; 
             </p>
             <p className="mt-1.5 text-sm text-amber-600/80">คุณไม่มีสิทธิ์ในการจัดการขั้นตอนนี้</p>
           </div>
+        ) : isPastStep ? (
+          <>
+            <div className="pointer-events-none select-none opacity-60">
+              {STEP_FORMS[step.id] || <p className="text-sm text-gray-400 text-center py-8">ไม่พบฟอร์ม</p>}
+            </div>
+            {/* Past-step action banner */}
+            {step.id === 'quote' ? (
+              <div className="mt-6 rounded-2xl border border-blue-200/60 bg-blue-50/80 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-blue-800">ส่งกลับให้ช่างประเมิน</p>
+                  <p className="text-xs text-blue-600 mt-0.5">ยกเลิกใบเสนอราคาและส่งกลับให้ช่างประเมินใหม่</p>
+                </div>
+                <button
+                  onClick={() => onGoToStep('assess')}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 hover:bg-blue-700 transition-all whitespace-nowrap"
+                >
+                  <ArrowLeft className="h-4 w-4" /> ส่งกลับช่างประเมิน
+                </button>
+              </div>
+            ) : step.id === 'approve' && canApproveQt ? (
+              <div className="mt-6 rounded-2xl border border-amber-200/60 bg-amber-50/80 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">ยกเลิกและแก้ไขใบเสนอราคา</p>
+                  <p className="text-xs text-amber-600 mt-0.5">ย้อนกลับไปแก้ไขใบเสนอราคาก่อนอนุมัติ</p>
+                </div>
+                <button
+                  onClick={() => onGoToStep('quote')}
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-amber-600/20 hover:bg-amber-700 transition-all whitespace-nowrap"
+                >
+                  <ArrowLeft className="h-4 w-4" /> แก้ไขใบเสนอราคา
+                </button>
+              </div>
+            ) : (
+              <div className="mt-6 rounded-2xl border border-gray-200/60 bg-gray-50/80 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-600">
+                    <Check className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">ขั้นตอนนี้ดำเนินการเสร็จสิ้นแล้ว</p>
+                    <p className="text-xs text-gray-500 mt-0.5">ไม่สามารถแก้ไขย้อนหลังได้</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           STEP_FORMS[step.id] || <p className="text-sm text-gray-400 text-center py-8">ไม่พบฟอร์ม</p>
         )}
@@ -257,6 +326,296 @@ const formatDate = (s?: string | null) =>
 
 const formatCurrency = (n?: number | null) =>
   n != null ? n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'
+
+const toNumber = (value: unknown, fallback = 0): number => {
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
+const cleanDocumentNote = (raw?: string | null): string => {
+  const text = (raw ?? '')
+    .replace(/\[CHECKLIST_TEMPLATE_START\][\s\S]*?\[CHECKLIST_TEMPLATE_END\]/g, '')
+    .replace(/\[CHECKLIST_RESULT_START\][\s\S]*?\[CHECKLIST_RESULT_END\]/g, '')
+    .trim()
+  return text
+}
+
+function thaiAmountText(n: number): string {
+  const ones = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า']
+  const places = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน']
+  const cv = (num: number): string => {
+    if (num <= 0) return ''
+    const s = String(num); let r = ''
+    for (let i = 0; i < s.length; i++) {
+      const d = parseInt(s[i]); const place = s.length - 1 - i
+      if (!d) continue
+      if (place === 1 && d === 1) r += 'สิบ'
+      else if (place === 1 && d === 2) r += 'ยี่สิบ'
+      else r += ones[d] + (places[place] ?? '')
+    }
+    return r
+  }
+  const abs = Math.abs(Math.round(n))
+  const mil = Math.floor(abs / 1_000_000); const rem = abs % 1_000_000
+  let out = ''
+  if (mil) out += cv(mil) + 'ล้าน'
+  out += cv(rem) || (mil ? '' : 'ศูนย์')
+  return out + 'บาทถ้วน'
+}
+
+interface BillingDocDrawOpts {
+  docTitle: string; docSubTitle?: string; docNo: string; docDate: string; docRef?: string
+  branch: { name: string; address: string; phone: string; tax_id: string }
+  customerName: string; customerAddress?: string; customerPhone?: string; customerTaxId?: string
+  items: Array<{ name: string; qty: number; unit_price: number; discount: number; subtotal: number }>
+  subtotal: number; vatPercent: number; vatAmount: number; grandTotal: number
+  note?: string; sigLeftLabel: string; sigRightLabel: string
+}
+
+function drawBillingDocCanvas(ctx: CanvasRenderingContext2D, w: number, h: number, opts: BillingDocDrawOpts) {
+  const pad = 72; const right = w - pad; let y = 64
+  const fmtN = (num: number) => toNumber(num).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const tx = (text: string, x: number, yy: number, size: number, color = '#111827', weight = 400, align: CanvasTextAlign = 'left') => {
+    ctx.font = `${weight} ${size}px sans-serif`; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(text, x, yy); ctx.textAlign = 'left'
+  }
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h)
+  // Company (left)
+  tx(opts.branch.name || 'บริษัท', pad, y + 28, 26, '#111827', 700)
+  tx(opts.branch.address || '', pad, y + 54, 15, '#4b5563')
+  tx(`เลขประจำตัวผู้เสียภาษี ${opts.branch.tax_id || '-'}`, pad, y + 74, 15, '#4b5563')
+  tx(`โทร: ${opts.branch.phone || '-'}`, pad, y + 94, 15, '#4b5563')
+  // Document title (right)
+  tx(opts.docTitle, right, y + 32, 38, '#111827', 700, 'right')
+  let mY = opts.docSubTitle ? y + 58 : y + 50
+  if (opts.docSubTitle) { tx(opts.docSubTitle, right, mY, 15, '#6b7280', 400, 'right'); mY += 28 }
+  tx(`เลขที่   ${opts.docNo}`, right, mY, 18, '#374151', 500, 'right'); mY += 24
+  tx(`วันที่   ${opts.docDate}`, right, mY, 18, '#374151', 500, 'right'); mY += 24
+  if (opts.docRef) tx(`อ้างอิง   ${opts.docRef}`, right, mY, 18, '#374151', 500, 'right')
+  y += 140
+  ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 2.5
+  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(right, y); ctx.stroke(); y += 28
+  // Customer
+  tx('ลูกค้า', pad, y, 14, '#9ca3af', 600); y += 22
+  tx(opts.customerName, pad, y, 22, '#111827', 700); y += 28
+  if (opts.customerAddress) { tx(opts.customerAddress, pad, y, 15, '#4b5563'); y += 22 }
+  if (opts.customerTaxId) { tx(`เลขประจำตัวผู้เสียภาษี ${opts.customerTaxId}`, pad, y, 15, '#4b5563'); y += 22 }
+  if (opts.customerPhone) { tx(`โทร ${opts.customerPhone}`, pad, y, 15, '#4b5563'); y += 22 }
+  y += 24
+  // Items table
+  const colW = [50, 490, 100, 150, 110, 196]
+  const colX = colW.reduce((acc, _w, i) => { acc.push(i === 0 ? pad : acc[i - 1] + colW[i - 1]); return acc }, [] as number[])
+  const tblW = colW.reduce((a, b) => a + b, 0); const rowH = 44
+  const hdrLabels = ['#', 'รายละเอียด', 'จำนวน', 'ราคาต่อหน่วย', 'ส่วนลด', 'มูลค่า']
+  const hdrAligns: CanvasTextAlign[] = ['center', 'left', 'center', 'right', 'right', 'right']
+  ctx.fillStyle = '#1f2937'; ctx.fillRect(pad, y, tblW, rowH)
+  hdrLabels.forEach((lbl, i) => {
+    const cx = hdrAligns[i] === 'center' ? colX[i] + colW[i] / 2 : hdrAligns[i] === 'right' ? colX[i] + colW[i] - 10 : colX[i] + 10
+    tx(lbl, cx, y + 28, 16, '#fff', 600, hdrAligns[i])
+  }); y += rowH
+  opts.items.slice(0, 22).forEach((item, idx) => {
+    ctx.fillStyle = idx % 2 === 0 ? '#fff' : '#f9fafb'; ctx.fillRect(pad, y, tblW, rowH)
+    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 0.5; ctx.strokeRect(pad, y, tblW, rowH)
+    const by = y + 28
+    tx(String(idx + 1), colX[0] + colW[0] / 2, by, 16, '#374151', 400, 'center')
+    tx(item.name || '-', colX[1] + 10, by, 16, '#111827')
+    tx(String(toNumber(item.qty)), colX[2] + colW[2] / 2, by, 16, '#374151', 400, 'center')
+    tx(fmtN(toNumber(item.unit_price)), colX[3] + colW[3] - 10, by, 16, '#374151', 400, 'right')
+    tx(fmtN(toNumber(item.discount || 0)), colX[4] + colW[4] - 10, by, 16, '#374151', 400, 'right')
+    tx(fmtN(toNumber(item.subtotal)), colX[5] + colW[5] - 10, by, 16, '#111827', 500, 'right'); y += rowH
+  })
+  if (opts.items.length > 22) { tx(`... และอีก ${opts.items.length - 22} รายการ`, pad + 10, y + 28, 14, '#9ca3af'); y += rowH }
+  ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 1
+  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(pad + tblW, y); ctx.stroke(); y += 24
+  // Totals (right-aligned)
+  const totX = right - 380; const totRowH = 32
+  tx('รวมเป็นเงิน', totX, y + 22, 17, '#4b5563'); tx(`${fmtN(toNumber(opts.subtotal))} บาท`, right, y + 22, 17, '#374151', 500, 'right'); y += totRowH
+  tx(`ภาษีมูลค่าเพิ่ม ${toNumber(opts.vatPercent, 7)}%`, totX, y + 22, 17, '#4b5563'); tx(`${fmtN(toNumber(opts.vatAmount))} บาท`, right, y + 22, 17, '#374151', 500, 'right'); y += totRowH
+  ctx.strokeStyle = '#374151'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(totX, y + 4); ctx.lineTo(right, y + 4); ctx.stroke(); y += 10
+  tx('จำนวนเงินรวมทั้งสิ้น', totX, y + 28, 19, '#111827', 700); tx(`${fmtN(toNumber(opts.grandTotal))} บาท`, right, y + 28, 22, '#111827', 700, 'right'); y += 46
+  // Thai text amount
+  tx(`(${thaiAmountText(toNumber(opts.grandTotal))})`, pad, y, 17, '#374151'); y += 44
+  // Note
+  tx('หมายเหตุ', pad, y, 14, '#9ca3af', 600); y += 22
+  tx(opts.note || '-', pad, y, 15, '#4b5563')
+  // Signature — always at bottom of page
+  const sigY = h - 210
+  ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 1; ctx.beginPath()
+  ctx.moveTo(pad + 20, sigY); ctx.lineTo(pad + 310, sigY)
+  ctx.moveTo(right - 310, sigY); ctx.lineTo(right - 20, sigY); ctx.stroke()
+  tx(opts.sigLeftLabel, pad + 165, sigY + 28, 15, '#6b7280', 400, 'center')
+  tx('วันที่ ____________________', pad + 165, sigY + 52, 14, '#9ca3af', 400, 'center')
+  tx(`ในนาม ${opts.customerName}`, pad + 165, sigY + 78, 13, '#374151', 400, 'center')
+  tx(opts.sigRightLabel, right - 165, sigY + 28, 15, '#6b7280', 400, 'center')
+  tx('วันที่ ____________________', right - 165, sigY + 52, 14, '#9ca3af', 400, 'center')
+  tx(`ในนาม ${opts.branch.name}`, right - 165, sigY + 78, 13, '#374151', 400, 'center')
+  tx('Sudyod Motor', w / 2, h - 30, 13, '#d1d5db', 400, 'center')
+}
+
+function drawWarrantyDocCanvas(
+  ctx: CanvasRenderingContext2D, w: number, h: number,
+  opts: {
+    docNo: string; docDate: string
+    branch: { name: string; address: string; phone: string; tax_id: string }
+    customerName: string; customerPhone?: string
+    vehicle?: { brand?: string; model?: string; plate?: string; mileage?: number }
+    items: Array<{ name: string; qty: number; pricing_type: string }>
+    note?: string
+  }
+) {
+  const pad = 72; const right = w - pad; let y = 64
+  const tx = (text: string, x: number, yy: number, size: number, color = '#111827', weight = 400, align: CanvasTextAlign = 'left') => {
+    ctx.font = `${weight} ${size}px sans-serif`; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(text, x, yy); ctx.textAlign = 'left'
+  }
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h)
+  tx(opts.branch.name || 'บริษัท', pad, y + 28, 26, '#111827', 700)
+  tx(opts.branch.address || '', pad, y + 54, 15, '#4b5563')
+  tx(`เลขประจำตัวผู้เสียภาษี ${opts.branch.tax_id || '-'}`, pad, y + 74, 15, '#4b5563')
+  tx(`โทร: ${opts.branch.phone || '-'}`, pad, y + 94, 15, '#4b5563')
+  tx('ใบรับประกัน', right, y + 32, 38, '#111827', 700, 'right')
+  tx(`เลขที่   ${opts.docNo}`, right, y + 62, 18, '#374151', 500, 'right')
+  tx(`วันที่   ${opts.docDate}`, right, y + 86, 18, '#374151', 500, 'right')
+  y += 140
+  ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 2.5
+  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(right, y); ctx.stroke(); y += 28
+  tx('ลูกค้า', pad, y, 14, '#9ca3af', 600); y += 22
+  tx(opts.customerName, pad, y, 22, '#111827', 700); y += 28
+  if (opts.customerPhone) { tx(`โทร ${opts.customerPhone}`, pad, y, 15, '#4b5563'); y += 22 }
+  y += 16
+  if (opts.vehicle) {
+    tx('ข้อมูลรถ', pad, y, 14, '#9ca3af', 600); y += 22
+    const veh = opts.vehicle
+    tx([veh.brand, veh.model].filter(Boolean).join(' ') || '-', pad, y, 18, '#111827', 600); y += 26
+    if (veh.plate) tx(`ทะเบียน: ${veh.plate}`, pad, y, 15, '#4b5563')
+    if (veh.mileage) tx(`เลขไมล์: ${veh.mileage.toLocaleString()} กม.`, pad + 320, y, 15, '#4b5563')
+    y += 26
+  }
+  y += 16
+  ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1
+  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(right, y); ctx.stroke(); y += 20
+  tx('รายการที่รับประกัน', pad, y, 16, '#111827', 700); y += 28
+  const wItems = opts.items.filter((it) => it.pricing_type === 'part')
+  const showItems = wItems.length > 0 ? wItems : opts.items
+  showItems.slice(0, 15).forEach((item, i) => {
+    tx(`${i + 1}. ${item.name || '-'}`, pad + 20, y, 16, '#374151'); y += 26
+  })
+  y += 20
+  ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1
+  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(right, y); ctx.stroke(); y += 20
+  tx('เงื่อนไขการรับประกัน', pad, y, 16, '#111827', 700); y += 30
+  const terms = [
+    '1. รับประกันคุณภาพอะไหล่และค่าแรง ระยะเวลา 3 เดือน นับจากวันรับรถ',
+    '2. ไม่รับประกันกรณีเกิดอุบัติเหตุ การดัดแปลง หรือการใช้งานผิดวัตถุประสงค์',
+    '3. การรับประกันไม่ครอบคลุมชิ้นส่วนที่สึกหรอตามปกติ (ยาง, เบรก, น้ำมัน)',
+    '4. ต้องนำรถเข้ารับการตรวจสอบและซ่อมที่ร้านเดิมเท่านั้น',
+    '5. กรุณาเก็บใบรับประกันนี้ไว้เป็นหลักฐาน',
+  ]
+  terms.forEach((term) => { tx(term, pad, y, 15, '#4b5563'); y += 26 })
+  if (opts.note) { y += 14; tx('หมายเหตุ', pad, y, 14, '#9ca3af', 600); y += 22; tx(opts.note, pad, y, 15, '#4b5563') }
+  // Signature — always at bottom
+  const sigY = h - 210
+  ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 1; ctx.beginPath()
+  ctx.moveTo(pad + 20, sigY); ctx.lineTo(pad + 310, sigY)
+  ctx.moveTo(right - 310, sigY); ctx.lineTo(right - 20, sigY); ctx.stroke()
+  tx('ลูกค้าผู้รับการรับประกัน', pad + 165, sigY + 28, 15, '#6b7280', 400, 'center')
+  tx('วันที่ ____________________', pad + 165, sigY + 52, 14, '#9ca3af', 400, 'center')
+  tx(`ในนาม ${opts.customerName}`, pad + 165, sigY + 78, 13, '#374151', 400, 'center')
+  tx('ผู้รับรองการรับประกัน', right - 165, sigY + 28, 15, '#6b7280', 400, 'center')
+  tx('วันที่ ____________________', right - 165, sigY + 52, 14, '#9ca3af', 400, 'center')
+  tx(`ในนาม ${opts.branch.name}`, right - 165, sigY + 78, 13, '#374151', 400, 'center')
+  tx('Sudyod Motor', w / 2, h - 30, 13, '#d1d5db', 400, 'center')
+}
+
+const crc32Table = (() => {
+  const table = new Uint32Array(256)
+  for (let i = 0; i < 256; i += 1) {
+    let c = i
+    for (let j = 0; j < 8; j += 1) {
+      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1)
+    }
+    table[i] = c >>> 0
+  }
+  return table
+})()
+
+function crc32(bytes: Uint8Array): number {
+  let c = 0xffffffff
+  for (let i = 0; i < bytes.length; i += 1) {
+    c = crc32Table[(c ^ bytes[i]) & 0xff] ^ (c >>> 8)
+  }
+  return (c ^ 0xffffffff) >>> 0
+}
+
+function writeUint32LE(view: DataView, offset: number, value: number) {
+  view.setUint32(offset, value >>> 0, true)
+}
+
+function writeUint16LE(view: DataView, offset: number, value: number) {
+  view.setUint16(offset, value & 0xffff, true)
+}
+
+async function buildSingleFileZip(fileName: string, fileBlob: Blob): Promise<Blob> {
+  const fileBytes = new Uint8Array(await fileBlob.arrayBuffer())
+  const fileNameBytes = new TextEncoder().encode(fileName)
+  const fileCrc32 = crc32(fileBytes)
+
+  const localHeaderSize = 30 + fileNameBytes.length
+  const centralHeaderSize = 46 + fileNameBytes.length
+  const eocdSize = 22
+  const totalSize = localHeaderSize + fileBytes.length + centralHeaderSize + eocdSize
+
+  const out = new Uint8Array(totalSize)
+  const view = new DataView(out.buffer)
+  let offset = 0
+
+  // Local file header
+  writeUint32LE(view, offset, 0x04034b50); offset += 4
+  writeUint16LE(view, offset, 20); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint32LE(view, offset, fileCrc32); offset += 4
+  writeUint32LE(view, offset, fileBytes.length); offset += 4
+  writeUint32LE(view, offset, fileBytes.length); offset += 4
+  writeUint16LE(view, offset, fileNameBytes.length); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  out.set(fileNameBytes, offset); offset += fileNameBytes.length
+  out.set(fileBytes, offset); offset += fileBytes.length
+
+  const centralDirectoryOffset = offset
+
+  // Central directory file header
+  writeUint32LE(view, offset, 0x02014b50); offset += 4
+  writeUint16LE(view, offset, 20); offset += 2
+  writeUint16LE(view, offset, 20); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint32LE(view, offset, fileCrc32); offset += 4
+  writeUint32LE(view, offset, fileBytes.length); offset += 4
+  writeUint32LE(view, offset, fileBytes.length); offset += 4
+  writeUint16LE(view, offset, fileNameBytes.length); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint32LE(view, offset, 0); offset += 4
+  writeUint32LE(view, offset, 0); offset += 4
+  out.set(fileNameBytes, offset); offset += fileNameBytes.length
+
+  // End of central directory record
+  writeUint32LE(view, offset, 0x06054b50); offset += 4
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 0); offset += 2
+  writeUint16LE(view, offset, 1); offset += 2
+  writeUint16LE(view, offset, 1); offset += 2
+  writeUint32LE(view, offset, centralHeaderSize); offset += 4
+  writeUint32LE(view, offset, centralDirectoryOffset); offset += 4
+  writeUint16LE(view, offset, 0)
+
+  return new Blob([out], { type: 'application/zip' })
+}
 
 /* ─── Document type config for print ─── */
 const STEP_DOC_CONFIG: Record<string, { title: string; noPrefix: string; noField: string }> = {
@@ -273,7 +632,7 @@ const STEP_DOC_CONFIG: Record<string, { title: string; noPrefix: string; noField
 
 /* ─── Status → Step mapping ─── */
 const SO_STATUS_STEP: Record<string, number> = {
-  draft: 0, pending_review: 1, pending_quote: 2, approved: 3,
+  draft: 0, pending_review: 1, pending_quote: 2, approved: 4,
   in_progress: 5, completed: 5, pending_payment: 6, pending_pickup: 7, closed: 7,
 }
 const QT_STATUS_STEP_SALE: Record<string, number> = {
@@ -284,15 +643,31 @@ function buildJobData(so: ServiceOrder | null, qt: Quotation | null, sourceType:
   const customer = so?.customer || qt?.customer
   const cName = customer ? (customer.type === 'corporate' ? customer.company_name : `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()) : ''
   const branch = so?.branch || qt?.branch
-  const items = (qt?.items ?? so?.items ?? []).map((it, i) => ({
-    id: ('id' in it ? it.id : i) as number,
-    name: ('product_name' in it ? it.product_name : (it as any).custom_name ?? (it as any).product?.name) ?? '',
-    qty: ('quantity' in it ? it.quantity : 1),
-    unit_price: ('unit_price' in it ? it.unit_price : 0),
-    discount: ('discount' in it ? (it.discount ?? 0) : 0),
-    subtotal: ('subtotal' in it ? (it.subtotal ?? 0) : ('total_price' in it ? it.total_price : 0)),
-    pricing_type: ('pricing_type' in it ? it.pricing_type : 'part') as 'part' | 'labor',
-  }))
+  const items = (qt?.items ?? so?.items ?? []).map((it, i) => {
+    const qty = toNumber('quantity' in it ? it.quantity : 1, 1)
+    const unitPrice = toNumber('unit_price' in it ? it.unit_price : 0, 0)
+    const discount = toNumber('discount' in it ? (it.discount ?? 0) : 0, 0)
+    const computedLineTotal = qty * unitPrice - discount
+    return {
+      id: ('id' in it ? it.id : i) as number,
+      name: ('product_name' in it ? it.product_name : (it as any).custom_name ?? (it as any).description ?? (it as any).variant?.name ?? (it as any).product?.name) ?? '',
+      qty,
+      unit_price: unitPrice,
+      discount,
+      subtotal: toNumber(
+        'subtotal' in it ? (it.subtotal ?? null)
+          : ('total_price' in it ? it.total_price : ('total' in it ? (it as any).total : null)),
+        computedLineTotal,
+      ),
+      pricing_type: ('pricing_type' in it ? it.pricing_type : 'part') as 'part' | 'labor',
+      product_id: ('product_id' in it ? it.product_id : undefined) as number | undefined,
+      product_variant_id: ('product_variant_id' in it ? (it as any).product_variant_id : undefined) as number | undefined,
+    }
+  })
+  const subtotal = toNumber(qt?.subtotal, items.reduce((s, i) => s + toNumber(i.subtotal), 0))
+  const vatPercent = toNumber(qt?.vat_percent, 7)
+  const vatAmount = toNumber(qt?.vat_amount, Math.round(subtotal * vatPercent / 100))
+  const grandTotal = toNumber(qt?.grand_total, subtotal + vatAmount)
   return {
     sourceType, sourceId,
     serviceOrder: so, quotation: qt,
@@ -306,11 +681,11 @@ function buildJobData(so: ServiceOrder | null, qt: Quotation | null, sourceType:
     createdAt: so?.created_at ?? qt?.created_at ?? new Date().toISOString(),
     branch: { name: branch?.name ?? '', address: (branch as any)?.address ?? '', phone: (branch as any)?.phone ?? '', tax_id: (branch as any)?.tax_id ?? '' },
     items,
-    subtotal: qt?.subtotal ?? items.reduce((s, i) => s + i.subtotal, 0),
-    vat_percent: qt?.vat_percent ?? 7,
-    vat_amount: qt?.vat_amount ?? 0,
-    grand_total: qt?.grand_total ?? items.reduce((s, i) => s + i.subtotal, 0),
-    note: qt?.note ?? so?.internal_note ?? '',
+    subtotal,
+    vat_percent: vatPercent,
+    vat_amount: vatAmount,
+    grand_total: grandTotal,
+    note: cleanDocumentNote(qt?.note ?? so?.internal_note ?? ''),
   }
 }
 
@@ -333,8 +708,17 @@ export function JobFlowPage() {
   const [loading, setLoading] = useState(!isCreateMode)
   const [error, setError] = useState<string | null>(null)
   const [currentStep, setCurrentStep] = useState(0)
+  const [maxStep, setMaxStep] = useState(0)
   const [flowType, setFlowType] = useState<string>(sourceType === 'repair' ? 'repair' : 'sale_no_deposit')
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [quotationDraft, setQuotationDraft] = useState<QuotationDraft | null>(null)
+
+  const [isSlipModalOpen, setIsSlipModalOpen] = useState(false)
+  const [isGeneratingSlip, setIsGeneratingSlip] = useState(false)
+  const [slipDocType, setSlipDocType] = useState<'receive' | 'assess' | 'quote' | 'invoice' | 'receipt' | 'warranty'>('receive')
+  const [slipImageUrl, setSlipImageUrl] = useState<string | null>(null)
+  const [slipPdfBlob, setSlipPdfBlob] = useState<Blob | null>(null)
+  const [slipPdfUrl, setSlipPdfUrl] = useState<string | null>(null)
 
   // Determine flow type for stepper
   const steps = FLOW_STEPS[flowType] ?? FLOW_STEPS.repair
@@ -344,6 +728,7 @@ export function JobFlowPage() {
     if (isCreateMode) {
       setJobData(buildJobData(null, null, sourceType, null))
       setCurrentStep(0)
+      setMaxStep(0)
       return
     }
     if (id && !id.includes(':')) { setError('URL ไม่ถูกต้อง: กรุณาระบุประเภทงาน เช่น repair:23 หรือ sale:23'); setLoading(false); return }
@@ -360,16 +745,29 @@ export function JobFlowPage() {
           try {
             const { data: qtRes } = await quotationService.getQuotations({ service_order_id: sourceId, limit: 1 })
             qt = qtRes.data?.[0] ?? null
+            if (qt?.id) {
+              const { data: qtDetailRes } = await quotationService.getQuotation(qt.id)
+              qt = qtDetailRes.data
+            }
           } catch { /* no QT yet */ }
           let inv: Invoice | null = null
           if (qt?.id) {
             try {
               const { data: invRes } = await invoiceService.getInvoices({ customer_id: so.customer_id, limit: 50 })
-              inv = invRes.data?.find((i) => i.quotation_id === qt!.id) ?? null
+              inv = invRes.data?.find((i) => i.quotation_id === qt.id) ?? null
             } catch { /* no invoice yet */ }
           }
           setJobData(buildJobData(so, qt, 'repair', sourceId, inv))
-          setCurrentStep(SO_STATUS_STEP[so.status] ?? 0)
+          let repairStep = so.status === 'draft' ? 1 : (SO_STATUS_STEP[so.status] ?? 0)
+          if (so.status === 'pending_quote' && qt) {
+            if (qt.status === 'sent') repairStep = 3
+            else if (qt.status === 'approved') repairStep = inv ? 5 : 4
+            else repairStep = 2
+          } else if (so.status === 'approved') {
+            repairStep = inv ? 5 : 4
+          }
+          setMaxStep(repairStep)
+          setCurrentStep(repairStep)
         } else {
           const { data: qtRes } = await quotationService.getQuotation(sourceId)
           const qt = qtRes.data
@@ -386,7 +784,9 @@ export function JobFlowPage() {
           } catch { /* no deposits */ }
           setFlowType(hasDeposit ? 'sale_deposit' : 'sale_no_deposit')
           setJobData(buildJobData(null, qt, 'sale', sourceId, inv))
-          setCurrentStep(QT_STATUS_STEP_SALE[qt.status] ?? 0)
+          const saleStep = QT_STATUS_STEP_SALE[qt.status] ?? 0
+          setMaxStep(saleStep)
+          setCurrentStep(saleStep)
         }
       } catch (err: any) {
         setError(err?.response?.data?.message ?? 'โหลดข้อมูลไม่สำเร็จ')
@@ -397,6 +797,17 @@ export function JobFlowPage() {
     }
     fetchData()
   }, [sourceType, sourceId, isCreateMode, refreshTrigger])
+
+  useEffect(() => {
+    return () => {
+      if (slipImageUrl) {
+        URL.revokeObjectURL(slipImageUrl)
+      }
+      if (slipPdfUrl) {
+        URL.revokeObjectURL(slipPdfUrl)
+      }
+    }
+  }, [slipImageUrl, slipPdfUrl])
 
   // Refresh data after step completion
   const handleStepComplete = (meta?: { newId?: number; invoiceId?: number }) => {
@@ -410,12 +821,599 @@ export function JobFlowPage() {
     if (!isCreateMode) {
       setRefreshTrigger((t) => t + 1)
     }
-    setCurrentStep(Math.min(steps.length - 1, currentStep + 1))
+    setQuotationDraft(null)
+    const nextStep = Math.min(steps.length - 1, currentStep + 1)
+    setMaxStep(nextStep)
+    setCurrentStep(nextStep)
+  }
+
+  const generateReceiveSlipImage = async () => {
+    if (!jobData) return null
+    setIsGeneratingSlip(true)
+    try {
+      const width = 1240
+      const height = 1754
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('สร้างภาพไม่สำเร็จ')
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, width, height)
+
+      const pad = 72
+      const contentWidth = width - pad * 2
+      let y = pad
+
+      const drawText = (text: string, x: number, yPos: number, size: number, color = '#111827', weight = 400) => {
+        ctx.font = `${weight} ${size}px sans-serif`
+        ctx.fillStyle = color
+        ctx.fillText(text, x, yPos)
+      }
+
+      const drawWrap = (text: string, x: number, yPos: number, maxWidth: number, lineHeight: number, size = 24, color = '#374151', weight = 400) => {
+        ctx.font = `${weight} ${size}px sans-serif`
+        ctx.fillStyle = color
+        const words = text.replace(/\s+/g, ' ').trim().split(' ')
+        let line = ''
+        let lineY = yPos
+        for (let i = 0; i < words.length; i += 1) {
+          const test = line ? `${line} ${words[i]}` : words[i]
+          if (ctx.measureText(test).width > maxWidth && line) {
+            ctx.fillText(line, x, lineY)
+            line = words[i]
+            lineY += lineHeight
+          } else {
+            line = test
+          }
+        }
+        if (line) ctx.fillText(line, x, lineY)
+        return lineY
+      }
+
+      const soNo = jobData.serviceOrder?.so_number ?? jobData.jobNumber ?? '-'
+      const createdDate = formatDate(jobData.createdAt)
+      const vehicle = jobData.serviceOrder?.vehicle
+      const vehicleName = `${vehicle?.brand ?? ''} ${vehicle?.model ?? ''}`.trim() || '-'
+      const plateNo = vehicle?.plate_number || '-'
+      const symptom = jobData.serviceOrder?.symptom || jobData.description || '-'
+
+      const left = pad
+      const right = width - pad
+
+      // Header: close to sample style (left company, right document title)
+      drawText(jobData.branch.name || 'สุดยอดมอเตอร์', left, y + 4, 30, '#111827', 700)
+      drawText(jobData.branch.address || '-', left, y + 30, 16, '#4b5563', 500)
+      drawText(`เลขประจำตัวผู้เสียภาษี: ${jobData.branch.tax_id || '-'}`, left, y + 52, 16, '#4b5563', 500)
+      drawText(`โทร: ${jobData.branch.phone || '-'}`, left, y + 74, 16, '#4b5563', 500)
+
+      drawText('ใบรับรถ', right - 180, y + 10, 46, '#111827', 700)
+      drawText(`เลขที่: ${soNo}`, right - 330, y + 44, 20, '#374151', 500)
+      drawText(`วันที่: ${createdDate}`, right - 330, y + 70, 20, '#374151', 500)
+      drawText(`อ้างอิงงาน: ${jobData.jobNumber || '-'}`, right - 330, y + 96, 20, '#374151', 500)
+
+      y += 118
+      ctx.strokeStyle = '#1f2937'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(left, y)
+      ctx.lineTo(right, y)
+      ctx.stroke()
+
+      // Customer section
+      y += 36
+      drawText('ลูกค้า', left, y, 17, '#6b7280', 700)
+      y += 28
+      drawText(jobData.customerName || '-', left, y, 24, '#111827', 700)
+      y += 30
+      y = drawWrap(jobData.customerAddress || '-', left, y, contentWidth, 24, 17, '#4b5563', 400) + 24
+      drawText(`โทร: ${jobData.customerPhone || '-'}`, left, y, 17, '#4b5563', 500)
+
+      // Vehicle section (table-like)
+      y += 42
+      drawText('ข้อมูลรถที่นำมาฝาก', left, y, 17, '#6b7280', 700)
+      y += 20
+
+      const rowH = 58
+      const labelW = 230
+      const valueX = left + labelW + 16
+      const tableW = contentWidth
+
+      const drawRow = (rowY: number, label: string, value: string, isLast = false) => {
+        ctx.fillStyle = '#f9fafb'
+        ctx.fillRect(left, rowY, labelW, rowH)
+        ctx.strokeStyle = '#d1d5db'
+        ctx.lineWidth = 1
+        ctx.strokeRect(left, rowY, tableW, rowH)
+        ctx.beginPath()
+        ctx.moveTo(left + labelW, rowY)
+        ctx.lineTo(left + labelW, rowY + rowH)
+        ctx.stroke()
+        drawText(label, left + 16, rowY + 36, 18, '#374151', 600)
+        drawText(value || '-', valueX, rowY + 36, 21, '#111827', 500)
+        if (isLast) {
+          ctx.beginPath()
+          ctx.moveTo(left, rowY + rowH)
+          ctx.lineTo(right, rowY + rowH)
+          ctx.stroke()
+        }
+      }
+
+      drawRow(y, 'รุ่นรถ', vehicleName)
+      y += rowH
+      drawRow(y, 'ทะเบียน', plateNo)
+      y += rowH
+      drawRow(y, 'เลขไมล์', jobData.serviceOrder?.mileage != null ? String(jobData.serviceOrder.mileage) : '-', true)
+      y += rowH
+
+      // Symptom section
+      y += 28
+      drawText('อาการแจ้งซ่อม', left, y, 17, '#6b7280', 700)
+      y += 16
+      ctx.strokeStyle = '#d1d5db'
+      ctx.lineWidth = 1
+      ctx.strokeRect(left, y, tableW, 170)
+      drawWrap(symptom, left + 16, y + 38, tableW - 32, 28, 19, '#374151', 400)
+
+      // Terms / notes
+      y += 210
+      drawText('หมายเหตุ', left, y, 17, '#6b7280', 700)
+      y += 20
+      drawWrap('ลูกค้านำรถมาฝากไว้ที่ร้านเรียบร้อยแล้ว กรุณาเก็บเอกสารฉบับนี้ไว้เพื่อใช้แสดงตอนรับรถคืน', left, y + 8, contentWidth, 24, 17, '#4b5563', 400)
+
+      // Signature area
+      const signY = height - 230
+      ctx.strokeStyle = '#9ca3af'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(left + 40, signY)
+      ctx.lineTo(left + 360, signY)
+      ctx.moveTo(right - 360, signY)
+      ctx.lineTo(right - 40, signY)
+      ctx.stroke()
+
+      drawText('ลูกค้า / วันที่', left + 135, signY + 30, 16, '#6b7280', 500)
+      drawText('ผู้รับรถ / วันที่', right - 255, signY + 30, 16, '#6b7280', 500)
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (!b) {
+            reject(new Error('สร้างไฟล์ภาพไม่สำเร็จ'))
+            return
+          }
+          resolve(b)
+        }, 'image/png', 1)
+      })
+
+      const pngDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result ?? ''))
+        reader.onerror = () => reject(new Error('แปลงรูปเป็น PDF ไม่สำเร็จ'))
+        reader.readAsDataURL(blob)
+      })
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      pdf.addImage(pngDataUrl, 'PNG', 0, 0, pageW, pageH, undefined, 'FAST')
+      const pdfBlob = pdf.output('blob')
+
+      if (slipImageUrl) {
+        URL.revokeObjectURL(slipImageUrl)
+      }
+      if (slipPdfUrl) {
+        URL.revokeObjectURL(slipPdfUrl)
+      }
+      const newUrl = URL.createObjectURL(blob)
+      const newPdfUrl = URL.createObjectURL(pdfBlob)
+      setSlipDocType('receive')
+      setSlipImageUrl(newUrl)
+      setSlipPdfBlob(pdfBlob)
+      setSlipPdfUrl(newPdfUrl)
+      setIsSlipModalOpen(true)
+      return { imageBlob: blob, pdfBlob, imageUrl: newUrl, pdfUrl: newPdfUrl }
+    } catch (e: any) {
+      toast.error(e?.message ?? 'ไม่สามารถสร้างเอกสารรูปภาพได้')
+      return null
+    } finally {
+      setIsGeneratingSlip(false)
+    }
+  }
+
+  const saveAndOpenSlip = async (
+    canvas: HTMLCanvasElement,
+    docType: 'receive' | 'assess' | 'quote' | 'invoice' | 'receipt' | 'warranty',
+  ) => {
+    const blob = await new Promise<Blob>((res, rej) => {
+      canvas.toBlob((b) => { if (!b) { rej(new Error('สร้างไฟล์ภาพไม่สำเร็จ')); return }; res(b) }, 'image/png', 1)
+    })
+    const dataUrl = await new Promise<string>((res, rej) => {
+      const reader = new FileReader()
+      reader.onload = () => res(String(reader.result ?? ''))
+      reader.onerror = () => rej(new Error('แปลงรูปเป็น PDF ไม่สำเร็จ'))
+      reader.readAsDataURL(blob)
+    })
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true })
+    const pageW = pdf.internal.pageSize.getWidth(); const pageH = pdf.internal.pageSize.getHeight()
+    pdf.addImage(dataUrl, 'PNG', 0, 0, pageW, pageH, undefined, 'FAST')
+    const pdfBlob = pdf.output('blob')
+    if (slipImageUrl) URL.revokeObjectURL(slipImageUrl)
+    if (slipPdfUrl) URL.revokeObjectURL(slipPdfUrl)
+    const newUrl = URL.createObjectURL(blob); const newPdfUrl = URL.createObjectURL(pdfBlob)
+    setSlipDocType(docType); setSlipImageUrl(newUrl); setSlipPdfBlob(pdfBlob); setSlipPdfUrl(newPdfUrl); setIsSlipModalOpen(true)
+    return { imageBlob: blob, pdfBlob, imageUrl: newUrl, pdfUrl: newPdfUrl }
+  }
+
+  const generateQuotationSlipImage = async () => {
+    if (!jobData) return null
+    setIsGeneratingSlip(true)
+    try {
+      const w = 1240; const h = 1754
+      const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('สร้างภาพไม่สำเร็จ')
+      const draftItems = quotationDraft?.items ?? jobData.items
+      const vatPercent = toNumber(quotationDraft?.vatPercent ?? jobData.vat_percent, 7)
+      const afterDiscount = quotationDraft
+        ? toNumber(quotationDraft.subtotal - quotationDraft.discount)
+        : toNumber(jobData.subtotal)
+      const vat = quotationDraft
+        ? toNumber(quotationDraft.vatAmount)
+        : toNumber(jobData.vat_amount, Math.round(afterDiscount * vatPercent / 100))
+      const grand = quotationDraft
+        ? toNumber(quotationDraft.grandTotal)
+        : toNumber(jobData.grand_total, afterDiscount + vat)
+      drawBillingDocCanvas(ctx, w, h, {
+        docTitle: 'ใบเสนอราคา',
+        docNo: jobData.quotation?.quotation_no ?? '-',
+        docDate: formatDate(jobData.createdAt),
+        docRef: jobData.jobNumber || undefined,
+        branch: jobData.branch,
+        customerName: jobData.customerName,
+        customerAddress: jobData.customerAddress || undefined,
+        customerPhone: jobData.customerPhone || undefined,
+        items: draftItems,
+        subtotal: afterDiscount, vatPercent, vatAmount: vat, grandTotal: grand,
+        note: quotationDraft?.note || jobData.note || undefined,
+        sigLeftLabel: 'ผู้สั่งซื้อสินค้า', sigRightLabel: 'ผู้อนุมัติ',
+      })
+      return await saveAndOpenSlip(canvas, 'quote')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'ไม่สามารถสร้างเอกสารรูปภาพได้')
+      return null
+    } finally { setIsGeneratingSlip(false) }
+  }
+
+  const generateInvoiceSlipImage = async () => {
+    if (!jobData) return null
+    setIsGeneratingSlip(true)
+    try {
+      const w = 1240; const h = 1754
+      const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('สร้างภาพไม่สำเร็จ')
+      const afterDiscount = toNumber(jobData.subtotal)
+      const vatPercent = toNumber(jobData.vat_percent, 7)
+      const vat = toNumber(jobData.vat_amount, Math.round(afterDiscount * vatPercent / 100))
+      const grand = toNumber(jobData.grand_total, afterDiscount + vat)
+      drawBillingDocCanvas(ctx, w, h, {
+        docTitle: 'ใบแจ้งหนี้',
+        docNo: jobData.invoice?.invoice_no ?? '-',
+        docDate: formatDate(jobData.createdAt),
+        docRef: jobData.quotation?.quotation_no || undefined,
+        branch: jobData.branch,
+        customerName: jobData.customerName,
+        customerAddress: jobData.customerAddress || undefined,
+        customerPhone: jobData.customerPhone || undefined,
+        items: jobData.items,
+        subtotal: afterDiscount, vatPercent, vatAmount: vat, grandTotal: grand,
+        note: jobData.note || undefined,
+        sigLeftLabel: 'ผู้เรียกเก็บ', sigRightLabel: 'ผู้อนุมัติ',
+      })
+      return await saveAndOpenSlip(canvas, 'invoice')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'ไม่สามารถสร้างเอกสารรูปภาพได้')
+      return null
+    } finally { setIsGeneratingSlip(false) }
+  }
+
+  const generateReceiptSlipImage = async () => {
+    if (!jobData) return null
+    setIsGeneratingSlip(true)
+    try {
+      const w = 1240; const h = 1754
+      const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('สร้างภาพไม่สำเร็จ')
+      const afterDiscount = toNumber(jobData.subtotal)
+      const vatPercent = toNumber(jobData.vat_percent, 7)
+      const vat = toNumber(jobData.vat_amount, Math.round(afterDiscount * vatPercent / 100))
+      const grand = toNumber(jobData.grand_total, afterDiscount + vat)
+      drawBillingDocCanvas(ctx, w, h, {
+        docTitle: 'ใบกำกับภาษี/ใบเสร็จรับเงิน',
+        docSubTitle: 'ต้นฉบับ',
+        docNo: jobData.invoice?.invoice_no ?? '-',
+        docDate: formatDate(jobData.createdAt),
+        docRef: jobData.quotation?.quotation_no || undefined,
+        branch: jobData.branch,
+        customerName: jobData.customerName,
+        customerAddress: jobData.customerAddress || undefined,
+        customerPhone: jobData.customerPhone || undefined,
+        items: jobData.items,
+        subtotal: afterDiscount, vatPercent, vatAmount: vat, grandTotal: grand,
+        note: jobData.note || undefined,
+        sigLeftLabel: 'ผู้จ่ายเงิน', sigRightLabel: 'ผู้รับเงิน',
+      })
+      return await saveAndOpenSlip(canvas, 'receipt')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'ไม่สามารถสร้างเอกสารรูปภาพได้')
+      return null
+    } finally { setIsGeneratingSlip(false) }
+  }
+
+  const generateWarrantySlipImage = async () => {
+    if (!jobData) return null
+    setIsGeneratingSlip(true)
+    try {
+      const w = 1240; const h = 1754
+      const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('สร้างภาพไม่สำเร็จ')
+      const veh = jobData.serviceOrder?.vehicle
+      const vehicle = veh ? { brand: veh.brand, model: veh.model, plate: veh.plate_number, mileage: jobData.serviceOrder?.mileage } : undefined
+      drawWarrantyDocCanvas(ctx, w, h, {
+        docNo: jobData.serviceOrder?.so_number ?? jobData.jobNumber ?? '-',
+        docDate: formatDate(jobData.createdAt),
+        branch: jobData.branch,
+        customerName: jobData.customerName,
+        customerPhone: jobData.customerPhone || undefined,
+        vehicle,
+        items: jobData.items,
+        note: jobData.note || undefined,
+      })
+      return await saveAndOpenSlip(canvas, 'warranty')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'ไม่สามารถสร้างเอกสารรูปภาพได้')
+      return null
+    } finally { setIsGeneratingSlip(false) }
+  }
+
+  const generateAssessSlipImage = async () => {
+    if (!jobData) return null
+    setIsGeneratingSlip(true)
+    try {
+      const width = 1240
+      const height = 1754
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('สร้างภาพไม่สำเร็จ')
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, width, height)
+
+      const pad = 72
+      const right = width - pad
+      let y = pad
+      const items = jobData.items ?? []
+
+      const drawText = (text: string, x: number, yPos: number, size: number, color = '#111827', weight = 400) => {
+        ctx.font = `${weight} ${size}px sans-serif`
+        ctx.fillStyle = color
+        ctx.fillText(text, x, yPos)
+      }
+
+      drawText(jobData.branch.name || 'สุดยอดมอเตอร์', pad, y + 4, 30, '#111827', 700)
+      drawText(jobData.branch.address || '-', pad, y + 30, 16, '#4b5563', 500)
+      drawText(`โทร: ${jobData.branch.phone || '-'}`, pad, y + 52, 16, '#4b5563', 500)
+
+      drawText('ใบประเมิน/รายการซ่อม', right - 380, y + 10, 36, '#111827', 700)
+      drawText(`อ้างอิงงาน: ${jobData.jobNumber || '-'}`, right - 380, y + 54, 20, '#374151', 500)
+      drawText(`วันที่: ${formatDate(jobData.createdAt)}`, right - 380, y + 80, 20, '#374151', 500)
+
+      y += 110
+      ctx.strokeStyle = '#1f2937'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(pad, y)
+      ctx.lineTo(right, y)
+      ctx.stroke()
+
+      y += 38
+      drawText('ลูกค้า', pad, y, 17, '#6b7280', 700)
+      y += 28
+      drawText(jobData.customerName || '-', pad, y, 24, '#111827', 700)
+      y += 30
+      drawText(`โทร: ${jobData.customerPhone || '-'}`, pad, y, 17, '#4b5563', 500)
+      const so = jobData.serviceOrder
+      if (so) {
+        drawText(`รถ: ${so.vehicle?.brand ?? ''} ${so.vehicle?.model ?? ''} ${so.vehicle?.plate_number ?? ''}`.trim(), right - 500, y, 17, '#4b5563', 500)
+      }
+
+      // Items table
+      y += 44
+      const tableX = pad
+      const tableW = width - pad * 2
+      const col = [70, 700, 170, 200]
+      const rowH = 46
+
+      ctx.fillStyle = '#f3f4f6'
+      ctx.fillRect(tableX, y, tableW, rowH)
+      ctx.strokeStyle = '#d1d5db'
+      ctx.lineWidth = 1
+      ctx.strokeRect(tableX, y, tableW, rowH)
+      drawText('#', tableX + 22, y + 30, 18, '#374151', 600)
+      drawText('รายการ', tableX + col[0] + 12, y + 30, 18, '#374151', 600)
+      drawText('จำนวน', tableX + col[0] + col[1] + 12, y + 30, 18, '#374151', 600)
+      drawText('ราคา/หน่วย', tableX + col[0] + col[1] + col[2] + 12, y + 30, 18, '#374151', 600)
+
+      y += rowH
+      items.slice(0, 16).forEach((item, idx) => {
+        ctx.strokeRect(tableX, y, tableW, rowH)
+        drawText(String(idx + 1), tableX + 22, y + 30, 18, '#111827', 500)
+        drawText(item.name || '-', tableX + col[0] + 12, y + 30, 18, '#111827', 500)
+        drawText(String(item.qty ?? 0), tableX + col[0] + col[1] + 12, y + 30, 18, '#111827', 500)
+        drawText(Number(item.unit_price ?? 0).toLocaleString(), tableX + col[0] + col[1] + col[2] + 12, y + 30, 18, '#111827', 500)
+        y += rowH
+      })
+
+      // Checklist section
+      const note = so?.internal_note ?? ''
+      const checklistItems: { name: string; checked: boolean; status: string }[] = []
+      const resultMatch = note.match(/\[CHECKLIST_RESULT_START\]([\s\S]*?)\[CHECKLIST_RESULT_END\]/)
+      if (resultMatch) {
+        for (const line of resultMatch[1].split('\n')) {
+          const m = line.match(/^\d+\.\s+\[(✓|○)\]\s+(.+?)\s+:\s+([^—\n]+?)(?:\s+—\s+(.*))?$/)
+          if (m) checklistItems.push({ checked: m[1] === '✓', name: m[2].trim(), status: m[3].trim() })
+        }
+      }
+
+      if (checklistItems.length > 0) {
+        y += 20
+        drawText('ผลตรวจสภาพรถ', pad, y, 22, '#111827', 700)
+        y += 32
+        const chRowH = 36
+        ctx.fillStyle = '#f3f4f6'
+        ctx.fillRect(tableX, y, tableW, chRowH)
+        ctx.strokeStyle = '#d1d5db'
+        ctx.lineWidth = 1
+        ctx.strokeRect(tableX, y, tableW, chRowH)
+        drawText('รายการ', tableX + 12, y + 24, 16, '#374151', 600)
+        drawText('ผล', tableX + 800, y + 24, 16, '#374151', 600)
+        drawText('สถานะ', tableX + 1000, y + 24, 16, '#374151', 600)
+        y += chRowH
+        checklistItems.slice(0, 12).forEach((it) => {
+          ctx.strokeRect(tableX, y, tableW, chRowH)
+          drawText(it.name, tableX + 12, y + 24, 16, '#111827', 500)
+          drawText(it.checked ? '✓' : '○', tableX + 800, y + 24, 16, it.checked ? '#16a34a' : '#9ca3af', 700)
+          drawText(it.status, tableX + 1000, y + 24, 16, '#374151', 500)
+          y += chRowH
+        })
+      }
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (!b) { reject(new Error('สร้างไฟล์ภาพไม่สำเร็จ')); return }
+          resolve(b)
+        }, 'image/png', 1)
+      })
+
+      const pngDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result ?? ''))
+        reader.onerror = () => reject(new Error('แปลงรูปเป็น PDF ไม่สำเร็จ'))
+        reader.readAsDataURL(blob)
+      })
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      pdf.addImage(pngDataUrl, 'PNG', 0, 0, pageW, pageH, undefined, 'FAST')
+      const pdfBlob = pdf.output('blob')
+
+      if (slipImageUrl) URL.revokeObjectURL(slipImageUrl)
+      if (slipPdfUrl) URL.revokeObjectURL(slipPdfUrl)
+      const newUrl = URL.createObjectURL(blob)
+      const newPdfUrl = URL.createObjectURL(pdfBlob)
+      setSlipDocType('assess')
+      setSlipImageUrl(newUrl)
+      setSlipPdfBlob(pdfBlob)
+      setSlipPdfUrl(newPdfUrl)
+      setIsSlipModalOpen(true)
+      return { imageBlob: blob, pdfBlob, imageUrl: newUrl, pdfUrl: newPdfUrl }
+    } catch (e: any) {
+      toast.error(e?.message ?? 'ไม่สามารถสร้างเอกสารรูปภาพได้')
+      return null
+    } finally {
+      setIsGeneratingSlip(false)
+    }
+  }
+
+  const handleViewSlip = async () => {
+    if (!slipImageUrl) {
+      await generateReceiveSlipImage()
+      return
+    }
+    window.open(slipImageUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleDownloadZip = async () => {
+    try {
+      let pdfBlob = slipPdfBlob
+      if (!pdfBlob) {
+        const generated = await generateReceiveSlipImage()
+        pdfBlob = generated?.pdfBlob ?? null
+      }
+      if (!pdfBlob) return
+      const soNo = jobData?.serviceOrder?.so_number ?? jobData?.jobNumber ?? 'receive-slip'
+      const zipBlob = await buildSingleFileZip(`${soNo}-receive-slip.pdf`, pdfBlob)
+      const url = URL.createObjectURL(zipBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${soNo}-receive-slip.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('ดาวน์โหลด ZIP เรียบร้อย')
+    } catch {
+      toast.error('ดาวน์โหลด ZIP ไม่สำเร็จ')
+    }
+  }
+
+  const handleCopyImageLink = async () => {
+    let imageUrl = slipImageUrl
+    if (!imageUrl) {
+      const generated = await generateReceiveSlipImage()
+      imageUrl = generated?.imageUrl ?? null
+    }
+    if (!imageUrl) return
+    try {
+      await navigator.clipboard.writeText(imageUrl)
+      toast.success('คัดลอกลิงก์รูปแล้ว (ลิงก์ชั่วคราวเฉพาะเครื่องนี้)')
+    } catch {
+      toast.error('คัดลอกลิงก์ไม่สำเร็จ')
+    }
+  }
+
+  const handleCopyPdfLink = async () => {
+    let pdfUrl = slipPdfUrl
+    if (!pdfUrl) {
+      const generated = await generateReceiveSlipImage()
+      pdfUrl = generated?.pdfUrl ?? null
+    }
+    if (!pdfUrl) return
+    try {
+      await navigator.clipboard.writeText(pdfUrl)
+      toast.success('คัดลอกลิงก์ PDF แล้ว (ลิงก์ชั่วคราวเฉพาะเครื่องนี้)')
+    } catch {
+      toast.error('คัดลอกลิงก์ไม่สำเร็จ')
+    }
   }
 
   const currentStepId = steps[currentStep]?.id ?? ''
-  const docConfig = STEP_DOC_CONFIG[currentStepId] ?? { title: 'เอกสาร', noPrefix: 'DOC', noField: 'doc_no' }
-  const docNo = jobData?.quotation?.quotation_no ?? jobData?.serviceOrder?.so_number ?? ''
+  const printStepId = currentStepId
+  const headerDocType: 'receive' | 'assess' | 'quote' | 'invoice' | 'receipt' | 'warranty' =
+    currentStepId === 'quote' || currentStepId === 'approve' || currentStepId === 'deposit' ? 'quote'
+      : currentStepId === 'assess' ? 'assess'
+      : currentStepId === 'invoice' ? 'invoice'
+      : currentStepId === 'payment' ? 'receipt'
+      : currentStepId === 'deliver' ? 'warranty'
+      : 'receive'
+
+  const handleOpenHeaderDocument = () => {
+    if (headerDocType === 'quote') { void generateQuotationSlipImage(); return }
+    if (headerDocType === 'assess') { void generateAssessSlipImage(); return }
+    if (headerDocType === 'invoice') { void generateInvoiceSlipImage(); return }
+    if (headerDocType === 'receipt') { void generateReceiptSlipImage(); return }
+    if (headerDocType === 'warranty') { void generateWarrantySlipImage(); return }
+    void generateReceiveSlipImage()
+  }
+
+  const docConfig = STEP_DOC_CONFIG[printStepId] ?? { title: 'เอกสาร', noPrefix: 'DOC', noField: 'doc_no' }
+  const docNo = printStepId === 'receive'
+    ? (jobData?.serviceOrder?.so_number ?? jobData?.jobNumber ?? '')
+    : (jobData?.quotation?.quotation_no ?? jobData?.serviceOrder?.so_number ?? '')
 
   return (
     <>
@@ -489,11 +1487,11 @@ export function JobFlowPage() {
             )}
             {!isCreateMode && (
               <button
-                onClick={() => { toast.success('เปิดหน้าต่างพิมพ์'); window.print() }}
+                onClick={handleOpenHeaderDocument}
                 className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 hover:bg-gray-50 transition-all hover:shadow"
               >
                 <Printer className="h-4 w-4 text-gray-500 group-hover:text-gray-700" />
-                <span>พิมพ์เอกสาร</span>
+                <span>{isGeneratingSlip ? 'กำลังสร้างเอกสาร...' : ({ receive: 'เอกสารใบรับรถ', assess: 'เอกสารใบประเมิน', quote: 'เอกสารใบเสนอราคา', invoice: 'เอกสารใบแจ้งหนี้', receipt: 'เอกสารใบเสร็จ', warranty: 'เอกสารใบรับประกัน' } as Record<string, string>)[headerDocType] ?? 'เอกสาร'}</span>
               </button>
             )}
           </div>
@@ -505,7 +1503,8 @@ export function JobFlowPage() {
         <FlowStepper
           steps={steps}
           currentStep={currentStep}
-          onStepClick={(i) => { if (i <= currentStep) setCurrentStep(i) }}
+          maxStep={maxStep}
+          onStepClick={(i) => { if (i <= maxStep) setCurrentStep(i) }}
         />
       </div>
 
@@ -515,6 +1514,12 @@ export function JobFlowPage() {
         flowType={flowType}
         jobData={jobData}
         onComplete={handleStepComplete}
+        isPastStep={currentStep < maxStep}
+        onGoToStep={(stepId) => {
+          const idx = steps.findIndex((s) => s.id === stepId)
+          if (idx >= 0) setCurrentStep(idx)
+        }}
+        onQuoteDraftChange={setQuotationDraft}
       />
 
       {/* Navigation Buttons */}
@@ -533,20 +1538,67 @@ export function JobFlowPage() {
               key={idx} 
               className={cn(
                 "h-1.5 rounded-full transition-all duration-300",
-                idx === currentStep ? "w-6 bg-blue-600" : idx < currentStep ? "w-1.5 bg-indigo-300" : "w-1.5 bg-gray-200"
+                idx === currentStep ? "w-6 bg-blue-600" : idx < maxStep ? "w-1.5 bg-indigo-300" : "w-1.5 bg-gray-200"
               )} 
             />
           ))}
         </div>
         <button
-          onClick={() => setCurrentStep(Math.min(steps.length - 1, currentStep + 1))}
-          disabled={currentStep === steps.length - 1}
+          onClick={() => setCurrentStep(Math.min(maxStep, currentStep + 1))}
+          disabled={currentStep >= maxStep}
           className="group inline-flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-gray-900/20 hover:bg-gray-800 hover:shadow-lg hover:shadow-gray-900/30 disabled:opacity-40 transition-all"
         >
           ถัดไป
           <ArrowRight className="h-4 w-4 opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
         </button>
       </div>
+      <DocumentOutputModal
+        isOpen={isSlipModalOpen}
+        title={({ receive: 'ใบรับรถ', assess: 'ใบประเมิน', quote: 'ใบเสนอราคา', invoice: 'ใบแจ้งหนี้', receipt: 'ใบเสร็จรับเงิน', warranty: 'ใบรับประกัน' } as Record<string, string>)[slipDocType] + ' (รูปภาพ A4)'}
+        subtitle="เลือกการใช้งานเอกสาร"
+        previewUrl={slipImageUrl}
+        previewAlt={`${slipDocType}-a4`}
+        onClose={() => setIsSlipModalOpen(false)}
+        actions={[
+          {
+            key: 'view',
+            label: '1. ดูหน้าเต็ม',
+            description: 'เปิดแท็บใหม่แสดงรูปเต็มขนาด A4',
+            icon: <Eye className="h-4 w-4" />,
+            onClick: () => { void handleViewSlip() },
+            tone: 'blue',
+          },
+          {
+            key: 'zip',
+            label: '2. ดาวน์โหลด ZIP',
+            description: 'ดาวน์โหลดไฟล์ ZIP ที่มีไฟล์ PDF ' + (({ receive: 'ใบรับรถ', assess: 'ใบประเมิน', quote: 'ใบเสนอราคา', invoice: 'ใบแจ้งหนี้', receipt: 'ใบเสร็จรับเงิน', warranty: 'ใบรับประกัน' } as Record<string, string>)[slipDocType] ?? 'เอกสาร'),
+            icon: <Download className="h-4 w-4" />,
+            onClick: () => { void handleDownloadZip() },
+            tone: 'green',
+          },
+          {
+            key: 'share',
+            label: '3. คัดลอกลิงก์รูป',
+            description: 'คัดลอกลิงก์ไฟล์รูปภาพเอกสาร',
+            icon: <Link2 className="h-4 w-4" />,
+            onClick: () => { void handleCopyImageLink() },
+            tone: 'amber',
+          },
+          {
+            key: 'share-pdf',
+            label: '4. คัดลอกลิงก์ PDF',
+            description: 'คัดลอกลิงก์ไฟล์ PDF เอกสาร',
+            icon: <Link2 className="h-4 w-4" />,
+            onClick: () => { void handleCopyPdfLink() },
+            tone: 'amber',
+          },
+        ]}
+        footerText="ลิงก์ public แบบเดาไม่ได้ต้องมี endpoint ฝั่ง backend สำหรับออก share token ของเอกสาร"
+        footerLinks={[
+          ...(slipImageUrl ? [{ label: 'รูปภาพ', url: slipImageUrl }] : []),
+          ...(slipPdfUrl ? [{ label: 'PDF', url: slipPdfUrl }] : []),
+        ]}
+      />
       </>
       )}
     </div>
@@ -585,6 +1637,20 @@ export function JobFlowPage() {
             <p style={{ fontSize: '11px', color: '#4b5563', margin: '1px 0 0' }}>{jobData.customerAddress}</p>
             <p style={{ fontSize: '11px', color: '#4b5563', margin: '1px 0 0' }}>โทร: {jobData.customerPhone}</p>
           </div>
+          {jobData.serviceOrder?.vehicle && (
+            <div style={{ padding: '2px 0 10px' }}>
+              <p style={{ fontSize: '10px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', margin: '0 0 4px' }}>ข้อมูลรถที่รับฝาก</p>
+              <p style={{ fontWeight: 600, fontSize: '13px', margin: 0 }}>
+                {(jobData.serviceOrder.vehicle.brand ?? '').trim()} {(jobData.serviceOrder.vehicle.model ?? '').trim()}
+              </p>
+              <p style={{ fontSize: '11px', color: '#4b5563', margin: '1px 0 0' }}>
+                ทะเบียน: {jobData.serviceOrder.vehicle.plate_number || '—'}
+              </p>
+              <p style={{ fontSize: '11px', color: '#4b5563', margin: '1px 0 0' }}>
+                อาการแจ้งซ่อม: {jobData.serviceOrder.symptom || '—'}
+              </p>
+            </div>
+          )}
         </div>
       )
 

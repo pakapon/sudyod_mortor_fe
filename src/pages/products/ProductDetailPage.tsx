@@ -386,7 +386,7 @@ export function ProductDetailPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-4">
-            <Field label="แบรนด์" value={product.brand?.name} />
+            <Field label="ยี่ห้อ" value={product.brand?.name} />
             <Field label="หมวดหมู่" value={product.category?.name} />
             <Field label="ประเภทสินค้า" value={product.product_type === 'standard' ? 'สินค้า (Standard)' : product.product_type === 'service' ? 'บริการ' : product.product_type ?? '—'} />
           </div>

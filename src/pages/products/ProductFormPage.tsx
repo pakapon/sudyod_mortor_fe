@@ -1346,12 +1346,12 @@ export function ProductFormPage() {
             </div>
           </div>
 
-          {/* Row 2: แบรนด์ + หมวดหมู่ + ประเภท */}
+          {/* Row 2: ยี่ห้อ + หมวดหมู่ + ประเภท */}
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className={labelCls}>แบรนด์</label>
+              <label className={labelCls}>ยี่ห้อ</label>
               <select value={form.brand_id} onChange={(e) => patchForm('brand_id', e.target.value)} className={fieldCls}>
-                <option value="">— เลือกแบรนด์ —</option>
+                <option value="">— เลือกยี่ห้อ —</option>
                 {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </div>

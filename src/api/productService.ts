@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { uploadService } from '@/api/uploadService'
 import type { ApiResponse, PaginatedResponse } from '@/types/api'
 import type {
   Product,
@@ -50,10 +51,11 @@ export const productService = {
   },
 
   uploadProductImage(id: number, file: File) {
-    const formData = new FormData()
-    formData.append('image', file)
-    return apiClient.post<ApiResponse<ProductImage>>(`/products/${id}/images`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    return uploadService.uploadFile<ProductImage>({
+      file,
+      module: 'products',
+      entity_id: id,
+      category: 'image',
     })
   },
 

@@ -1,4 +1,5 @@
 import { apiClient } from '@/api/client'
+import { uploadService } from '@/api/uploadService'
 import type { ApiResponse, PaginatedResponse } from '@/types/api'
 import type {
   Customer,
@@ -97,16 +98,17 @@ export const customerService = {
   },
 
   uploadDocument(customerId: number, file: File, payload: CustomerDocumentPayload) {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('file_type', payload.file_type)
-    if (payload.file_name) formData.append('file_name', payload.file_name)
-    if (payload.note) formData.append('note', payload.note)
-    return apiClient.post<ApiResponse<CustomerDocument>>(
-      `/customers/${customerId}/documents`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    )
+    return uploadService.uploadFile<CustomerDocument>({
+      file,
+      module: 'customers',
+      entity_id: customerId,
+      category: 'document',
+      metadata: {
+        file_type: payload.file_type,
+        file_name: payload.file_name,
+        note: payload.note,
+      },
+    })
   },
 
   // ── Timeline ──────────────────────────────────────────────────────────────
@@ -136,12 +138,11 @@ export const customerService = {
 
   // ── Photo ─────────────────────────────────────────────────────────────────
   uploadCustomerPhoto(customerId: number, file: File) {
-    const formData = new FormData()
-    formData.append('photo', file)
-    return apiClient.post<ApiResponse<{ photo_url: string }>>(
-      `/customers/${customerId}/photo`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    )
+    return uploadService.uploadFile<{ photo_url: string }>({
+      file,
+      module: 'customers',
+      entity_id: customerId,
+      category: 'photo',
+    })
   },
 }

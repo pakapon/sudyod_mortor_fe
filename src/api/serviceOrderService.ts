@@ -46,7 +46,11 @@ export const serviceOrderService = {
 
   // ── Status Transitions ───────────────────────────────────────────────────
   transition(id: number, payload: TransitionPayload) {
-    return apiClient.patch<ApiResponse<ServiceOrder>>(`/service-orders/${id}/transition`, payload)
+    const normalizedPayload = {
+      status: payload.status ?? payload.target_status,
+      note: payload.note,
+    }
+    return apiClient.patch<ApiResponse<ServiceOrder>>(`/service-orders/${id}/transition`, normalizedPayload)
   },
 
   assign(id: number, payload: AssignPayload) {
@@ -67,11 +71,9 @@ export const serviceOrderService = {
   },
 
   uploadGpsPhoto(id: number, formData: FormData) {
-    return apiClient.post<ApiResponse<ServiceOrderGpsPhoto>>(
-      `/service-orders/${id}/gps-photos`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    )
+    return apiClient.post<ApiResponse<ServiceOrderGpsPhoto>>(`/service-orders/${id}/gps-photos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
   },
 
   deleteGpsPhoto(id: number, photoId: number) {

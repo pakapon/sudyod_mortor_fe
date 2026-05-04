@@ -8,7 +8,9 @@ export interface QuotationItem {
   id?: number
   quotation_id?: number
   product_id?: number | null
+  product_variant_id?: number | null
   product_name?: string
+  variant?: { id: number; name: string; sku?: string }
   quantity: number
   unit_price: number
   pricing_type: QuotationPricingType
@@ -77,6 +79,7 @@ export interface QuotationListParams {
 
 export interface QuotationItemPayload {
   product_id?: number | null
+  product_variant_id?: number | null
   quantity: number
   unit_price: number
   pricing_type: QuotationPricingType

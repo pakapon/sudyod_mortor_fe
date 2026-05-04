@@ -1,4 +1,5 @@
 import { apiClient } from '@/api/client'
+import { uploadService } from '@/api/uploadService'
 import type { ApiResponse, PaginatedResponse } from '@/types/api'
 import type {
   LoanApplication,
@@ -70,16 +71,17 @@ export const loanService = {
     file: File,
     options?: { document_type?: LoanDocumentType; file_name?: string; note?: string },
   ) {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('document_type', options?.document_type ?? 'other')
-    if (options?.file_name) formData.append('file_name', options.file_name)
-    if (options?.note) formData.append('note', options.note)
-    return apiClient.post<ApiResponse<LoanDocument>>(
-      `/loan-applications/${loanId}/documents`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    )
+    return uploadService.uploadFile<LoanDocument>({
+      file,
+      module: 'loan_applications',
+      entity_id: loanId,
+      category: 'document',
+      metadata: {
+        document_type: options?.document_type ?? 'other',
+        file_name: options?.file_name,
+        note: options?.note,
+      },
+    })
   },
 
   deleteLoanDocument(loanId: number, documentId: number) {
@@ -129,16 +131,17 @@ export const loanService = {
     file: File,
     options?: { document_type?: LoanDocumentType; file_name?: string; note?: string },
   ) {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('document_type', options?.document_type ?? 'other')
-    if (options?.file_name) formData.append('file_name', options.file_name)
-    if (options?.note) formData.append('note', options.note)
-    return apiClient.post<ApiResponse<LoanDocument>>(
-      `/store-loans/${loanId}/documents`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    )
+    return uploadService.uploadFile<LoanDocument>({
+      file,
+      module: 'store_loans',
+      entity_id: loanId,
+      category: 'document',
+      metadata: {
+        document_type: options?.document_type ?? 'other',
+        file_name: options?.file_name,
+        note: options?.note,
+      },
+    })
   },
 
   deleteStoreLoanDocument(loanId: number, documentId: number) {
