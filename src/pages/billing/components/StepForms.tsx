@@ -22,6 +22,7 @@ import type { JobData, QuotationDraft } from '../JobFlowPage'
 import type { PaymentMethod } from '@/types/invoice'
 import type { InventoryItem } from '@/types/inventory'
 import type { VehicleInspectionChecklist } from '@/types/vehicleInspection'
+import type { ServiceOrderGpsPhoto } from '@/types/serviceOrder'
 import { INSPECTION_STATUS_OPTIONS } from '@/types/vehicleInspection'
 
 type QItemMode = 'product' | 'custom'
@@ -621,8 +622,8 @@ export function AssessmentForm({ onComplete, jobData }: FormProps) {
         }
         const gpsPhotoType = gpsTypeByStatus[status ?? ''] ?? 'damage_spot'
 
-        let lat = 13.7563309
-        let lng = 100.5017651
+        let lat: number
+        let lng: number
         try {
           const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
@@ -630,7 +631,8 @@ export function AssessmentForm({ onComplete, jobData }: FormProps) {
           lat = pos.coords.latitude
           lng = pos.coords.longitude
         } catch (e) {
-          console.warn('Geolocation failed, used default coordinates')
+          toast.error('ไม่สามารถระบุตำแหน่ง GPS ได้ กรุณาอนุญาตตำแหน่งแล้วลองใหม่อีกครั้ง')
+          return
         }
         const formatICT = () => {
           const d = new Date()
@@ -1038,6 +1040,24 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
   const [customerSearch, setCustomerSearch] = useState('')
   const [customerResults, setCustomerResults] = useState<Array<{ id: number; full_name: string; phone: string | null }>>([])
   const [pickedCustomer, setPickedCustomer] = useState<{ id: number; full_name: string } | null>(null)
+  const [custMode, setCustMode] = useState<'search' | 'new'>('search')
+  const [newCustForm, setNewCustForm] = useState({
+    type: 'personal' as 'personal' | 'corporate',
+    firstName: '',
+    lastName: '',
+    phone: '',
+    companyName: '',
+    taxId: '',
+    idCard: '',
+    address: '',
+    companyBranch: '',
+    contactName: '',
+  })
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
+  const custSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [saleMode, setSaleMode] = useState<'full' | 'deposit'>('full')
+  const [saleDepositAmount, setSaleDepositAmount] = useState('')
+  const [saleDepositMethod, setSaleDepositMethod] = useState<'cash' | 'transfer' | 'card'>('cash')
 
   // inventory search state per row
   const [invSearch, setInvSearch] = useState<string[]>(items.map((it) => (it.mode === 'product' ? it.name : '')))
@@ -1046,17 +1066,100 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
   const [priceInputs, setPriceInputs] = useState<string[]>(items.map((it) => String(it.price ?? 0)))
   const invDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const searchCustomers = async (q: string) => {
+  const generateCustomerCode = () => {
+    const d = new Date()
+    const pad = (v: number) => String(v).padStart(2, '0')
+    const ts = `${String(d.getFullYear()).slice(-2)}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+    const rand = String(Math.floor(Math.random() * 1000)).padStart(3, '0')
+    return `CU${ts}${rand}`
+  }
+
+  const searchCustomers = (q: string) => {
     setCustomerSearch(q)
+    if (custSearchRef.current) clearTimeout(custSearchRef.current)
     if (q.trim().length < 2) { setCustomerResults([]); return }
+    custSearchRef.current = setTimeout(async () => {
+      try {
+        const { data } = await customerService.getCustomers({ search: q, limit: 10 })
+        setCustomerResults(data.data.map((c: any) => ({
+          id: c.id,
+          full_name: c.full_name ?? c.company_name ?? `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() ?? `#${c.id}`,
+          phone: c.phone ?? c.phones?.[0]?.phone ?? null,
+        })))
+      } catch { setCustomerResults([]) }
+    }, 300)
+  }
+
+  const handleCreateNewCustomer = async () => {
+    if (newCustForm.type === 'personal' && !newCustForm.firstName.trim()) {
+      toast.error('กรุณากรอกชื่อ')
+      return
+    }
+    if (newCustForm.type === 'corporate' && !newCustForm.companyName.trim()) {
+      toast.error('กรุณากรอกชื่อบริษัท/ร้าน')
+      return
+    }
+    if (!employee?.branch_id) { toast.error('ไม่พบข้อมูลสาขา'); return }
+    setIsCreatingCustomer(true)
     try {
-      const { data } = await customerService.getCustomers({ search: q, limit: 10 })
-      setCustomerResults(data.data.map((c: any) => ({
-        id: c.id,
-        full_name: c.full_name ?? c.company_name ?? `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() ?? `#${c.id}`,
-        phone: c.phone ?? c.phones?.[0]?.phone ?? null,
-      })))
-    } catch { setCustomerResults([]) }
+      const isCorporate = newCustForm.type === 'corporate'
+      const normalizedFirstName = isCorporate ? newCustForm.companyName.trim() : newCustForm.firstName.trim()
+      let created: any = null
+      let lastErr: any = null
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const payload: import('@/types/customer').CustomerPayload = {
+          type: newCustForm.type,
+          customer_code: generateCustomerCode(),
+          branch_id: employee.branch_id,
+          first_name: normalizedFirstName,
+          last_name: isCorporate ? undefined : (newCustForm.lastName.trim() || undefined),
+          company_name: isCorporate ? newCustForm.companyName.trim() : undefined,
+          tax_id: newCustForm.taxId.trim() || undefined,
+          id_card: !isCorporate ? (newCustForm.idCard.trim() || undefined) : undefined,
+          address: newCustForm.address.trim() || undefined,
+          company_branch: isCorporate ? (newCustForm.companyBranch.trim() || undefined) : undefined,
+          contact_name: isCorporate ? (newCustForm.contactName.trim() || undefined) : undefined,
+          phones: newCustForm.phone.trim() ? [{ type: 'mobile', number: newCustForm.phone.trim(), is_primary: true }] : [],
+        }
+        try {
+          const { data: res } = await customerService.createCustomer(payload)
+          created = res.data
+          break
+        } catch (err: any) {
+          lastErr = err
+          const msg = String(err?.response?.data?.message ?? err?.message ?? '').toLowerCase()
+          const isDuplicateCode = msg.includes('customer_code') || msg.includes('idx_customers_customer_code') || msg.includes('duplicate') || msg.includes('1062')
+          if (!isDuplicateCode) {
+            throw err
+          }
+        }
+      }
+      if (!created) {
+        throw lastErr ?? new Error('create customer failed')
+      }
+      const full = (created.company_name ?? `${created.first_name ?? ''} ${created.last_name ?? ''}`.trim()) || `#${created.id}`
+      setPickedCustomer({ id: created.id, full_name: full })
+      setCustomerResults([])
+      setCustomerSearch('')
+      setCustMode('search')
+      setNewCustForm({
+        type: 'personal',
+        firstName: '',
+        lastName: '',
+        phone: '',
+        companyName: '',
+        taxId: '',
+        idCard: '',
+        address: '',
+        companyBranch: '',
+        contactName: '',
+      })
+      toast.success(`สร้างลูกค้า "${full}" เรียบร้อย`)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'สร้างลูกค้าไม่สำเร็จ')
+    } finally {
+      setIsCreatingCustomer(false)
+    }
   }
 
   const handleInvSearch = (rowIdx: number, q: string) => {
@@ -1144,6 +1247,17 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
     if (isSubmitting) return
     const customerId = existingCustomerId ?? pickedCustomer?.id
     if (!customerId) { toast.error('กรุณาเลือกลูกค้า'); return }
+    if (jobData?.sourceType === 'sale' && saleMode === 'deposit') {
+      const dpAmount = Number(saleDepositAmount || 0)
+      if (!Number.isFinite(dpAmount) || dpAmount <= 0) {
+        toast.error('กรุณากรอกยอดมัดจำให้มากกว่า 0')
+        return
+      }
+      if (dpAmount >= total) {
+        toast.error('ยอดมัดจำควรน้อยกว่ายอดรวมสินค้า')
+        return
+      }
+    }
     setIsSubmitting(true)
     try {
       const { data: qtRes } = await quotationService.createQuotation({
@@ -1163,7 +1277,23 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
         })),
       })
       await quotationService.send(qtRes.data.id)
-      toast.success('ส่งใบเสนอราคาเรียบร้อย')
+      // For sale flow: auto-approve then branch by mode
+      if (jobData?.sourceType === 'sale') {
+        await quotationService.approve(qtRes.data.id)
+        if (saleMode === 'deposit') {
+          await depositService.create({
+            quotation_id: qtRes.data.id,
+            amount: Number(saleDepositAmount || 0),
+            payment_method: saleDepositMethod,
+          })
+        } else {
+          try {
+            const { data: invRes } = await invoiceService.createFromQuotation({ quotation_id: qtRes.data.id })
+            await invoiceService.issue(invRes.data.id)
+          } catch { /* invoice creation failure is non-fatal — PaymentStepForm will retry */ }
+        }
+      }
+      toast.success(jobData?.sourceType === 'sale' && saleMode === 'deposit' ? 'บันทึกใบเสนอราคาและรับมัดจำเรียบร้อย' : 'ส่งใบเสนอราคาเรียบร้อย')
       onDraftChange?.(null)
       onComplete(jobData?.sourceType === 'sale' && !jobData.sourceId ? { newId: qtRes.data.id } : undefined)
     } catch (err: any) {
@@ -1176,59 +1306,303 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
   return (
     <div className="space-y-5">
       {needsCustomerPick && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm relative overflow-hidden">
+        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm relative z-20 overflow-visible">
           <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
           <div className="flex items-center gap-2 text-sm font-semibold text-blue-800 mb-3">
             <UserSearch className="h-4 w-4" /> 
             เลือกลูกค้า {pickedCustomer ? <span className="font-normal text-blue-600">· {pickedCustomer.full_name}</span> : <span className="font-normal text-gray-500">(บังคับ)</span>}
           </div>
           {!pickedCustomer && (
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input
-                value={customerSearch}
-                onChange={(e) => searchCustomers(e.target.value)}
-                placeholder="ค้นหาลูกค้าด้วยชื่อ / เบอร์โทร"
-                className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
-              />
-              {customerResults.length > 0 && (
-                <ul className="absolute left-0 top-full z-50 mt-1 w-full max-h-48 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl text-sm divide-y divide-gray-100">
-                  {customerResults.map((c) => (
-                    <li key={c.id}>
+            <div className="space-y-3">
+              {/* Tab switcher */}
+              <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setCustMode('search')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-all ${
+                    custMode === 'search' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  ค้นหาลูกค้าเดิม
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustMode('new')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-all ${
+                    custMode === 'new' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <span className="text-sm leading-none">+</span>
+                  ลูกค้าใหม่
+                </button>
+              </div>
+
+              {/* Tab 1 — ค้นหาลูกค้าเดิม */}
+              {custMode === 'search' && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input
+                    value={customerSearch}
+                    onChange={(e) => searchCustomers(e.target.value)}
+                    placeholder="ชื่อ / เบอร์โทร / บัตรประชาชน"
+                    className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                  />
+                  {customerSearch.trim().length >= 2 && (
+                    <ul className="absolute left-0 top-full z-50 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl text-sm divide-y divide-gray-100">
+                      {customerResults.length === 0 ? (
+                        <li className="px-4 py-3">
+                          <p className="text-gray-400 text-xs mb-1.5">ไม่พบลูกค้าในระบบ</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const parts = customerSearch.trim().split(' ')
+                              setNewCustForm((p) => ({
+                                ...p,
+                                type: 'personal',
+                                firstName: parts[0] ?? '',
+                                lastName: parts.slice(1).join(' ') ?? '',
+                              }))
+                              setCustMode('new')
+                              setCustomerResults([])
+                            }}
+                            className="text-xs text-blue-600 font-semibold hover:underline"
+                          >
+                            + สร้างลูกค้าใหม่
+                          </button>
+                        </li>
+                      ) : (
+                        customerResults.map((c) => (
+                          <li key={c.id}>
+                            <button
+                              type="button"
+                              onClick={() => { setPickedCustomer({ id: c.id, full_name: c.full_name }); setCustomerResults([]); setCustomerSearch('') }}
+                              className="flex items-center w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                            >
+                              <span className="font-medium text-gray-800">{c.full_name}</span>
+                              {c.phone && <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{c.phone}</span>}
+                            </button>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 2 — ลูกค้าใหม่ */}
+              {custMode === 'new' && (
+                <div className="space-y-2.5 rounded-lg border border-gray-200 bg-white p-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">ประเภทลูกค้า <span className="text-red-500">*</span></label>
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => { setPickedCustomer({ id: c.id, full_name: c.full_name }); setCustomerResults([]); setCustomerSearch('') }}
-                        className="flex items-center w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                        onClick={() => setNewCustForm((p) => ({ ...p, type: 'personal' }))}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${newCustForm.type === 'personal' ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
                       >
-                        <span className="font-medium text-gray-800">{c.full_name}</span>
-                        {c.phone && <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{c.phone}</span>}
+                        บุคคลธรรมดา
                       </button>
-                    </li>
-                  ))}
-                </ul>
+                      <button
+                        type="button"
+                        onClick={() => setNewCustForm((p) => ({ ...p, type: 'corporate' }))}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${newCustForm.type === 'corporate' ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                      >
+                        นิติบุคคล
+                      </button>
+                    </div>
+                  </div>
+
+                  {newCustForm.type === 'personal' ? (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">ชื่อ <span className="text-red-500">*</span></label>
+                        <input
+                          value={newCustForm.firstName}
+                          onChange={(e) => setNewCustForm((p) => ({ ...p, firstName: e.target.value }))}
+                          placeholder="ชื่อ"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">นามสกุล</label>
+                        <input
+                          value={newCustForm.lastName}
+                          onChange={(e) => setNewCustForm((p) => ({ ...p, lastName: e.target.value }))}
+                          placeholder="นามสกุล (ถ้ามี)"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">เลขบัตรประชาชน</label>
+                        <input
+                          value={newCustForm.idCard}
+                          onChange={(e) => setNewCustForm((p) => ({ ...p, idCard: e.target.value }))}
+                          placeholder="13 หลัก (ถ้ามี)"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">เบอร์โทร</label>
+                        <input
+                          value={newCustForm.phone}
+                          onChange={(e) => setNewCustForm((p) => ({ ...p, phone: e.target.value }))}
+                          placeholder="เบอร์โทร"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <label className="text-xs text-gray-500 mb-1 block">ชื่อบริษัท / ร้าน <span className="text-red-500">*</span></label>
+                        <input
+                          value={newCustForm.companyName}
+                          onChange={(e) => setNewCustForm((p) => ({ ...p, companyName: e.target.value }))}
+                          placeholder="ชื่อบริษัท / ร้าน"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">เลขผู้เสียภาษี</label>
+                        <input
+                          value={newCustForm.taxId}
+                          onChange={(e) => setNewCustForm((p) => ({ ...p, taxId: e.target.value }))}
+                          placeholder="13 หลัก (ถ้ามี)"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">สาขาของลูกค้า</label>
+                        <input
+                          value={newCustForm.companyBranch}
+                          onChange={(e) => setNewCustForm((p) => ({ ...p, companyBranch: e.target.value }))}
+                          placeholder="เช่น สำนักงานใหญ่"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">ชื่อผู้ติดต่อ</label>
+                        <input
+                          value={newCustForm.contactName}
+                          onChange={(e) => setNewCustForm((p) => ({ ...p, contactName: e.target.value }))}
+                          placeholder="ชื่อผู้ติดต่อ (ถ้ามี)"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">เบอร์โทร</label>
+                        <input
+                          value={newCustForm.phone}
+                          onChange={(e) => setNewCustForm((p) => ({ ...p, phone: e.target.value }))}
+                          placeholder="เบอร์โทร"
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">ที่อยู่สำหรับออกเอกสาร</label>
+                    <input
+                      value={newCustForm.address}
+                      onChange={(e) => setNewCustForm((p) => ({ ...p, address: e.target.value }))}
+                      placeholder="ที่อยู่ (ถ้ามี)"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCreateNewCustomer}
+                    disabled={isCreatingCustomer || (newCustForm.type === 'personal' ? !newCustForm.firstName.trim() : !newCustForm.companyName.trim())}
+                    className="w-full rounded-lg bg-blue-600 text-white text-sm font-semibold py-2 hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {isCreatingCustomer ? 'กำลังสร้าง...' : 'สร้างลูกค้าและเลือก'}
+                  </button>
+                </div>
               )}
             </div>
           )}
           {pickedCustomer && (
-            <button type="button" onClick={() => setPickedCustomer(null)} className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">เปลี่ยนลูกค้า</button>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-600 text-xs">✓</span>
+                <span className="font-medium text-gray-800">{pickedCustomer.full_name}</span>
+              </div>
+              <button type="button" onClick={() => { setPickedCustomer(null); setCustMode('search') }} className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">เปลี่ยน</button>
+            </div>
           )}
         </div>
       )}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-visible">
-        <div className="overflow-x-auto">
+      {jobData?.sourceType === 'sale' && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
+          <div className="text-sm font-semibold text-indigo-800">รูปแบบการขาย</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setSaleMode('full')}
+              className={cn(
+                'rounded-lg border px-3 py-2 text-sm font-semibold transition-colors text-left',
+                saleMode === 'full' ? 'border-indigo-300 bg-white text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
+              )}
+            >
+              ขายปกติ
+            </button>
+            <button
+              type="button"
+              onClick={() => setSaleMode('deposit')}
+              className={cn(
+                'rounded-lg border px-3 py-2 text-sm font-semibold transition-colors text-left',
+                saleMode === 'deposit' ? 'border-indigo-300 bg-white text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
+              )}
+            >
+              ขายแบบมัดจำ
+            </button>
+          </div>
+
+          {saleMode === 'deposit' && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">ยอดมัดจำ <span className="text-red-500">*</span></label>
+                <input
+                  type="number"
+                  value={saleDepositAmount}
+                  onChange={(e) => setSaleDepositAmount(e.target.value)}
+                  placeholder="เช่น 5000"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">วิธีรับมัดจำ</label>
+                <select
+                  value={saleDepositMethod}
+                  onChange={(e) => setSaleDepositMethod(e.target.value as 'cash' | 'transfer' | 'card')}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                >
+                  <option value="cash">เงินสด</option>
+                  <option value="transfer">โอนเงิน</option>
+                  <option value="card">บัตร</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      <div className="rounded-xl border border-gray-200 overflow-visible shadow-sm bg-white">
+        <div className="hidden md:block">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50/80 border-b border-gray-200"><tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 w-32">ประเภท</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 w-36">ประเภท</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">รายการ</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 w-28">ราคา</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 w-20">จำนวน</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 w-28">รวม</th>
-              <th className="w-10" />
+              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 w-32">ราคา</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 w-24">จำนวน</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 w-32">รวม</th>
+              <th className="w-12" />
             </tr></thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((it, i) => (
                 <tr key={i} className="group hover:bg-gray-50/50 transition-colors">
-                  <td className="px-4 py-2.5 align-top">
+                  <td className="px-4 py-3 align-top">
                     <div className="relative">
                       <select
                         value={it.mode}
@@ -1252,97 +1626,250 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
                           const ns = [...invSearch]; ns[i] = ''; setInvSearch(ns)
                           const nr = [...invResults]; nr[i] = []; setInvResults(nr)
                         }}
-                        className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-1.5 pr-8 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                        className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2 pr-8 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                       >
                         <option value="product">สินค้า (catalog)</option>
                         <option value="custom">อื่นๆ (พิมพ์เอง)</option>
                       </select>
-                      <ChevronDown className="absolute right-2 top-2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                      <ChevronDown className="absolute right-2 top-2.5 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 align-top relative">
+                  <td className={cn('px-4 py-3 align-top', activeInvRow === i && 'relative z-20')}>
                     {it.mode === 'product' ? (
-                      <div>
-                        <div className="relative">
-                          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-gray-400" />
-                          <input
-                            className="w-full rounded-lg border border-gray-200 pl-8 pr-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                            placeholder="ค้นหาสินค้าจาก catalog..."
-                            value={invSearch[i] || it.name}
-                            onChange={(e) => handleInvSearch(i, e.target.value)}
-                            onFocus={() => setActiveInvRow(i)}
-                          />
-                        </div>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
+                        <input
+                          className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                          placeholder="พิมพ์ค้นหาสินค้า..."
+                          value={invSearch[i] || it.name}
+                          onChange={(e) => handleInvSearch(i, e.target.value)}
+                          onFocus={() => setActiveInvRow(i)}
+                          onBlur={() => setTimeout(() => { if (activeInvRow === i) setActiveInvRow(null) }, 150)}
+                          autoComplete="off"
+                        />
+                        {activeInvRow === i && !!invSearch[i]?.trim() && (
+                          <ul className="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg max-h-52 overflow-y-auto">
+                            {invResults[i]?.length ? invResults[i].map((inv) => (
+                              <li
+                                key={`${inv.product_id}-${inv.product_variant_id}`}
+                                onMouseDown={(e) => { e.preventDefault(); handleSelectInvItem(i, inv) }}
+                                className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 transition-colors"
+                              >
+                                <span className="font-medium text-gray-800">{inv.variant?.name ?? inv.product?.name ?? `#${inv.id}`}</span>
+                                <span className="text-xs text-gray-400 ml-2 shrink-0">คงเหลือ {inv.quantity}</span>
+                              </li>
+                            )) : <li className="px-3 py-2 text-xs text-gray-400">ไม่พบสินค้า</li>}
+                          </ul>
+                        )}
                         {it.stock !== undefined && (
                           <div className="text-xs font-medium text-gray-500 mt-1 flex items-center gap-1">
-                            <Package className="h-3 w-3" /> คงเหลือ: <span className={it.stock > 0 ? "text-green-600" : "text-red-500"}>{it.stock}</span> ชิ้น
+                            <Package className="h-3 w-3" /> คงเหลือ: <span className={it.stock > 0 ? 'text-green-600' : 'text-red-500'}>{it.stock}</span> ชิ้น
                           </div>
-                        )}
-                        {activeInvRow === i && invResults[i]?.length > 0 && (
-                          <ul className="absolute left-4 top-[2.5rem] z-50 mt-1 w-72 max-h-56 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl text-sm divide-y divide-gray-100">
-                            {invResults[i].map((inv) => (
-                              <li key={inv.id}>
-                                <button
-                                  type="button"
-                                  onMouseDown={(e) => { e.preventDefault(); handleSelectInvItem(i, inv) }}
-                                  className="block w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
-                                >
-                                  <div className="font-medium text-gray-800">{inv.variant?.name ?? inv.product?.name}</div>
-                                  <div className="flex items-center gap-2 mt-0.5 text-xs">
-                                    <span className="text-gray-400 bg-gray-100 px-1.5 rounded">{inv.product?.sku}</span>
-                                    <span className="text-green-600 font-medium">฿{Number(inv.variant?.selling_price ?? 0).toLocaleString()}</span>
-                                    <span className="text-gray-500 ml-auto">เหลือ {inv.quantity}</span>
-                                  </div>
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
                         )}
                       </div>
                     ) : (
                       <input
-                        className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                         placeholder="พิมพ์รายการ..."
                         value={it.name}
                         onChange={(e) => { const n = [...items]; n[i] = { ...n[i], name: e.target.value }; setItems(n) }}
                       />
                     )}
                   </td>
-                  <td className="px-4 py-2.5 align-top"><input type="number" className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-right focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" value={priceInputs[i] ?? ''} onChange={(e) => {
-                    const raw = e.target.value
-                    const np = [...priceInputs]
-                    np[i] = raw
-                    setPriceInputs(np)
+                  <td className="px-4 py-3 align-top">
+                    <input
+                      type="number"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-right focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                      value={priceInputs[i] ?? ''}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        const np = [...priceInputs]
+                        np[i] = raw
+                        setPriceInputs(np)
 
-                    if (raw === '') {
-                      const n = [...items]
-                      n[i] = { ...n[i], price: 0 }
-                      setItems(n)
-                      return
-                    }
+                        if (raw === '') {
+                          const n = [...items]
+                          n[i] = { ...n[i], price: 0 }
+                          setItems(n)
+                          return
+                        }
 
-                    if (raw === '-' || raw === '.' || raw === '-.') {
-                      return
-                    }
+                        if (raw === '-' || raw === '.' || raw === '-.') {
+                          return
+                        }
 
-                    const parsed = Number(raw)
-                    if (!Number.isFinite(parsed)) {
-                      return
-                    }
+                        const parsed = Number(raw)
+                        if (!Number.isFinite(parsed)) {
+                          return
+                        }
 
-                    const n = [...items]
-                    n[i] = { ...n[i], price: parsed }
-                    setItems(n)
-                  }} /></td>
-                  <td className="px-4 py-2.5 align-top text-center"><input type="number" className="w-16 mx-auto rounded-lg border border-gray-200 px-2 py-1.5 text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" value={it.qty} onChange={(e) => { const n = [...items]; n[i] = { ...n[i], qty: Number(e.target.value) }; setItems(n) }} /></td>
-                  <td className="px-4 py-2.5 align-top text-right font-medium text-gray-800 pt-3">฿{(it.price * it.qty).toLocaleString()}</td>
-                  <td className="px-2 align-top pt-2"><button onClick={() => removeItem(i)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"><Trash2 className="h-4 w-4" /></button></td>
+                        const n = [...items]
+                        n[i] = { ...n[i], price: parsed }
+                        setItems(n)
+                      }}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-center align-top">
+                    <input
+                      type="number"
+                      className="w-16 rounded-lg border border-gray-200 px-2 py-2 text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                      value={it.qty}
+                      onChange={(e) => { const n = [...items]; n[i] = { ...n[i], qty: Number(e.target.value) }; setItems(n) }}
+                    />
+                  </td>
+                  <td className="px-4 py-3 align-top text-right font-semibold text-gray-800">฿{(it.price * it.qty).toLocaleString()}</td>
+                  <td className="px-2 text-center">
+                    <button onClick={() => removeItem(i)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors md:opacity-0 md:group-hover:opacity-100">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <button onClick={addItem} className="flex w-full items-center justify-center gap-1.5 border-t border-gray-200 bg-gray-50/50 px-4 py-3 text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors rounded-b-xl">
+        <div className="md:hidden divide-y divide-gray-100">
+          {items.map((it, i) => (
+            <div key={i} className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-gray-500">รายการสินค้า</label>
+                <button
+                  type="button"
+                  onClick={() => removeItem(i)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+                  title="ลบรายการ"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gray-500">ประเภท</label>
+                <div className="relative">
+                  <select
+                    value={it.mode}
+                    onChange={(e) => {
+                      const nextMode = e.target.value as QItemMode
+                      const n = [...items]
+                      n[i] = {
+                        ...n[i],
+                        mode: nextMode,
+                        product_id: undefined,
+                        product_variant_id: undefined,
+                        name: '',
+                        price: 0,
+                        stock: undefined,
+                        pricing_type: nextMode === 'product' ? 'part' : 'labor',
+                      }
+                      setItems(n)
+                      const np = [...priceInputs]
+                      np[i] = '0'
+                      setPriceInputs(np)
+                      const ns = [...invSearch]; ns[i] = ''; setInvSearch(ns)
+                      const nr = [...invResults]; nr[i] = []; setInvResults(nr)
+                    }}
+                    className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2 pr-8 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  >
+                    <option value="product">สินค้า (catalog)</option>
+                    <option value="custom">อื่นๆ (พิมพ์เอง)</option>
+                  </select>
+                  <ChevronDown className="absolute right-2 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className={cn('space-y-1', activeInvRow === i && 'relative z-20')}>
+                <label className="text-xs font-semibold text-gray-500">รายการ</label>
+                {it.mode === 'product' ? (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
+                    <input
+                      className="w-full rounded-lg border border-gray-200 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                      value={invSearch[i] || it.name}
+                      onChange={(e) => handleInvSearch(i, e.target.value)}
+                      onFocus={() => setActiveInvRow(i)}
+                      onBlur={() => setTimeout(() => { if (activeInvRow === i) setActiveInvRow(null) }, 150)}
+                      placeholder="พิมพ์ค้นหาสินค้า..."
+                      autoComplete="off"
+                    />
+                    {activeInvRow === i && !!invSearch[i]?.trim() && (
+                      <ul className="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                        {invResults[i]?.length ? invResults[i].map((inv) => (
+                          <li
+                            key={`${inv.product_id}-${inv.product_variant_id}`}
+                            onMouseDown={(e) => { e.preventDefault(); handleSelectInvItem(i, inv) }}
+                            className="flex items-center justify-between px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 transition-colors"
+                          >
+                            <span className="font-medium text-gray-800">{inv.variant?.name ?? inv.product?.name ?? `#${inv.id}`}</span>
+                            <span className="text-xs text-gray-400 ml-2 shrink-0">คงเหลือ {inv.quantity}</span>
+                          </li>
+                        )) : <li className="px-3 py-2 text-xs text-gray-400">ไม่พบสินค้า</li>}
+                      </ul>
+                    )}
+                    {it.stock !== undefined && (
+                      <p className="mt-1 text-xs text-gray-500">คงเหลือ {it.stock} ชิ้น</p>
+                    )}
+                  </div>
+                ) : (
+                  <input
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    placeholder="พิมพ์รายการ..."
+                    value={it.name}
+                    onChange={(e) => { const n = [...items]; n[i] = { ...n[i], name: e.target.value }; setItems(n) }}
+                  />
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-500">ราคา</label>
+                  <input
+                    type="number"
+                    className="w-full rounded-lg border border-gray-200 px-2 py-2 text-sm text-right focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    value={priceInputs[i] ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value
+                      const np = [...priceInputs]
+                      np[i] = raw
+                      setPriceInputs(np)
+
+                      if (raw === '') {
+                        const n = [...items]
+                        n[i] = { ...n[i], price: 0 }
+                        setItems(n)
+                        return
+                      }
+
+                      if (raw === '-' || raw === '.' || raw === '-.') return
+                      const parsed = Number(raw)
+                      if (!Number.isFinite(parsed)) return
+
+                      const n = [...items]
+                      n[i] = { ...n[i], price: parsed }
+                      setItems(n)
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-500">จำนวน</label>
+                  <input
+                    type="number"
+                    className="w-full rounded-lg border border-gray-200 px-2 py-2 text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    value={it.qty}
+                    onChange={(e) => { const n = [...items]; n[i] = { ...n[i], qty: Number(e.target.value) }; setItems(n) }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-500">รวม</label>
+                  <div className="h-[38px] rounded-lg border border-gray-200 bg-gray-50 px-2 flex items-center justify-end text-sm font-semibold text-gray-800">
+                    ฿{(it.price * it.qty).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button onClick={addItem} className="flex w-full items-center justify-center gap-1.5 border-t border-gray-200 bg-gray-50/50 px-4 py-3 text-xs font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors">
           <Plus className="h-4 w-4" /> เพิ่มรายการ
         </button>
       </div>
@@ -1626,15 +2153,19 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
   const [photos, setPhotos] = useState<File[]>([])
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([])
   const photoPreviewUrlsRef = useRef<string[]>([])
+  const [existingPhotos, setExistingPhotos] = useState<ServiceOrderGpsPhoto[]>([])
   type RepairTask = { name: string; reason: string; done: boolean }
   type UsedPart = { name: string; symptom: string; qty: number }
 
-  const buildRepairTasksFromAssessment = () => {
+  const REPAIR_DONE_STATUSES = ['completed', 'pending_payment', 'pending_pickup', 'closed']
+  const isRepairDone = REPAIR_DONE_STATUSES.includes(jobData?.serviceOrder?.status ?? '')
+
+  const buildRepairTasksFromAssessment = (allDone = false) => {
     const checklist = parseChecklistFromNote(jobData?.serviceOrder?.internal_note)
     const mapped = checklist.map((cl) => ({
       name: cl.name,
       reason: cl.reason.trim(),
-      done: false,
+      done: allDone,
     }))
 
     return mapped
@@ -1660,15 +2191,25 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
       .filter((it): it is UsedPart => Boolean(it))
   }
 
-  const [tasks, setTasks] = useState<RepairTask[]>(buildRepairTasksFromAssessment)
+  const [tasks, setTasks] = useState<RepairTask[]>(() => buildRepairTasksFromAssessment(isRepairDone))
   const [usedParts, setUsedParts] = useState<UsedPart[]>(buildUsedPartsFromAssessment)
 
   useEffect(() => {
-    setTasks(buildRepairTasksFromAssessment())
+    setTasks(buildRepairTasksFromAssessment(isRepairDone))
     setUsedParts(buildUsedPartsFromAssessment())
-  }, [JSON.stringify(jobData?.serviceOrder?.items ?? []), JSON.stringify(jobData?.items ?? []), jobData?.serviceOrder?.internal_note])
+  }, [JSON.stringify(jobData?.serviceOrder?.items ?? []), JSON.stringify(jobData?.items ?? []), jobData?.serviceOrder?.internal_note, isRepairDone])
 
-  const allDone = tasks.every((t) => t.done)
+  useEffect(() => {
+    const soId = jobData?.serviceOrder?.id
+    if (!soId) return
+    serviceOrderService.getGpsPhotos(soId).then((res) => {
+      const repairTypes = ['pre_repair', 'pre_delivery']
+      const filtered = (res.data.data ?? []).filter((p: ServiceOrderGpsPhoto) => repairTypes.includes(p.type))
+      setExistingPhotos(filtered)
+    }).catch(() => {})
+  }, [jobData?.serviceOrder?.id])
+
+  const allDone = isRepairDone || tasks.every((t) => t.done)
 
   const handlePhotoChange = (files: File[]) => {
     photoPreviewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
@@ -1735,15 +2276,18 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
         }
         const gpsPhotoType = gpsPhotoTypeByStatus[currentStatus ?? ''] ?? 'pre_repair'
 
-        let lat = 13.7563309
-        let lng = 100.5017651
+        let lat: number
+        let lng: number
         try {
           const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
           })
           lat = pos.coords.latitude
           lng = pos.coords.longitude
-        } catch (e) {}
+        } catch (e) {
+          toast.error('ไม่สามารถระบุตำแหน่ง GPS ได้ กรุณาอนุญาตตำแหน่งแล้วลองใหม่อีกครั้ง')
+          return
+        }
 
         const formatICT = () => {
           const d = new Date()
@@ -1764,6 +2308,11 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
 
       if (currentStatus === 'in_progress') {
         await serviceOrderService.transition(soId, { status: 'completed' })
+        currentStatus = 'completed'
+      }
+
+      if (currentStatus === 'completed') {
+        await serviceOrderService.transition(soId, { status: 'pending_payment' })
       }
       toast.success('ซ่อมเสร็จเรียบร้อย')
       onComplete()
@@ -1844,6 +2393,21 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
         </div>
       </div>
       
+      {existingPhotos.length > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="bg-gray-50/80 px-4 py-3 border-b border-gray-200 flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <Camera className="h-4 w-4 text-gray-500" /> รูปที่อัปโหลดแล้ว ({existingPhotos.length})
+          </div>
+          <div className="p-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {existingPhotos.map((photo) => (
+              <div key={photo.id} className="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-1">
+                <img src={photo.photo_url} alt={`repair-${photo.type}-${photo.id}`} className="h-20 w-full rounded object-contain bg-gray-50" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/50 py-6 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:border-gray-400 hover:text-gray-700 transition-all cursor-pointer w-full group">
         <div className={cn("p-3 rounded-full shadow-sm transition-all", photos.length > 0 ? "bg-amber-100 text-amber-600 group-hover:bg-amber-200" : "bg-white text-gray-400 group-hover:scale-110 group-hover:text-gray-600")}>
           <Camera className="h-6 w-6" />
@@ -1893,9 +2457,34 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const invoiceId = jobData?.invoice?.id ?? null
   const [method, setMethod] = useState<PaymentMethod>('cash')
+  const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount')
+  const [discountInput, setDiscountInput] = useState('')
   const [received, setReceived] = useState('')
-  const total = jobData?.grand_total ?? 0
-  const change = method === 'cash' && received ? Number(received) - total : 0
+  const [reference, setReference] = useState('')
+  const [confirmed, setConfirmed] = useState(false)
+  const total = Number(jobData?.grand_total ?? 0)
+
+  // Safety: for sale flow, auto-create & issue invoice if QT is approved but no invoice yet
+  const autoCreateRef = useRef(false)
+  useEffect(() => {
+    if (invoiceId || autoCreateRef.current) return
+    if (jobData?.sourceType !== 'sale') return
+    const qtId = jobData?.quotation?.id
+    if (!qtId || jobData?.quotation?.status !== 'approved') return
+    autoCreateRef.current = true
+    invoiceService.createFromQuotation({ quotation_id: qtId })
+      .then(({ data }) => invoiceService.issue(data.data.id).then(() => {
+        onComplete({ invoiceId: data.data.id })
+      }))
+      .catch(() => { autoCreateRef.current = false })
+  }, [invoiceId, jobData?.sourceType, jobData?.quotation?.id, jobData?.quotation?.status, onComplete])
+  const discountRaw = Number(discountInput || 0)
+  const discountAmount = discountType === 'percent'
+    ? Math.min(total, Math.max(0, (total * discountRaw) / 100))
+    : Math.min(total, Math.max(0, discountRaw))
+  const netTotal = Math.max(0, total - discountAmount)
+  const receivedAmount = Number(received || 0)
+  const change = method === 'cash' && received ? receivedAmount - netTotal : 0
 
   if (!invoiceId) {
     return (
@@ -1907,6 +2496,27 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
   }
 
   const invoiceStatus = jobData?.invoice?.status
+  if (invoiceStatus === 'paid') {
+    const payment = (jobData as any)?.payment
+    const methodLabels: Record<string, string> = { cash: 'เงินสด', transfer: 'โอนเงิน', card: 'บัตรเครดิต', cheque: 'เช็ค' }
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center">
+          <p className="text-emerald-800 font-semibold text-lg">✅ ชำระเงินเรียบร้อยแล้ว</p>
+          <p className="text-sm text-emerald-600 mt-1">ออกใบเสร็จรับเงินสำเร็จ</p>
+        </div>
+        {payment && (
+          <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-2 text-sm">
+            <div className="flex justify-between"><span className="text-gray-500">วิธีชำระเงิน</span><span className="font-medium">{methodLabels[payment.method] ?? payment.method}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">จำนวนชำระ</span><span className="font-semibold text-emerald-700">฿{Number(payment.amount).toLocaleString()}</span></div>
+            {payment.reference && (
+              <div className="flex justify-between"><span className="text-gray-500">เลขอ้างอิง</span><span>{payment.reference.replace(/\s*\|\s*discount:[0-9.]+/g, '').trim() || '-'}</span></div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
   if (invoiceStatus && invoiceStatus !== 'issued') {
     const statusLabel: Record<string, string> = {
       draft: 'ร่าง (ยังไม่ออกบิล)',
@@ -1925,10 +2535,26 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
   const handleSubmit = async () => {
     if (isSubmitting) return
     if (!invoiceId) { toast.error('ไม่พบใบแจ้งหนี้'); return }
+    if (discountRaw < 0) { toast.error('ส่วนลดต้องมากกว่าหรือเท่ากับ 0'); return }
+    if (method === 'cash' && received && receivedAmount < netTotal) { toast.error('จำนวนเงินรับไม่พอ'); return }
+    if (!confirmed) { toast.error('กรุณาตรวจสอบข้อมูลก่อนออกใบเสร็จ'); return }
     setIsSubmitting(true)
     try {
-      await invoiceService.addPayment(invoiceId, { amount: total, method, paid_at: new Date().toISOString() })
+      const refParts = [reference.trim()]
+      if (discountAmount > 0) {
+        refParts.push(`discount:${discountAmount.toFixed(2)}`)
+      }
+      await invoiceService.addPayment(invoiceId, {
+        amount: netTotal,
+        method,
+        paid_at: new Date().toISOString(),
+        reference: refParts.filter(Boolean).join(' | ') || undefined,
+      })
       await invoiceService.issueReceipt(invoiceId)
+      const soId = jobData?.serviceOrder?.id
+      if (soId) {
+        await serviceOrderService.transition(soId, { status: 'pending_pickup' })
+      }
       toast.success('ชำระเงินและออกใบเสร็จเรียบร้อย')
       onComplete()
     } catch (err: any) {
@@ -1947,7 +2573,43 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
         <p className="text-sm font-semibold text-emerald-800 mb-1 relative z-10 flex items-center justify-center gap-2">
           <Banknote className="h-4 w-4" /> ยอดที่ต้องชำระ
         </p>
-        <span className="text-4xl font-black text-emerald-600 tracking-tight relative z-10 drop-shadow-sm">฿{total.toLocaleString()}</span>
+        <span className="text-4xl font-black text-emerald-600 tracking-tight relative z-10 drop-shadow-sm">฿{netTotal.toLocaleString()}</span>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="w-full sm:w-40">
+            <label className="text-sm font-semibold text-gray-700">ประเภทส่วนลด</label>
+            <select
+              value={discountType}
+              onChange={(e) => setDiscountType(e.target.value as 'amount' | 'percent')}
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              <option value="amount">บาท</option>
+              <option value="percent">เปอร์เซ็นต์</option>
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="text-sm font-semibold text-gray-700">ส่วนลด</label>
+            <div className="mt-1 relative">
+              <span className="absolute left-3 top-2.5 text-gray-400 text-sm">{discountType === 'amount' ? '฿' : '%'}</span>
+              <input
+                type="number"
+                min={0}
+                value={discountInput}
+                onChange={(e) => setDiscountInput(e.target.value)}
+                placeholder="0"
+                className="w-full rounded-lg border border-gray-200 pl-8 pr-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
+          <div className="flex items-center justify-between text-gray-600"><span>ยอดใบแจ้งหนี้</span><span>฿{total.toLocaleString()}</span></div>
+          <div className="flex items-center justify-between text-gray-600"><span>ส่วนลด</span><span>-฿{discountAmount.toLocaleString()}</span></div>
+          <div className="flex items-center justify-between border-t border-gray-200 pt-2 text-base font-bold text-gray-800"><span>ยอดสุทธิที่รับชำระ</span><span>฿{netTotal.toLocaleString()}</span></div>
+        </div>
       </div>
       
       <div className="space-y-3">
@@ -1970,10 +2632,10 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
           <label className="text-sm font-semibold text-gray-700">รับเงินมา (บาท)</label>
           <div className="relative">
             <span className="absolute left-4 top-3 text-gray-400 font-bold">฿</span>
-            <input type="number" value={received} onChange={(e) => setReceived(e.target.value)} placeholder={String(total)}
+            <input type="number" value={received} onChange={(e) => setReceived(e.target.value)} placeholder={String(netTotal)}
               className="w-full rounded-xl border border-gray-200 bg-gray-50/50 pl-10 pr-4 py-3 text-right text-xl font-bold focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all" />
           </div>
-          {Number(received) >= total && (
+          {receivedAmount >= netTotal && (
             <div className="flex justify-between items-center rounded-lg bg-green-50 p-3 border border-green-100">
               <span className="text-sm font-medium text-green-800">เงินทอน</span>
               <span className="text-lg font-bold text-green-600">฿{change.toLocaleString()}</span>
@@ -1981,9 +2643,32 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
           )}
         </div>
       )}
+
+      {(method === 'transfer' || method === 'card' || method === 'cheque') && (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2">
+          <label className="text-sm font-semibold text-gray-700">เลขอ้างอิงการชำระ (ถ้ามี)</label>
+          <input
+            type="text"
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            placeholder="เช่น TRX123456"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+          />
+        </div>
+      )}
+
+      <label className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3">
+        <input
+          type="checkbox"
+          checked={confirmed}
+          onChange={(e) => setConfirmed(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+        <span className="text-sm text-blue-800">ตรวจสอบข้อมูลครบแล้ว: วิธีชำระเงิน, ส่วนลด, ยอดสุทธิ ก่อนออกใบเสร็จ</span>
+      </label>
       
       <div className="pt-2">
-        <ActionButton onClick={handleSubmit} loading={isSubmitting} variant="primary" className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25">
+        <ActionButton onClick={handleSubmit} loading={isSubmitting} disabled={!confirmed} variant="primary" className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25">
           <CheckCircle2 className="h-5 w-5" /> ยืนยันชำระเงิน & ออกใบเสร็จ
         </ActionButton>
       </div>
@@ -1992,12 +2677,56 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
 }
 
 /* ─── Deliver / Close Step ─── */
-export function DeliverForm({ onComplete, jobData, type = 'repair' }: FormProps & { type?: string }) {
+export function DeliverForm({ onComplete, jobData, type = 'repair', onPrintDN, onPrintWR, onWarrantyMonthsChange }: FormProps & { type?: string; onPrintDN?: () => void; onPrintWR?: () => void; onWarrantyMonthsChange?: (months: number) => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [dnSigned, setDnSigned] = useState(false)
   const [wrCreated, setWrCreated] = useState(false)
   const [warrantyMonths, setWarrantyMonths] = useState(3)
   const [deliveryPhotos, setDeliveryPhotos] = useState<File[]>([])
+  const [existingDeliveryPhotos, setExistingDeliveryPhotos] = useState<ServiceOrderGpsPhoto[]>([])
+
+  useEffect(() => {
+    const soId = jobData?.serviceOrder?.id
+    if (!soId) return
+    serviceOrderService.getGpsPhotos(soId).then((res) => {
+      const filtered = (res.data.data ?? []).filter((p: ServiceOrderGpsPhoto) => p.type === 'delivery')
+      setExistingDeliveryPhotos(filtered)
+    }).catch(() => {})
+  }, [jobData?.serviceOrder?.id])
+
+  useEffect(() => {
+    const soStatus = jobData?.serviceOrder?.status
+    const isRepair = type === 'repair'
+    const ownerType = isRepair ? 'service_order' : 'quotation'
+    const ownerId = isRepair ? jobData?.serviceOrder?.id : jobData?.quotation?.id
+
+    if (soStatus === 'closed') {
+      setDnSigned(true)
+    }
+
+    if (!ownerId) {
+      return
+    }
+
+    const loadWarranty = async () => {
+      try {
+        const { data } = await warrantyService.getWarranties({ owner_type: ownerType, owner_id: ownerId, page: 1, limit: 10 })
+        const rows = data.data ?? []
+        if (rows.length === 0) {
+          return
+        }
+        const latest = [...rows].sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0]
+        setWrCreated(true)
+        const months = Math.max(1, Number(latest.warranty_months ?? 3))
+        setWarrantyMonths(months)
+        onWarrantyMonthsChange?.(months)
+      } catch {
+        // ignore and keep current form defaults
+      }
+    }
+
+    void loadWarranty()
+  }, [jobData?.quotation?.id, jobData?.serviceOrder?.id, jobData?.serviceOrder?.status, onWarrantyMonthsChange, type])
 
   const handleSubmit = async () => {
     if (isSubmitting) return
@@ -2014,19 +2743,38 @@ export function DeliverForm({ onComplete, jobData, type = 'repair' }: FormProps 
 
     const ownerType = isRepair ? 'service_order' : 'quotation'
     const ownerId = isRepair ? soId! : qtId!
+    const customerId = isRepair
+      ? jobData?.serviceOrder?.customer_id
+      : jobData?.quotation?.customer_id
+
+    if (!customerId || customerId <= 0) {
+      toast.error('ไม่พบข้อมูลลูกค้า ไม่สามารถสร้างใบส่งมอบได้')
+      return
+    }
 
     setIsSubmitting(true)
     try {
+      if (isRepair && soId) {
+        const soDetail = await serviceOrderService.getServiceOrder(soId)
+        const currentStatus = soDetail.data.data.status
+        if (currentStatus === 'pending_payment') {
+          await serviceOrderService.transition(soId, { status: 'pending_pickup' })
+        }
+      }
+
       if (isRepair && soId && deliveryPhotos.length > 0) {
-        let lat = 13.7563309
-        let lng = 100.5017651
+        let lat: number
+        let lng: number
         try {
           const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
           })
           lat = pos.coords.latitude
           lng = pos.coords.longitude
-        } catch (e) {}
+        } catch (e) {
+          toast.error('ไม่สามารถระบุตำแหน่ง GPS ได้ กรุณาอนุญาตตำแหน่งแล้วลองใหม่อีกครั้ง')
+          return
+        }
 
         const formatICT = () => {
           const d = new Date()
@@ -2045,7 +2793,7 @@ export function DeliverForm({ onComplete, jobData, type = 'repair' }: FormProps 
         }
       }
 
-      const { data: dnRes } = await deliveryNoteService.create({ owner_type: ownerType, owner_id: ownerId })
+      const { data: dnRes } = await deliveryNoteService.create({ owner_type: ownerType, owner_id: ownerId, customer_id: customerId })
       await deliveryNoteService.sign(dnRes.data.id, { signed_by: jobData?.customerName ?? 'ลูกค้า', signed_at: new Date().toISOString() })
       if (wrCreated) {
         await warrantyService.create({
@@ -2093,7 +2841,7 @@ export function DeliverForm({ onComplete, jobData, type = 'repair' }: FormProps 
               <label className="text-xs font-medium text-gray-700">ระยะเวลารับประกัน:</label>
               <div className="relative flex items-center">
                 <input
-                  type="number" min={1} max={120} value={warrantyMonths} onChange={(e) => setWarrantyMonths(Math.max(1, Number(e.target.value)))}
+                  type="number" min={1} max={120} value={warrantyMonths} onChange={(e) => { const m = Math.max(1, Number(e.target.value)); setWarrantyMonths(m); onWarrantyMonthsChange?.(m) }}
                   className="w-20 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-semibold text-center focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
                 <span className="ml-2 text-xs text-gray-500 font-medium">เดือน</span>
@@ -2103,13 +2851,70 @@ export function DeliverForm({ onComplete, jobData, type = 'repair' }: FormProps 
         </div>
       </div>
       
-      <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/50 py-6 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:border-gray-400 hover:text-gray-700 transition-all cursor-pointer w-full group">
-        <div className={cn("p-3 rounded-full shadow-sm transition-all", deliveryPhotos.length > 0 ? "bg-green-100 text-green-600 group-hover:bg-green-200" : "bg-white text-gray-400 group-hover:scale-110 group-hover:text-gray-600")}>
-          <Camera className="h-6 w-6" />
+      {/* DN + WR Print Buttons */}
+      {(onPrintDN || onPrintWR) && (
+        <div className="flex gap-2">
+          {onPrintDN && (
+            <button
+              type="button"
+              onClick={onPrintDN}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-all"
+            >
+              <FileText className="h-4 w-4" /> พิมพ์ DN
+            </button>
+          )}
+          {onPrintWR && (
+            <button
+              type="button"
+              onClick={onPrintWR}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700 hover:bg-green-100 hover:border-green-300 transition-all"
+            >
+              <FileText className="h-4 w-4" /> พิมพ์ WR
+            </button>
+          )}
         </div>
-        <span>ถ่ายรูปส่งมอบ / เซ็นเอกสาร {deliveryPhotos.length > 0 && <span className="text-green-600 font-bold ml-1">({deliveryPhotos.length} รูป)</span>}</span>
-        <input type="file" multiple accept="image/*" capture="environment" className="hidden" onChange={(e) => setDeliveryPhotos(Array.from(e.target.files ?? []))} />
-      </label>
+      )}
+
+      {/* Photo upload + previews */}
+      <div className="space-y-3">
+        {existingDeliveryPhotos.length > 0 && (
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="bg-gray-50/80 px-4 py-3 border-b border-gray-200 flex items-center gap-2 text-sm font-semibold text-gray-700">
+              <Camera className="h-4 w-4 text-gray-500" /> รูปส่งมอบที่อัปโหลดแล้ว ({existingDeliveryPhotos.length})
+            </div>
+            <div className="p-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {existingDeliveryPhotos.map((photo) => (
+                <div key={photo.id} className="relative overflow-hidden rounded-lg border border-gray-200 bg-white p-1">
+                  <img src={photo.photo_url} alt={`delivery-${photo.id}`} className="h-20 w-full rounded object-contain bg-gray-50" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50/50 py-5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:border-gray-400 hover:text-gray-700 transition-all cursor-pointer w-full group">
+          <div className={cn("p-3 rounded-full shadow-sm transition-all", deliveryPhotos.length > 0 ? "bg-green-100 text-green-600 group-hover:bg-green-200" : "bg-white text-gray-400 group-hover:scale-110 group-hover:text-gray-600")}>
+            <Camera className="h-6 w-6" />
+          </div>
+          <span>ถ่ายรูปส่งมอบ / เซ็นเอกสาร {deliveryPhotos.length > 0 && <span className="text-green-600 font-bold ml-1">+เพิ่มรูป</span>}</span>
+          <input type="file" multiple accept="image/*" capture="environment" className="hidden" onChange={(e) => setDeliveryPhotos(prev => [...prev, ...Array.from(e.target.files ?? [])])} />
+        </label>
+        {deliveryPhotos.length > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            {deliveryPhotos.map((file, idx) => (
+              <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 group">
+                <img src={URL.createObjectURL(file)} alt={`รูป ${idx + 1}`} className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setDeliveryPhotos(prev => prev.filter((_, i) => i !== idx))}
+                  className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       
       <div className="pt-2">
         <ActionButton onClick={handleSubmit} loading={isSubmitting} disabled={!dnSigned}>

@@ -23,6 +23,7 @@ export interface DeliveryNote {
 export interface CreateDeliveryNotePayload {
   owner_type: DeliveryNoteOwnerType
   owner_id: number
+  customer_id: number
   items?: Omit<DeliveryNoteItem, 'id'>[]
 }
 

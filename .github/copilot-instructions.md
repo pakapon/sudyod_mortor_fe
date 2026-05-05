@@ -10,6 +10,21 @@
 - NEVER add comments unless explicitly asked.
 - If unsure about scope, ASK before making changes.
 
+## No Mock Data (STRICT)
+- NEVER use mock data, hardcoded fake data, placeholder arrays, or stub responses under any circumstances.
+- ALL data must come from real API calls through the service layer.
+- If real data is unavailable, STOP and ask — do NOT fall back to mock data silently.
+
+## Don't Touch What's Already Working
+- If a piece of code is not part of the requested change, leave it completely untouched.
+- "Working" code must stay exactly as-is: structure, naming, logic, formatting — everything.
+- Only the explicitly requested piece may change.
+
+## Impact Check (REQUIRED before delivering)
+- Before delivering any change, check whether it affects other components, hooks, types, or services.
+- If a change has side effects, LIST every affected file/component clearly and explain the impact.
+- If the impact is unclear, ASK before proceeding.
+
 ## UI Rules
 - NEVER restructure or reorganize UI components.
 - NEVER change component layout, order, or nesting.

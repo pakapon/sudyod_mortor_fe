@@ -35,6 +35,7 @@ interface DocItem {
   date: string
   linkedJob: string | null
   linkPath: string | null
+  searchTokens?: string[]
 }
 
 function customerName(c?: { first_name?: string; last_name?: string; company_name?: string; type?: string }) {
@@ -146,6 +147,12 @@ function wrToDoc(wr: Warranty): DocItem {
   }
 }
 
+function buildSearchTokens(...values: Array<string | null | undefined>) {
+  return Array.from(new Set(values
+    .map((value) => (value ?? '').trim().toLowerCase())
+    .filter(Boolean)))
+}
+
 /* ─── Icons ─── */
 function SearchIcon() {
   return (
@@ -188,14 +195,85 @@ export function DocumentBrowserPage() {
         .then((r) => r.data.data ?? []).catch(() => []),
     ]).then(([sos, qts, invs, dps, wrs]) => {
       if (cancelled) return
+      const soNoById = new Map<number, string>(
+        sos
+          .filter((so) => Boolean(so.so_number))
+          .map((so) => [so.id, so.so_number])
+      )
+      const qtById = new Map<number, Quotation>(qts.map((qt) => [qt.id, qt]))
+      const qtNoById = new Map<number, string>(
+        qts
+          .filter((qt) => Boolean(qt.quotation_no))
+          .map((qt) => [qt.id, qt.quotation_no])
+      )
+      const soNoByQtId = new Map<number, string>(
+        qts
+          .map((qt) => {
+            const soNo = qt.service_order_id
+              ? soNoById.get(qt.service_order_id) ?? qt.service_order?.so_number ?? qt.service_order?.so_no
+              : qt.service_order?.so_number ?? qt.service_order?.so_no
+            return [qt.id, soNo ?? ''] as const
+          })
+          .filter((entry) => Boolean(entry[1])) as Array<readonly [number, string]>
+      )
+
       const paidInvoices = invs.filter((i) => i.status === 'paid' && i.receipt?.receipt_no)
       const merged: DocItem[] = [
-        ...sos.map(soToDoc),
-        ...qts.map(qtToDoc),
-        ...invs.map(invToDoc),
-        ...paidInvoices.map(rcpToDoc),
-        ...dps.map(dpToDoc),
-        ...wrs.map(wrToDoc),
+        ...sos.map((so) => ({
+          ...soToDoc(so),
+          searchTokens: buildSearchTokens(so.so_number),
+        })),
+        ...qts.map((qt) => {
+          const soNo = qt.service_order_id
+            ? soNoById.get(qt.service_order_id) ?? qt.service_order?.so_number ?? qt.service_order?.so_no
+            : qt.service_order?.so_number ?? qt.service_order?.so_no
+          return {
+            ...qtToDoc(qt),
+            searchTokens: buildSearchTokens(qt.quotation_no, soNo),
+          }
+        }),
+        ...invs.map((inv) => {
+          const soNo = inv.service_order_id ? soNoById.get(inv.service_order_id) : undefined
+          const qtNo = inv.quotation_id ? qtNoById.get(inv.quotation_id) : undefined
+          const soNoViaQt = inv.quotation_id ? soNoByQtId.get(inv.quotation_id) : undefined
+          return {
+            ...invToDoc(inv),
+            searchTokens: buildSearchTokens(inv.invoice_no, qtNo, soNo, soNoViaQt),
+          }
+        }),
+        ...paidInvoices.map((inv) => {
+          const soNo = inv.service_order_id ? soNoById.get(inv.service_order_id) : undefined
+          const qtNo = inv.quotation_id ? qtNoById.get(inv.quotation_id) : undefined
+          const soNoViaQt = inv.quotation_id ? soNoByQtId.get(inv.quotation_id) : undefined
+          return {
+            ...rcpToDoc(inv),
+            searchTokens: buildSearchTokens(inv.receipt?.receipt_no, inv.invoice_no, qtNo, soNo, soNoViaQt),
+          }
+        }),
+        ...dps.map((dp) => {
+          const qt = qtById.get(dp.quotation_id)
+          const qtNo = qt?.quotation_no
+          const soNo = qt?.service_order_id
+            ? soNoById.get(qt.service_order_id) ?? qt.service_order?.so_number ?? qt.service_order?.so_no
+            : qt?.service_order?.so_number ?? qt?.service_order?.so_no
+          return {
+            ...dpToDoc(dp),
+            searchTokens: buildSearchTokens(dp.deposit_no, qtNo, soNo),
+          }
+        }),
+        ...wrs.map((wr) => {
+          const qt = wr.owner_type === 'quotation' ? qtById.get(wr.owner_id) : undefined
+          const qtNo = qt?.quotation_no
+          const soNo = wr.owner_type === 'service_order'
+            ? soNoById.get(wr.owner_id)
+            : qt?.service_order_id
+              ? soNoById.get(qt.service_order_id) ?? qt.service_order?.so_number ?? qt.service_order?.so_no
+              : qt?.service_order?.so_number ?? qt?.service_order?.so_no
+          return {
+            ...wrToDoc(wr),
+            searchTokens: buildSearchTokens(wr.warranty_no, qtNo, soNo),
+          }
+        }),
       ].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
       setDocs(merged)
     }).finally(() => { if (!cancelled) setLoading(false) })
@@ -206,9 +284,9 @@ export function DocumentBrowserPage() {
     if (typeFilter && d.type !== typeFilter) return false
     if (search) {
       const q = search.toLowerCase()
+      const searchPool = [d.docNumber, d.customerName, ...(d.searchTokens ?? [])]
       return (
-        d.docNumber.toLowerCase().includes(q) ||
-        d.customerName.toLowerCase().includes(q)
+        searchPool.some((value) => value.toLowerCase().includes(q))
       )
     }
     return true
@@ -256,7 +334,7 @@ export function DocumentBrowserPage() {
           </span>
           <input
             type="text"
-            placeholder="ค้นเลขเอกสาร / ชื่อลูกค้า..."
+            placeholder="ค้นเลขเอกสารหลัก (เช่น SO-2026-0030) / ชื่อลูกค้า..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
