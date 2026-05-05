@@ -17,6 +17,16 @@ function customerName(c?: Invoice['customer']): string {
   return [c.first_name, c.last_name].filter(Boolean).join(' ') || '-'
 }
 
+function itemName(item: Invoice['items'][number]): string {
+  const it = item as Invoice['items'][number] & { product?: { name?: string }; sku?: string | null }
+  return it.description || it.product?.name || it.sku || '-'
+}
+
+function itemLineTotal(item: Invoice['items'][number]): number {
+  const it = item as Invoice['items'][number] & { total?: number | string; subtotal?: number | string }
+  return Number(it.subtotal ?? it.total ?? Number(it.quantity) * Number(it.unit_price) ?? 0)
+}
+
 export function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [invoice, setInvoice] = useState<Invoice | null>(null)
@@ -120,10 +130,10 @@ export function InvoiceDetailPage() {
                   {invoice.items.map((item, idx) => (
                     <tr key={item.id}>
                       <td className="py-2.5 text-gray-400">{idx + 1}</td>
-                      <td className="py-2.5 text-gray-900">{item.description}</td>
+                      <td className="py-2.5 text-gray-900">{itemName(item)}</td>
                       <td className="py-2.5 text-right text-gray-700">{item.quantity}</td>
                       <td className="py-2.5 text-right text-gray-700">{Number(item.unit_price).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                      <td className="py-2.5 text-right font-medium text-gray-900">{Number(item.subtotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2.5 text-right font-medium text-gray-900">{itemLineTotal(item).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                 </tbody>

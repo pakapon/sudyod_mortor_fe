@@ -2,7 +2,7 @@ export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'overdue' | 'cancelled
 
 export type InvoiceType = 'service' | 'sale' | 'retail'
 
-export type PaymentMethod = 'cash' | 'transfer' | 'card' | 'cheque'
+export type PaymentMethod = 'cash' | 'transfer' | 'credit_card' | 'cheque'
 
 export interface InvoiceItem {
   id: number
@@ -53,6 +53,9 @@ export interface Invoice {
   vat_percent: number
   vat_amount: number
   grand_total: number
+  balance_due?: number
+  paid_amount?: number
+  deposit_deducted?: number
   due_date?: string
   paid_at?: string
   payments?: Payment[]
@@ -77,6 +80,7 @@ export interface InvoiceListParams {
 
 export interface CreateInvoiceFromQTPayload {
   quotation_id: number
+  override_amount?: number
 }
 
 export interface CreateRetailInvoicePayload {

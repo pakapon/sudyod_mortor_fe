@@ -1,4 +1,4 @@
-import type { ProductVariant } from '@/types/product'
+import type { ProductImage, ProductVariant } from '@/types/product'
 
 // ---- Warehouse ----
 
@@ -52,7 +52,7 @@ export interface InventoryItem {
   id: number
   product_id: number
   product_variant_id: number
-  product?: { id: number; sku: string; name: string; unit?: { id: number; name: string } }
+  product?: { id: number; sku: string; name: string; unit?: { id: number; name: string }; images?: ProductImage[] }
   variant?: ProductVariant
   warehouse_id: number
   warehouse?: { id: number; name: string }

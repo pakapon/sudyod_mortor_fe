@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 import {
@@ -19,7 +19,7 @@ import { inventoryService } from '@/api/inventoryService'
 import { vehicleInspectionService } from '@/api/vehicleInspectionService'
 import { hrService } from '@/api/hrService'
 import type { JobData, QuotationDraft } from '../JobFlowPage'
-import type { PaymentMethod } from '@/types/invoice'
+import type { Invoice, PaymentMethod } from '@/types/invoice'
 import type { InventoryItem } from '@/types/inventory'
 import type { VehicleInspectionChecklist } from '@/types/vehicleInspection'
 import type { ServiceOrderGpsPhoto } from '@/types/serviceOrder'
@@ -42,6 +42,20 @@ type FormProps = {
   onComplete: (meta?: StepCompleteMeta) => void
   jobData?: JobData | null
   onDraftChange?: (draft: QuotationDraft | null) => void
+  onViewInvoice?: (invoiceId: number) => void
+  onPrintInvoiceDocument?: (invoiceId: number, docType: 'invoice' | 'receipt') => void
+}
+const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
+const formatMoney = (value: number) => roundMoney(Number(value || 0)).toLocaleString('th-TH', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+const getInvoiceBillingAmount = (invoice?: Partial<Invoice> | null) =>
+  roundMoney(Number(invoice?.grand_total ?? invoice?.balance_due ?? 0))
+const getInvoiceOutstandingAmount = (invoice?: Partial<Invoice> | null) => {
+  const dueBase = Number(invoice?.balance_due ?? invoice?.grand_total ?? 0)
+  const paid = Number(invoice?.paid_amount ?? 0)
+  return roundMoney(Math.max(0, dueBase - paid))
 }
 
 /* ─── Receive Vehicle Step ─── */
@@ -1031,10 +1045,11 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
         }))
       : [{ mode: 'custom' as QItemMode, name: '', price: 0, qty: 1, pricing_type: 'labor' as const }],
   )
-  const [discount, setDiscount] = useState(0)
-  const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0)
-  const vat = Math.round((subtotal - discount) * 0.07)
-  const total = subtotal - discount + vat
+  const [discount, setDiscount] = useState(roundMoney((jobData?.items ?? []).reduce((sum, it) => sum + Number(it.discount ?? 0), 0)))
+  const subtotal = roundMoney(items.reduce((s, i) => s + i.price * i.qty, 0))
+  const afterDiscount = roundMoney(subtotal - discount)
+  const vat = roundMoney(afterDiscount * 0.07)
+  const total = roundMoney(afterDiscount + vat)
   const existingCustomerId = jobData?.serviceOrder?.customer_id ?? jobData?.quotation?.customer_id ?? null
   const needsCustomerPick = !existingCustomerId
   const [customerSearch, setCustomerSearch] = useState('')
@@ -1055,9 +1070,6 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
   })
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false)
   const custSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [saleMode, setSaleMode] = useState<'full' | 'deposit'>('full')
-  const [saleDepositAmount, setSaleDepositAmount] = useState('')
-  const [saleDepositMethod, setSaleDepositMethod] = useState<'cash' | 'transfer' | 'card'>('cash')
 
   // inventory search state per row
   const [invSearch, setInvSearch] = useState<string[]>(items.map((it) => (it.mode === 'product' ? it.name : '')))
@@ -1214,17 +1226,20 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
     if (!onDraftChange) return
     const mappedItems = items
       .filter((it) => it.name.trim())
-      .map((it, idx) => ({
+      .map((it, idx) => {
+        const itemDiscount = idx === 0 ? discount : 0
+
+        return {
         id: idx,
         name: it.name,
         qty: Number(it.qty ?? 0),
         unit_price: Number(it.price ?? 0),
-        discount: 0,
-        subtotal: Number(it.qty ?? 0) * Number(it.price ?? 0),
+        discount: itemDiscount,
+        subtotal: Number(it.qty ?? 0) * Number(it.price ?? 0) - itemDiscount,
         pricing_type: (it.mode === 'product' ? 'part' : 'labor') as 'part' | 'labor',
         product_id: it.mode === 'product' ? it.product_id : undefined,
         product_variant_id: it.mode === 'product' ? it.product_variant_id : undefined,
-      }))
+      }})
 
     onDraftChange({
       items: mappedItems,
@@ -1247,17 +1262,6 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
     if (isSubmitting) return
     const customerId = existingCustomerId ?? pickedCustomer?.id
     if (!customerId) { toast.error('กรุณาเลือกลูกค้า'); return }
-    if (jobData?.sourceType === 'sale' && saleMode === 'deposit') {
-      const dpAmount = Number(saleDepositAmount || 0)
-      if (!Number.isFinite(dpAmount) || dpAmount <= 0) {
-        toast.error('กรุณากรอกยอดมัดจำให้มากกว่า 0')
-        return
-      }
-      if (dpAmount >= total) {
-        toast.error('ยอดมัดจำควรน้อยกว่ายอดรวมสินค้า')
-        return
-      }
-    }
     setIsSubmitting(true)
     try {
       const { data: qtRes } = await quotationService.createQuotation({
@@ -1266,34 +1270,17 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
         service_order_id: jobData?.serviceOrder?.id,
         validity_days: 30,
         vat_percent: 7,
-        items: items.filter((it) => it.name.trim()).map((it) => ({
+        items: items.filter((it) => it.name.trim()).map((it, idx) => ({
           quantity: Number(it.qty ?? 0),
           unit_price: Number(it.price ?? 0),
           pricing_type: it.mode === 'product' ? 'part' : 'labor',
           product_id: it.mode === 'product' ? (it.product_id ?? null) : null,
           product_variant_id: it.mode === 'product' ? (it.product_variant_id ?? null) : null,
           description: it.name,
-          discount: 0,
+          discount: idx === 0 ? discount : 0,
         })),
       })
-      await quotationService.send(qtRes.data.id)
-      // For sale flow: auto-approve then branch by mode
-      if (jobData?.sourceType === 'sale') {
-        await quotationService.approve(qtRes.data.id)
-        if (saleMode === 'deposit') {
-          await depositService.create({
-            quotation_id: qtRes.data.id,
-            amount: Number(saleDepositAmount || 0),
-            payment_method: saleDepositMethod,
-          })
-        } else {
-          try {
-            const { data: invRes } = await invoiceService.createFromQuotation({ quotation_id: qtRes.data.id })
-            await invoiceService.issue(invRes.data.id)
-          } catch { /* invoice creation failure is non-fatal — PaymentStepForm will retry */ }
-        }
-      }
-      toast.success(jobData?.sourceType === 'sale' && saleMode === 'deposit' ? 'บันทึกใบเสนอราคาและรับมัดจำเรียบร้อย' : 'ส่งใบเสนอราคาเรียบร้อย')
+      toast.success('สร้างใบเสนอราคาเรียบร้อย')
       onDraftChange?.(null)
       onComplete(jobData?.sourceType === 'sale' && !jobData.sourceId ? { newId: qtRes.data.id } : undefined)
     } catch (err: any) {
@@ -1530,60 +1517,6 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
                 <span className="font-medium text-gray-800">{pickedCustomer.full_name}</span>
               </div>
               <button type="button" onClick={() => { setPickedCustomer(null); setCustMode('search') }} className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">เปลี่ยน</button>
-            </div>
-          )}
-        </div>
-      )}
-      {jobData?.sourceType === 'sale' && (
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
-          <div className="text-sm font-semibold text-indigo-800">รูปแบบการขาย</div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setSaleMode('full')}
-              className={cn(
-                'rounded-lg border px-3 py-2 text-sm font-semibold transition-colors text-left',
-                saleMode === 'full' ? 'border-indigo-300 bg-white text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
-              )}
-            >
-              ขายปกติ
-            </button>
-            <button
-              type="button"
-              onClick={() => setSaleMode('deposit')}
-              className={cn(
-                'rounded-lg border px-3 py-2 text-sm font-semibold transition-colors text-left',
-                saleMode === 'deposit' ? 'border-indigo-300 bg-white text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
-              )}
-            >
-              ขายแบบมัดจำ
-            </button>
-          </div>
-
-          {saleMode === 'deposit' && (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">ยอดมัดจำ <span className="text-red-500">*</span></label>
-                <input
-                  type="number"
-                  value={saleDepositAmount}
-                  onChange={(e) => setSaleDepositAmount(e.target.value)}
-                  placeholder="เช่น 5000"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">วิธีรับมัดจำ</label>
-                <select
-                  value={saleDepositMethod}
-                  onChange={(e) => setSaleDepositMethod(e.target.value as 'cash' | 'transfer' | 'card')}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                >
-                  <option value="cash">เงินสด</option>
-                  <option value="transfer">โอนเงิน</option>
-                  <option value="card">บัตร</option>
-                </select>
-              </div>
             </div>
           )}
         </div>
@@ -1875,7 +1808,7 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
       </div>
       <div className="flex justify-end pt-2">
         <div className="w-72 space-y-2 text-sm bg-gray-50/80 p-4 rounded-xl border border-gray-200 shadow-sm">
-          <div className="flex justify-between items-center"><span className="text-gray-500 font-medium">ราคาสินค้า/บริการ</span><span className="font-semibold text-gray-700">฿{subtotal.toLocaleString()}</span></div>
+          <div className="flex justify-between items-center"><span className="text-gray-500 font-medium">ราคาสินค้า/บริการ</span><span className="font-semibold text-gray-700">฿{formatMoney(subtotal)}</span></div>
           <div className="flex justify-between items-center">
             <span className="text-gray-500 font-medium">ส่วนลด</span>
             <div className="relative">
@@ -1883,8 +1816,8 @@ export function QuotationForm({ onComplete, jobData, onDraftChange }: FormProps)
               <input type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="w-24 rounded-lg border border-gray-200 pl-6 pr-2 py-1 text-sm text-right focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" />
             </div>
           </div>
-          <div className="flex justify-between items-center"><span className="text-gray-500 font-medium">VAT 7%</span><span className="font-semibold text-gray-700">฿{vat.toLocaleString()}</span></div>
-          <div className="flex justify-between items-center border-t border-gray-200 pt-3 mt-1 text-base font-bold"><span>รวมทั้งสิ้น</span><span className="text-blue-600 text-lg">฿{total.toLocaleString()}</span></div>
+          <div className="flex justify-between items-center"><span className="text-gray-500 font-medium">VAT 7%</span><span className="font-semibold text-gray-700">฿{formatMoney(vat)}</span></div>
+          <div className="flex justify-between items-center border-t border-gray-200 pt-3 mt-1 text-base font-bold"><span>รวมทั้งสิ้น</span><span className="text-blue-600 text-lg">฿{formatMoney(total)}</span></div>
         </div>
       </div>
       <div className="pt-2">
@@ -2453,110 +2386,168 @@ export function RepairWorkForm({ onComplete, jobData }: FormProps) {
 }
 
 /* ─── Payment Step ─── */
-export function PaymentStepForm({ onComplete, jobData }: FormProps) {
+export function PaymentStepForm({ onComplete, jobData, onViewInvoice, onPrintInvoiceDocument }: FormProps) {
+  const isSale = jobData?.sourceType === 'sale'
+  const quotationId = jobData?.quotation?.id ?? null
+  const quotationStatus = jobData?.quotation?.status
+  const qtTotal = roundMoney(Number(jobData?.grand_total ?? jobData?.quotation?.grand_total ?? 0))
+
+  // ── Multi-invoice state (sale flow) ──────────────────────────────────────
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [loadingInvoices, setLoadingInvoices] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [createMode, setCreateMode] = useState<'amount' | 'percent'>('amount')
+  const [partialAmount, setPartialAmount] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+
+  // ── Single-invoice state (repair flow + payment form) ────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const invoiceId = jobData?.invoice?.id ?? null
+  const invoiceId = isSale ? selectedInvoice?.id ?? null : (jobData?.invoice?.id ?? null)
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount')
   const [discountInput, setDiscountInput] = useState('')
   const [received, setReceived] = useState('')
   const [reference, setReference] = useState('')
   const [confirmed, setConfirmed] = useState(false)
-  const total = Number(jobData?.grand_total ?? 0)
 
-  // Safety: for sale flow, auto-create & issue invoice if QT is approved but no invoice yet
-  const autoCreateRef = useRef(false)
-  useEffect(() => {
-    if (invoiceId || autoCreateRef.current) return
-    if (jobData?.sourceType !== 'sale') return
-    const qtId = jobData?.quotation?.id
-    if (!qtId || jobData?.quotation?.status !== 'approved') return
-    autoCreateRef.current = true
-    invoiceService.createFromQuotation({ quotation_id: qtId })
-      .then(({ data }) => invoiceService.issue(data.data.id).then(() => {
-        onComplete({ invoiceId: data.data.id })
-      }))
-      .catch(() => { autoCreateRef.current = false })
-  }, [invoiceId, jobData?.sourceType, jobData?.quotation?.id, jobData?.quotation?.status, onComplete])
+  const activeInvoice = isSale ? selectedInvoice : jobData?.invoice ?? null
+  const total = roundMoney(
+    activeInvoice
+      ? getInvoiceOutstandingAmount(activeInvoice)
+      : Number(jobData?.grand_total ?? 0),
+  )
   const discountRaw = Number(discountInput || 0)
-  const discountAmount = discountType === 'percent'
+  const discountAmount = roundMoney(discountType === 'percent'
     ? Math.min(total, Math.max(0, (total * discountRaw) / 100))
-    : Math.min(total, Math.max(0, discountRaw))
-  const netTotal = Math.max(0, total - discountAmount)
-  const receivedAmount = Number(received || 0)
-  const change = method === 'cash' && received ? receivedAmount - netTotal : 0
+    : Math.min(total, Math.max(0, discountRaw)))
+  const netTotal = roundMoney(Math.max(0, total - discountAmount))
+  const receivedAmount = roundMoney(Number(received || 0))
+  const change = roundMoney(method === 'cash' && received ? receivedAmount - netTotal : 0)
 
-  if (!invoiceId) {
-    return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
-        <p className="text-amber-800 font-medium">⚠️ ยังไม่มีใบแจ้งหนี้</p>
-        <p className="text-sm text-amber-600 mt-1">กรุณาสร้างใบแจ้งหนี้ก่อนดำเนินการชำระเงิน</p>
-      </div>
-    )
-  }
-
-  const invoiceStatus = jobData?.invoice?.status
-  if (invoiceStatus === 'paid') {
-    const payment = (jobData as any)?.payment
-    const methodLabels: Record<string, string> = { cash: 'เงินสด', transfer: 'โอนเงิน', card: 'บัตรเครดิต', cheque: 'เช็ค' }
-    return (
-      <div className="space-y-4">
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center">
-          <p className="text-emerald-800 font-semibold text-lg">✅ ชำระเงินเรียบร้อยแล้ว</p>
-          <p className="text-sm text-emerald-600 mt-1">ออกใบเสร็จรับเงินสำเร็จ</p>
-        </div>
-        {payment && (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">วิธีชำระเงิน</span><span className="font-medium">{methodLabels[payment.method] ?? payment.method}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">จำนวนชำระ</span><span className="font-semibold text-emerald-700">฿{Number(payment.amount).toLocaleString()}</span></div>
-            {payment.reference && (
-              <div className="flex justify-between"><span className="text-gray-500">เลขอ้างอิง</span><span>{payment.reference.replace(/\s*\|\s*discount:[0-9.]+/g, '').trim() || '-'}</span></div>
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }
-  if (invoiceStatus && invoiceStatus !== 'issued') {
-    const statusLabel: Record<string, string> = {
-      draft: 'ร่าง (ยังไม่ออกบิล)',
-      paid: 'ชำระแล้ว',
-      overdue: 'เกินกำหนด',
-      cancelled: 'ยกเลิก',
+  // ── Load invoices for sale QT ─────────────────────────────────────────────
+  const loadInvoices = useCallback(async () => {
+    if (!quotationId) return
+    setLoadingInvoices(true)
+    try {
+      const res = await invoiceService.getInvoices({ quotation_id: quotationId, limit: 50 })
+      // Filter locally to ensure only this QT's invoices are shown (double-safety)
+      const all = res.data.data ?? []
+      setInvoices(all.filter((i) => i.quotation_id === quotationId))
+    } catch {
+      // silent
+    } finally {
+      setLoadingInvoices(false)
     }
-    return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
-        <p className="text-amber-800 font-medium">⚠️ ใบแจ้งหนี้ยังไม่พร้อมชำระ</p>
-        <p className="text-sm text-amber-600 mt-1">สถานะปัจจุบัน: {statusLabel[invoiceStatus] ?? invoiceStatus}</p>
-      </div>
-    )
+  }, [quotationId])
+
+  useEffect(() => {
+    if (isSale && quotationId) {
+      loadInvoices()
+    }
+  }, [isSale, quotationId, loadInvoices])
+
+  // ── Auto-send & approve QT before creating invoice ────────────────────────
+  const ensureQtApproved = async () => {
+    if (!quotationId) throw new Error('ไม่พบใบเสนอราคา')
+
+    let currentStatus = quotationStatus
+
+    if (currentStatus === 'draft') {
+      try {
+        await quotationService.send(quotationId)
+        currentStatus = 'sent'
+      } catch {
+        // Continue to re-check latest status from server
+      }
+    }
+
+    if (currentStatus !== 'approved') {
+      try {
+        await quotationService.approve(quotationId)
+      } catch (err) {
+        const { data } = await quotationService.getQuotation(quotationId)
+        if (data?.data?.status !== 'approved') {
+          throw err
+        }
+      }
+    }
   }
 
+  // ── Create partial invoice ────────────────────────────────────────────────
+  const handleCreateInvoice = async () => {
+    if (isCreating) return
+    const amount = createAmount
+    if (createMode === 'percent') {
+      if (!partialAmount || createPercent <= 0 || createPercent > 100) {
+        toast.error('กรุณาระบุเปอร์เซ็นต์ระหว่าง 0.01 - 100')
+        return
+      }
+    } else if (!amount || amount <= 0) {
+      toast.error('กรุณาระบุจำนวนเงิน')
+      return
+    }
+    const totalInvoiced = roundMoney(invoices.filter(i => i.status !== 'cancelled').reduce((s, i) => s + getInvoiceBillingAmount(i), 0))
+    const remaining = roundMoney(qtTotal - totalInvoiced)
+    if (amount > remaining + 0.01) { toast.error(`ยอดเกินคงเหลือ ฿${formatMoney(remaining)}`); return }
+    setIsCreating(true)
+    try {
+      if (invoices.length === 0) {
+        await ensureQtApproved()
+      }
+      const { data: invRes } = await invoiceService.createFromQuotation({
+        quotation_id: quotationId!,
+        override_amount: amount,
+      })
+      await invoiceService.issue(invRes.data.id)
+      toast.success('สร้างใบแจ้งหนี้เรียบร้อย')
+      setShowCreateForm(false)
+      setCreateMode('amount')
+      setPartialAmount('')
+      await loadInvoices()
+      // Auto-select the new invoice for payment
+      setSelectedInvoice({ ...invRes.data, balance_due: amount, grand_total: amount } as Invoice)
+      setMethod('cash')
+      setDiscountInput('')
+      setReceived('')
+      setReference('')
+      setConfirmed(false)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'สร้างใบแจ้งหนี้ไม่สำเร็จ')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  // ── Pay selected invoice ──────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (isSubmitting) return
-    if (!invoiceId) { toast.error('ไม่พบใบแจ้งหนี้'); return }
-    if (discountRaw < 0) { toast.error('ส่วนลดต้องมากกว่าหรือเท่ากับ 0'); return }
+    const payInvoiceId = isSale ? selectedInvoice?.id : invoiceId
+    if (!payInvoiceId) { toast.error('ไม่พบใบแจ้งหนี้'); return }
     if (method === 'cash' && received && receivedAmount < netTotal) { toast.error('จำนวนเงินรับไม่พอ'); return }
     if (!confirmed) { toast.error('กรุณาตรวจสอบข้อมูลก่อนออกใบเสร็จ'); return }
     setIsSubmitting(true)
     try {
       const refParts = [reference.trim()]
-      if (discountAmount > 0) {
-        refParts.push(`discount:${discountAmount.toFixed(2)}`)
-      }
-      await invoiceService.addPayment(invoiceId, {
+      if (discountAmount > 0) refParts.push(`discount:${discountAmount.toFixed(2)}`)
+      await invoiceService.addPayment(payInvoiceId, {
         amount: netTotal,
         method,
         paid_at: new Date().toISOString(),
         reference: refParts.filter(Boolean).join(' | ') || undefined,
       })
-      await invoiceService.issueReceipt(invoiceId)
-      const soId = jobData?.serviceOrder?.id
-      if (soId) {
-        await serviceOrderService.transition(soId, { status: 'pending_pickup' })
+      await invoiceService.issueReceipt(payInvoiceId)
+      if (!isSale) {
+        const soId = jobData?.serviceOrder?.id
+        if (soId) await serviceOrderService.transition(soId, { status: 'pending_pickup' })
       }
       toast.success('ชำระเงินและออกใบเสร็จเรียบร้อย')
-      onComplete()
+      if (isSale) {
+        setSelectedInvoice(null)
+        await loadInvoices()
+      } else {
+        onComplete()
+      }
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? 'เกิดข้อผิดพลาด')
     } finally {
@@ -2564,6 +2555,360 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
     }
   }
 
+  // ── REPAIR FLOW: single invoice path ──────────────────────────────────────
+  if (!isSale) {
+    if (!invoiceId) {
+      return (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center space-y-3">
+          <p className="text-amber-800 font-medium">⚠️ ยังไม่มีใบแจ้งหนี้</p>
+          <p className="text-sm text-amber-600">กรุณาออกใบแจ้งหนี้จากหน้าใบเสนอราคา</p>
+        </div>
+      )
+    }
+    const invoiceStatus = jobData?.invoice?.status
+    if (invoiceStatus === 'paid') {
+      const payment = (jobData as any)?.payment
+      const methodLabels: Record<string, string> = { cash: 'เงินสด', transfer: 'โอนเงิน', credit_card: 'บัตรเครดิต', cheque: 'เช็ค' }
+      return (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center">
+            <p className="text-emerald-800 font-semibold text-lg">✅ ชำระเงินเรียบร้อยแล้ว</p>
+            <p className="text-sm text-emerald-600 mt-1">ออกใบเสร็จรับเงินสำเร็จ</p>
+          </div>
+          {payment && (
+            <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-gray-500">วิธีชำระเงิน</span><span className="font-medium">{methodLabels[payment.method] ?? payment.method}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">จำนวนชำระ</span><span className="font-semibold text-emerald-700">฿{Number(payment.amount).toLocaleString()}</span></div>
+              {payment.reference && (
+                <div className="flex justify-between"><span className="text-gray-500">เลขอ้างอิง</span><span>{payment.reference.replace(/\s*\|\s*discount:[0-9.]+/g, '').trim() || '-'}</span></div>
+              )}
+            </div>
+          )}
+        </div>
+      )
+    }
+    if (invoiceStatus && invoiceStatus !== 'issued') {
+      const statusLabel: Record<string, string> = { draft: 'ร่าง (ยังไม่ออกบิล)', paid: 'ชำระแล้ว', overdue: 'เกินกำหนด', cancelled: 'ยกเลิก' }
+      return (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
+          <p className="text-amber-800 font-medium">⚠️ ใบแจ้งหนี้ยังไม่พร้อมชำระ</p>
+          <p className="text-sm text-amber-600 mt-1">สถานะปัจจุบัน: {statusLabel[invoiceStatus] ?? invoiceStatus}</p>
+        </div>
+      )
+    }
+    // Repair payment form (single invoice)
+    return <SingleInvoicePaymentUI total={total} netTotal={netTotal} discountAmount={discountAmount} change={change} method={method} setMethod={setMethod} discountType={discountType} setDiscountType={setDiscountType} discountInput={discountInput} setDiscountInput={setDiscountInput} received={received} setReceived={setReceived} reference={reference} setReference={setReference} confirmed={confirmed} setConfirmed={setConfirmed} handleSubmit={handleSubmit} isSubmitting={isSubmitting} receivedAmount={receivedAmount} />
+  }
+
+  // ── SALE FLOW: multi-invoice path ─────────────────────────────────────────
+  const activeInvoices = invoices.filter(i => i.status !== 'cancelled')
+  const totalInvoiced = roundMoney(activeInvoices.reduce((s, i) => s + getInvoiceBillingAmount(i), 0))
+  const totalPaid = roundMoney(activeInvoices.reduce((s, i) => s + Number(i.paid_amount ?? 0), 0))
+  const remaining = roundMoney(Math.max(0, qtTotal - totalInvoiced))
+  const allPaid = qtTotal > 0 && totalPaid >= qtTotal - 0.01
+  const createInputValue = Number(partialAmount || 0)
+  const createPercent = createMode === 'percent'
+    ? roundMoney(Math.min(100, Math.max(0, createInputValue)))
+    : roundMoney(remaining > 0 ? (Math.max(0, createInputValue) / remaining) * 100 : 0)
+  const createAmount = createMode === 'percent'
+    ? roundMoney(remaining * (createPercent / 100))
+    : roundMoney(Math.max(0, createInputValue))
+  const remainingAfterCreate = roundMoney(Math.max(0, remaining - createAmount))
+
+  const switchCreateMode = (mode: 'amount' | 'percent') => {
+    if (mode === createMode) return
+
+    const nextValue = mode === 'percent'
+      ? (createAmount > 0 && remaining > 0 ? String(roundMoney((createAmount / remaining) * 100)) : '100')
+      : (createAmount > 0 ? String(createAmount) : String(remaining))
+
+    setCreateMode(mode)
+    setPartialAmount(nextValue)
+  }
+
+  // Payment form for selected invoice
+  if (selectedInvoice) {
+    const selInv = invoices.find(i => i.id === selectedInvoice.id) ?? selectedInvoice
+    if (selInv.status === 'paid') {
+      return (
+        <div className="space-y-4">
+          <button type="button" onClick={() => setSelectedInvoice(null)} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
+            ← กลับรายการใบแจ้งหนี้
+          </button>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center">
+            <p className="text-emerald-800 font-semibold text-lg">✅ ชำระเงินเรียบร้อยแล้ว</p>
+            <p className="text-sm text-emerald-600 mt-1">{selInv.invoice_no} — ออกใบเสร็จสำเร็จ</p>
+          </div>
+          <ActionButton onClick={() => setSelectedInvoice(null)} variant="secondary">
+            กลับรายการใบแจ้งหนี้
+          </ActionButton>
+        </div>
+      )
+    }
+    return (
+      <div className="space-y-4">
+        <button type="button" onClick={() => setSelectedInvoice(null)} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
+          ← กลับรายการใบแจ้งหนี้
+        </button>
+        <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
+          <span className="font-semibold text-gray-700">{selInv.invoice_no}</span>
+          <span className="ml-2 text-gray-500">ยอดค้าง ฿{formatMoney(getInvoiceOutstandingAmount(selInv))}</span>
+        </div>
+        <SingleInvoicePaymentUI total={total} netTotal={netTotal} discountAmount={discountAmount} change={change} method={method} setMethod={setMethod} discountType={discountType} setDiscountType={setDiscountType} discountInput={discountInput} setDiscountInput={setDiscountInput} received={received} setReceived={setReceived} reference={reference} setReference={setReference} confirmed={confirmed} setConfirmed={setConfirmed} handleSubmit={handleSubmit} isSubmitting={isSubmitting} receivedAmount={receivedAmount} />
+      </div>
+    )
+  }
+
+  // Invoice list view
+  const statusLabel: Record<string, string> = { draft: 'ร่าง', issued: 'รอชำระ', paid: 'ชำระแล้ว', overdue: 'เกินกำหนด', cancelled: 'ยกเลิก' }
+  const statusColor: Record<string, string> = { draft: 'text-gray-500 bg-gray-100', issued: 'text-blue-700 bg-blue-50', paid: 'text-emerald-700 bg-emerald-50', overdue: 'text-red-700 bg-red-50', cancelled: 'text-gray-400 bg-gray-50' }
+
+  return (
+    <div className="space-y-5">
+      {/* QT summary */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-gray-700">ยอดใบเสนอราคารวม</span>
+          <span className="font-bold text-gray-900">฿{formatMoney(qtTotal)}</span>
+        </div>
+        <div className="flex items-center justify-between text-gray-500">
+          <span>ออกใบแจ้งหนี้แล้ว</span>
+          <span>฿{formatMoney(totalInvoiced)}</span>
+        </div>
+        <div className="flex items-center justify-between border-t border-gray-100 pt-2">
+          <span className="font-semibold text-gray-700">คงเหลือ</span>
+          <span className={cn('font-bold', remaining > 0 ? 'text-amber-600' : 'text-emerald-600')}>
+            ฿{formatMoney(remaining)}
+          </span>
+        </div>
+      </div>
+
+      {/* Invoice list */}
+      {loadingInvoices ? (
+        <div className="py-6 text-center text-sm text-gray-400">กำลังโหลด...</div>
+      ) : invoices.length === 0 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center text-sm text-amber-700">
+          ยังไม่มีใบแจ้งหนี้ — กรุณาสร้างใบแจ้งหนี้เพื่อรับชำระเงิน
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-gray-600">รายการใบแจ้งหนี้</p>
+          {invoices.map((inv) => (
+            <div key={inv.id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <div className="space-y-0.5">
+                <p className="text-sm font-semibold text-gray-800">{inv.invoice_no}</p>
+                <p className="text-xs text-gray-500">฿{formatMoney(getInvoiceBillingAmount(inv))}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onViewInvoice?.(inv.id)}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:text-gray-800"
+                >
+                  ดูบิล
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPrintInvoiceDocument?.(inv.id, inv.status === 'paid' ? 'receipt' : 'invoice')}
+                  className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                >
+                  {inv.status === 'paid' ? 'พิมพ์ใบเสร็จ' : 'พิมพ์บิล'}
+                </button>
+                <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-medium', statusColor[inv.status] ?? 'text-gray-500 bg-gray-100')}>
+                  {statusLabel[inv.status] ?? inv.status}
+                </span>
+                {inv.status === 'issued' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedInvoice(inv)
+                      setMethod('cash')
+                      setDiscountInput('')
+                      setReceived('')
+                      setReference('')
+                      setConfirmed(false)
+                    }}
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                  >
+                    ชำระเงิน
+                  </button>
+                )}
+                {inv.status === 'paid' && (
+                  <span className="text-xs text-emerald-600 font-medium">✅ มีใบเสร็จ</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create invoice form */}
+      {showCreateForm ? (
+        <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-5 shadow-sm space-y-4">
+          <div className="flex flex-col gap-3 border-b border-blue-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-blue-900">สร้างใบแจ้งหนี้บางส่วน</p>
+              <p className="mt-1 text-xs text-blue-700">เลือกระบุเป็นจำนวนเงินหรือเปอร์เซ็นต์ของยอดคงเหลือได้ทันที</p>
+            </div>
+            <div className="rounded-xl border border-blue-200 bg-white/90 px-3 py-2 text-right shadow-sm">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-blue-500">ยอดคงเหลือที่ออกบิลได้</div>
+              <div className="text-lg font-bold text-blue-900">฿{formatMoney(remaining)}</div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.95fr)]">
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">รูปแบบการสร้างใบแจ้งหนี้</label>
+                <div className="mt-2 grid grid-cols-2 gap-2 rounded-2xl border border-blue-100 bg-white p-1.5 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => switchCreateMode('amount')}
+                    className={cn(
+                      'rounded-xl px-4 py-3 text-sm font-semibold transition-all',
+                      createMode === 'amount'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                        : 'text-blue-700 hover:bg-blue-50'
+                    )}
+                  >
+                    ระบุเป็นเงินบาท
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchCreateMode('percent')}
+                    className={cn(
+                      'rounded-xl px-4 py-3 text-sm font-semibold transition-all',
+                      createMode === 'percent'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                        : 'text-blue-700 hover:bg-blue-50'
+                    )}
+                  >
+                    ระบุเป็นเปอร์เซ็นต์
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">
+                  {createMode === 'amount' ? 'จำนวนเงินที่ต้องการสร้าง' : 'เปอร์เซ็นต์ของยอดคงเหลือ'}
+                </label>
+                <div className="mt-2 relative">
+                  <span className="absolute left-4 top-3 text-sm font-semibold text-gray-400">{createMode === 'amount' ? '฿' : '%'}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={createMode === 'amount' ? remaining : 100}
+                    step="0.01"
+                    value={partialAmount}
+                    onChange={(e) => setPartialAmount(e.target.value)}
+                    placeholder={createMode === 'amount' ? `สูงสุด ฿${formatMoney(remaining)}` : 'เช่น 25, 50, 75'}
+                    className="w-full rounded-2xl border border-blue-100 bg-white px-11 py-3 text-base font-semibold text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  {createMode === 'amount'
+                    ? 'ระบบจะสร้าง INV ตามจำนวนเงินบาทที่ระบุ'
+                    : 'ระบบจะคำนวณเป็นเงินบาทจากเปอร์เซ็นต์ของยอดคงเหลือ'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {[100, 70, 50, 30].map((pct) => {
+                  const shortcutAmount = roundMoney(remaining * pct / 100)
+                  return (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setPartialAmount(createMode === 'amount' ? String(shortcutAmount) : String(pct))}
+                      className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50"
+                    >
+                      {createMode === 'amount' ? `฿${formatMoney(shortcutAmount)}` : `${pct}%`}
+                    </button>
+                  )
+                })}
+                <button
+                  type="button"
+                  onClick={() => setPartialAmount(createMode === 'amount' ? String(remaining) : '100')}
+                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100"
+                >
+                  ทั้งหมด {createMode === 'amount' ? `฿${formatMoney(remaining)}` : '100%'}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm">
+              <div className="text-sm font-semibold text-gray-800">สรุปก่อนสร้างใบแจ้งหนี้</div>
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="flex items-center justify-between text-gray-600">
+                  <span>ยอดคงเหลือก่อนสร้าง</span>
+                  <span className="font-semibold text-gray-900">฿{formatMoney(remaining)}</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-600">
+                  <span>รูปแบบที่เลือก</span>
+                  <span className="font-semibold text-gray-900">{createMode === 'amount' ? 'จำนวนเงิน' : 'เปอร์เซ็นต์'}</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-600">
+                  <span>ค่าที่ระบุ</span>
+                  <span className="font-semibold text-gray-900">{createMode === 'amount' ? `฿${formatMoney(createInputValue)}` : `${formatMoney(createPercent)}%`}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-blue-50 px-3 py-2 text-blue-900">
+                  <span className="font-medium">ยอดที่จะสร้าง INV</span>
+                  <span className="text-lg font-bold">฿{formatMoney(createAmount)}</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-600">
+                  <span>คงเหลือหลังสร้าง</span>
+                  <span className="font-semibold text-gray-900">฿{formatMoney(remainingAfterCreate)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <ActionButton onClick={handleCreateInvoice} loading={isCreating} variant="primary" className="flex-1">
+              <CheckCircle2 className="h-4 w-4" /> ยืนยันสร้างใบแจ้งหนี้
+            </ActionButton>
+            <button type="button" onClick={() => { setShowCreateForm(false); setCreateMode('amount'); setPartialAmount('') }}
+              className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {remaining > 0.01 && (
+            <ActionButton onClick={() => { setShowCreateForm(true); setCreateMode('amount'); setPartialAmount(String(remaining)) }} variant="secondary">
+              + สร้างใบแจ้งหนี้ (คงเหลือ ฿{formatMoney(remaining)})
+            </ActionButton>
+          )}
+          {allPaid && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center space-y-3">
+              <p className="text-emerald-800 font-semibold">✅ ชำระครบทุกใบแจ้งหนี้เรียบร้อย</p>
+              <ActionButton onClick={() => onComplete()} variant="primary" className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700">
+                <CheckCircle2 className="h-4 w-4" /> ไปขั้นตอนถัดไป
+              </ActionButton>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ─── Shared: Single Invoice Payment UI ─── */
+function SingleInvoicePaymentUI({
+  total, netTotal, discountAmount, change, method, setMethod, discountType, setDiscountType,
+  discountInput, setDiscountInput, received, setReceived, reference, setReference,
+  confirmed, setConfirmed, handleSubmit, isSubmitting, receivedAmount,
+}: {
+  total: number; netTotal: number; discountAmount: number; change: number
+  method: PaymentMethod; setMethod: (m: PaymentMethod) => void
+  discountType: 'amount' | 'percent'; setDiscountType: (t: 'amount' | 'percent') => void
+  discountInput: string; setDiscountInput: (v: string) => void
+  received: string; setReceived: (v: string) => void
+  reference: string; setReference: (v: string) => void
+  confirmed: boolean; setConfirmed: (v: boolean) => void
+  handleSubmit: () => void; isSubmitting: boolean; receivedAmount: number
+}) {
   return (
     <div className="space-y-6">
       <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 p-6 text-center shadow-sm relative overflow-hidden">
@@ -2573,18 +2918,15 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
         <p className="text-sm font-semibold text-emerald-800 mb-1 relative z-10 flex items-center justify-center gap-2">
           <Banknote className="h-4 w-4" /> ยอดที่ต้องชำระ
         </p>
-        <span className="text-4xl font-black text-emerald-600 tracking-tight relative z-10 drop-shadow-sm">฿{netTotal.toLocaleString()}</span>
+        <span className="text-4xl font-black text-emerald-600 tracking-tight relative z-10 drop-shadow-sm">฿{formatMoney(netTotal)}</span>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="w-full sm:w-40">
             <label className="text-sm font-semibold text-gray-700">ประเภทส่วนลด</label>
-            <select
-              value={discountType}
-              onChange={(e) => setDiscountType(e.target.value as 'amount' | 'percent')}
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            >
+            <select value={discountType} onChange={(e) => setDiscountType(e.target.value as 'amount' | 'percent')}
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
               <option value="amount">บาท</option>
               <option value="percent">เปอร์เซ็นต์</option>
             </select>
@@ -2593,31 +2935,24 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
             <label className="text-sm font-semibold text-gray-700">ส่วนลด</label>
             <div className="mt-1 relative">
               <span className="absolute left-3 top-2.5 text-gray-400 text-sm">{discountType === 'amount' ? '฿' : '%'}</span>
-              <input
-                type="number"
-                min={0}
-                value={discountInput}
-                onChange={(e) => setDiscountInput(e.target.value)}
-                placeholder="0"
-                className="w-full rounded-lg border border-gray-200 pl-8 pr-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              />
+              <input type="number" min={0} value={discountInput} onChange={(e) => setDiscountInput(e.target.value)} placeholder="0"
+                className="w-full rounded-lg border border-gray-200 pl-8 pr-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
             </div>
           </div>
         </div>
-
         <div className="grid gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
-          <div className="flex items-center justify-between text-gray-600"><span>ยอดใบแจ้งหนี้</span><span>฿{total.toLocaleString()}</span></div>
-          <div className="flex items-center justify-between text-gray-600"><span>ส่วนลด</span><span>-฿{discountAmount.toLocaleString()}</span></div>
-          <div className="flex items-center justify-between border-t border-gray-200 pt-2 text-base font-bold text-gray-800"><span>ยอดสุทธิที่รับชำระ</span><span>฿{netTotal.toLocaleString()}</span></div>
+          <div className="flex items-center justify-between text-gray-600"><span>ยอดใบแจ้งหนี้</span><span>฿{formatMoney(total)}</span></div>
+          <div className="flex items-center justify-between text-gray-600"><span>ส่วนลด</span><span>-฿{formatMoney(discountAmount)}</span></div>
+          <div className="flex items-center justify-between border-t border-gray-200 pt-2 text-base font-bold text-gray-800"><span>ยอดสุทธิที่รับชำระ</span><span>฿{formatMoney(netTotal)}</span></div>
         </div>
       </div>
-      
+
       <div className="space-y-3">
         <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
           <CreditCard className="h-4 w-4" /> เลือกช่องทางชำระเงิน
         </label>
         <div className="grid grid-cols-3 gap-3">
-          {([['cash', '💵', 'เงินสด'], ['transfer', '🏦', 'โอนเงิน'], ['card', '💳', 'บัตรเครดิต']] as const).map(([v, ico, lbl]) => (
+          {([['cash', '💵', 'เงินสด'], ['transfer', '🏦', 'โอนเงิน'], ['credit_card', '💳', 'บัตรเครดิต']] as const).map(([v, ico, lbl]) => (
             <button key={v} onClick={() => setMethod(v)}
               className={cn('flex flex-col items-center justify-center gap-2 rounded-xl border-2 py-4 text-sm font-bold transition-all',
                 method === v ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm scale-[1.02]' : 'border-gray-100 bg-white text-gray-500 hover:bg-gray-50 hover:border-gray-200')}>
@@ -2626,7 +2961,7 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
           ))}
         </div>
       </div>
-      
+
       {method === 'cash' && (
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
           <label className="text-sm font-semibold text-gray-700">รับเงินมา (บาท)</label>
@@ -2638,35 +2973,26 @@ export function PaymentStepForm({ onComplete, jobData }: FormProps) {
           {receivedAmount >= netTotal && (
             <div className="flex justify-between items-center rounded-lg bg-green-50 p-3 border border-green-100">
               <span className="text-sm font-medium text-green-800">เงินทอน</span>
-              <span className="text-lg font-bold text-green-600">฿{change.toLocaleString()}</span>
+              <span className="text-lg font-bold text-green-600">฿{formatMoney(change)}</span>
             </div>
           )}
         </div>
       )}
 
-      {(method === 'transfer' || method === 'card' || method === 'cheque') && (
+      {(method === 'transfer' || method === 'credit_card' || method === 'cheque') && (
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2">
           <label className="text-sm font-semibold text-gray-700">เลขอ้างอิงการชำระ (ถ้ามี)</label>
-          <input
-            type="text"
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
-            placeholder="เช่น TRX123456"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-          />
+          <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="เช่น TRX123456"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
         </div>
       )}
 
       <label className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3">
-        <input
-          type="checkbox"
-          checked={confirmed}
-          onChange={(e) => setConfirmed(e.target.checked)}
-          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-        />
+        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
         <span className="text-sm text-blue-800">ตรวจสอบข้อมูลครบแล้ว: วิธีชำระเงิน, ส่วนลด, ยอดสุทธิ ก่อนออกใบเสร็จ</span>
       </label>
-      
+
       <div className="pt-2">
         <ActionButton onClick={handleSubmit} loading={isSubmitting} disabled={!confirmed} variant="primary" className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-emerald-500/25">
           <CheckCircle2 className="h-5 w-5" /> ยืนยันชำระเงิน & ออกใบเสร็จ
@@ -2684,15 +3010,47 @@ export function DeliverForm({ onComplete, jobData, type = 'repair', onPrintDN, o
   const [warrantyMonths, setWarrantyMonths] = useState(3)
   const [deliveryPhotos, setDeliveryPhotos] = useState<File[]>([])
   const [existingDeliveryPhotos, setExistingDeliveryPhotos] = useState<ServiceOrderGpsPhoto[]>([])
+  const [existingDnId, setExistingDnId] = useState<number | null>(null)
+  const [jobCompleted, setJobCompleted] = useState(false)
+  const deliveryPhotoServiceOrderId = jobData?.serviceOrder?.id ?? jobData?.quotation?.service_order_id ?? jobData?.quotation?.service_order?.id
+
+  const loadDeliveryPhotos = useCallback(async (serviceOrderId?: number, deliveryNoteId?: number) => {
+    if (serviceOrderId) {
+      try {
+        const res = await serviceOrderService.getGpsPhotos(serviceOrderId)
+        const filtered = (res.data.data ?? [])
+          .map((p: any) => ({
+            ...p,
+            type: p.type ?? p.photo_type,
+            photo_url: p.photo_url ?? p.file_url,
+          }))
+          .filter((p: any) => p.type === 'delivery' && p.photo_url)
+        setExistingDeliveryPhotos(filtered)
+      } catch {
+        setExistingDeliveryPhotos([])
+      }
+    } else if (deliveryNoteId) {
+      try {
+        const res = await deliveryNoteService.getGpsPhotos(deliveryNoteId)
+        const filtered = (res.data.data ?? [])
+          .map((p: any) => ({
+            ...p,
+            type: p.type ?? p.photo_type,
+            photo_url: p.photo_url ?? p.file_url,
+          }))
+          .filter((p: any) => p.photo_url)
+        setExistingDeliveryPhotos(filtered)
+      } catch {
+        setExistingDeliveryPhotos([])
+      }
+    } else {
+      setExistingDeliveryPhotos([])
+    }
+  }, [])
 
   useEffect(() => {
-    const soId = jobData?.serviceOrder?.id
-    if (!soId) return
-    serviceOrderService.getGpsPhotos(soId).then((res) => {
-      const filtered = (res.data.data ?? []).filter((p: ServiceOrderGpsPhoto) => p.type === 'delivery')
-      setExistingDeliveryPhotos(filtered)
-    }).catch(() => {})
-  }, [jobData?.serviceOrder?.id])
+    void loadDeliveryPhotos(deliveryPhotoServiceOrderId, existingDnId ?? undefined)
+  }, [deliveryPhotoServiceOrderId, existingDnId, loadDeliveryPhotos])
 
   useEffect(() => {
     const soStatus = jobData?.serviceOrder?.status
@@ -2708,7 +3066,25 @@ export function DeliverForm({ onComplete, jobData, type = 'repair', onPrintDN, o
       return
     }
 
-    const loadWarranty = async () => {
+    const loadData = async () => {
+      try {
+        // Check for existing DN
+        const dnRes = await deliveryNoteService.getDeliveryNotes({ owner_type: ownerType, owner_id: ownerId, limit: 10 })
+        const dns = (dnRes.data as any)?.data ?? []
+        if (dns.length > 0) {
+          const latestDn = [...dns].sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0))[0]
+          setExistingDnId(latestDn.id)
+          if (latestDn.signed_at) {
+            setDnSigned(true)
+            if (!isRepair) {
+              setJobCompleted(true)
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+
       try {
         const { data } = await warrantyService.getWarranties({ owner_type: ownerType, owner_id: ownerId, page: 1, limit: 10 })
         const rows = data.data ?? []
@@ -2725,20 +3101,21 @@ export function DeliverForm({ onComplete, jobData, type = 'repair', onPrintDN, o
       }
     }
 
-    void loadWarranty()
+    void loadData()
   }, [jobData?.quotation?.id, jobData?.serviceOrder?.id, jobData?.serviceOrder?.status, onWarrantyMonthsChange, type])
 
   const handleSubmit = async () => {
     if (isSubmitting) return
-    const soId = jobData?.serviceOrder?.id
+    const soId = deliveryPhotoServiceOrderId
     const qtId = jobData?.quotation?.id
     const isRepair = type === 'repair'
 
     if (isRepair && !soId) { toast.error('ไม่พบข้อมูลใบสั่งซ่อม'); return }
     if (!isRepair && !qtId) { toast.error('ไม่พบใบเสนอราคา'); return }
 
-    if (deliveryPhotos.length === 0) {
-      toast('แนะนำให้ถ่ายรูปส่งมอบก่อนปิดงาน', { icon: '📷' })
+    if (deliveryPhotos.length === 0 && existingDeliveryPhotos.length === 0) {
+      toast.error('กรุณาถ่ายรูปส่งมอบก่อนปิดงาน')
+      return
     }
 
     const ownerType = isRepair ? 'service_order' : 'quotation'
@@ -2762,7 +3139,7 @@ export function DeliverForm({ onComplete, jobData, type = 'repair', onPrintDN, o
         }
       }
 
-      if (isRepair && soId && deliveryPhotos.length > 0) {
+      if (soId && deliveryPhotos.length > 0) {
         let lat: number
         let lng: number
         try {
@@ -2791,10 +3168,44 @@ export function DeliverForm({ onComplete, jobData, type = 'repair', onPrintDN, o
           
           await serviceOrderService.uploadGpsPhoto(soId, formData)
         }
+        await loadDeliveryPhotos(soId, undefined)
       }
 
-      const { data: dnRes } = await deliveryNoteService.create({ owner_type: ownerType, owner_id: ownerId, customer_id: customerId })
-      await deliveryNoteService.sign(dnRes.data.id, { signed_by: jobData?.customerName ?? 'ลูกค้า', signed_at: new Date().toISOString() })
+      const dnId = existingDnId ?? (await deliveryNoteService.create({ owner_type: ownerType, owner_id: ownerId, customer_id: customerId })).data.data.id
+
+      if (deliveryPhotos.length > 0 && !soId) {
+        let lat: number
+        let lng: number
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
+          })
+          lat = pos.coords.latitude
+          lng = pos.coords.longitude
+        } catch (e) {
+          toast.error('ไม่สามารถระบุตำแหน่ง GPS ได้ กรุณาอนุญาตตำแหน่งแล้วลองใหม่อีกครั้ง')
+          return
+        }
+
+        const formatICT = () => {
+          const d = new Date()
+          return new Date(d.getTime() + (7 * 60 * 60 * 1000)).toISOString().slice(0, 19)
+        }
+
+        for (const file of deliveryPhotos) {
+          const formData = new FormData()
+          formData.append('photo', file)
+          formData.append('latitude', lat.toString())
+          formData.append('longitude', lng.toString())
+          formData.append('taken_at', formatICT())
+          
+          await deliveryNoteService.uploadGpsPhoto(dnId, formData)
+        }
+        await loadDeliveryPhotos(undefined, dnId)
+      }
+      if (!existingDnId) {
+        await deliveryNoteService.sign(dnId, { signed_by: jobData?.customerName ?? 'ลูกค้า', signed_at: new Date().toISOString() })
+      }
       if (wrCreated) {
         await warrantyService.create({
           owner_type: ownerType, owner_id: ownerId,
@@ -2805,6 +3216,10 @@ export function DeliverForm({ onComplete, jobData, type = 'repair', onPrintDN, o
         await serviceOrderService.transition(soId, { status: 'closed' })
       }
       toast.success('ปิดงานเรียบร้อย')
+      if (!isRepair) {
+        setJobCompleted(true)
+        setExistingDnId(dnId)
+      }
       onComplete()
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? 'เกิดข้อผิดพลาด')
@@ -2815,6 +3230,17 @@ export function DeliverForm({ onComplete, jobData, type = 'repair', onPrintDN, o
 
   return (
     <div className="space-y-5">
+      {jobCompleted && (
+        <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-5 py-4 shadow-sm">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+            <Flag className="h-5 w-5 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-green-800">ปิดงานเรียบร้อยแล้ว</p>
+            <p className="text-xs text-green-600 mt-0.5">ใบส่งมอบออกและเซ็นแล้ว งานนี้เสร็จสมบูรณ์</p>
+          </div>
+        </div>
+      )}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
         <label className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 cursor-pointer transition-colors group">
           <div className="relative flex items-center justify-center">
@@ -2917,8 +3343,8 @@ export function DeliverForm({ onComplete, jobData, type = 'repair', onPrintDN, o
       </div>
       
       <div className="pt-2">
-        <ActionButton onClick={handleSubmit} loading={isSubmitting} disabled={!dnSigned}>
-          <Flag className="h-5 w-5" /> ปิดงานสมบูรณ์
+        <ActionButton onClick={handleSubmit} loading={isSubmitting} disabled={jobCompleted || !dnSigned}>
+          <Flag className="h-5 w-5" /> {jobCompleted ? 'ปิดงานแล้ว' : 'ปิดงานสมบูรณ์'}
         </ActionButton>
       </div>
     </div>
@@ -2929,7 +3355,7 @@ export function DeliverForm({ onComplete, jobData, type = 'repair', onPrintDN, o
 export function DepositForm({ onComplete, jobData }: FormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [amount, setAmount] = useState(jobData?.grand_total ? Math.round(jobData.grand_total * 0.3) : 5000)
-  const [method, setMethod] = useState<'cash' | 'transfer' | 'card'>('cash')
+  const [method, setMethod] = useState<'cash' | 'transfer' | 'credit_card'>('cash')
 
   const handleSubmit = async () => {
     if (isSubmitting) return
@@ -2969,7 +3395,7 @@ export function DepositForm({ onComplete, jobData }: FormProps) {
           <CreditCard className="h-4 w-4" /> เลือกช่องทางรับเงิน
         </label>
         <div className="grid grid-cols-3 gap-3">
-          {([['cash', '💵', 'เงินสด'], ['transfer', '🏦', 'โอนเงิน'], ['card', '💳', 'บัตรเครดิต']] as const).map(([v, ico, lbl]) => (
+          {([['cash', '💵', 'เงินสด'], ['transfer', '🏦', 'โอนเงิน'], ['credit_card', '💳', 'บัตรเครดิต']] as const).map(([v, ico, lbl]) => (
             <button key={v} onClick={() => setMethod(v)}
               className={cn(
                 'flex flex-col items-center justify-center gap-2 rounded-xl border-2 py-4 text-sm font-bold transition-all',

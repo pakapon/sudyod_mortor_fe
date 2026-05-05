@@ -1,6 +1,6 @@
 export type DepositStatus = 'collected' | 'refunded'
 
-export type DepositPaymentMethod = 'cash' | 'transfer' | 'card'
+export type DepositPaymentMethod = 'cash' | 'transfer' | 'credit_card'
 
 export interface Deposit {
   id: number

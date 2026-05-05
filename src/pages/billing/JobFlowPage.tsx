@@ -7,6 +7,7 @@ import { serviceOrderService } from '@/api/serviceOrderService'
 import { quotationService } from '@/api/quotationService'
 import { invoiceService } from '@/api/invoiceService'
 import { depositService } from '@/api/depositService'
+import { deliveryNoteService } from '@/api/deliveryNoteService'
 import { toast } from 'react-hot-toast'
 import {
   Car, Search, FileText, CheckCircle, Receipt, Wrench, CreditCard, Flag, Package, BadgeDollarSign, Check, Printer, ShoppingCart, ArrowLeft, ArrowRight, PenTool, Eye, Download, Link2
@@ -16,6 +17,7 @@ import type { Quotation } from '@/types/quotation'
 import type { Invoice } from '@/types/invoice'
 import { DocumentOutputModal } from '@/components/ui/DocumentOutputModal'
 import { jsPDF } from 'jspdf'
+import { drawBillingDocCanvas } from '@/lib/documentRenderers'
 
 /* ─── Unified Job Data (passed to StepForms) ─── */
 export interface JobData {
@@ -23,7 +25,7 @@ export interface JobData {
   sourceId: number | null
   serviceOrder?: ServiceOrder | null
   quotation?: Quotation | null
-  invoice?: { id: number; invoice_no?: string; status?: string } | null
+  invoice?: { id: number; invoice_no?: string; status?: Invoice['status']; grand_total?: number; balance_due?: number; paid_amount?: number } | null
   jobNumber: string
   flowLabel: string
   customerName: string
@@ -202,7 +204,7 @@ import {
 } from './components/StepForms'
 
 /* ─── Step Content — renders the correct form per step ID ─── */
-function StepContent({ step, flowType, jobData, onComplete, isPastStep, onGoToStep, onQuoteDraftChange, onPrintDN, onPrintWR, onWarrantyMonthsChange }: {
+function StepContent({ step, flowType, jobData, onComplete, isPastStep, onGoToStep, onQuoteDraftChange, onPrintInvoiceDocument, onPrintDN, onPrintWR, onWarrantyMonthsChange }: {
   step: FlowStep
   flowType: string
   jobData: JobData | null
@@ -210,11 +212,11 @@ function StepContent({ step, flowType, jobData, onComplete, isPastStep, onGoToSt
   isPastStep: boolean
   onGoToStep: (stepId: string) => void
   onQuoteDraftChange: (draft: QuotationDraft | null) => void
+  onPrintInvoiceDocument?: (invoiceId: number, docType: 'invoice' | 'receipt') => void
   onPrintDN?: () => void
   onPrintWR?: () => void
   onWarrantyMonthsChange?: (months: number) => void
 }) {
-  const navigate = useNavigate()
   const { permissions } = useAuthStore()
   const canPerform = hasPermission(permissions, step.permission.module, step.permission.action as any)
   const canApproveQt = hasPermission(permissions, 'quotations', 'can_approve')
@@ -226,7 +228,7 @@ function StepContent({ step, flowType, jobData, onComplete, isPastStep, onGoToSt
     approve:    <ApproveForm onComplete={onComplete} jobData={jobData} />,
     invoice:    <InvoiceForm onComplete={onComplete} jobData={jobData} />,
     repair_wk:  <RepairWorkForm onComplete={onComplete} jobData={jobData} />,
-    payment:    <PaymentStepForm onComplete={onComplete} jobData={jobData} />,
+    payment:    <PaymentStepForm onComplete={onComplete} jobData={jobData} onViewInvoice={(invoiceId) => { window.location.assign(`/billing/invoices/${invoiceId}`) }} onPrintInvoiceDocument={onPrintInvoiceDocument} />,
     deliver:    <DeliverForm onComplete={onComplete} jobData={jobData} type={flowType === 'repair' ? 'repair' : 'sale'} onPrintDN={onPrintDN} onPrintWR={onPrintWR} onWarrantyMonthsChange={onWarrantyMonthsChange} />,
     deposit:    <DepositForm onComplete={onComplete} jobData={jobData} />,
   }
@@ -276,7 +278,7 @@ function StepContent({ step, flowType, jobData, onComplete, isPastStep, onGoToSt
               {STEP_FORMS[step.id] || <p className="text-sm text-gray-400 text-center py-8">ไม่พบฟอร์ม</p>}
             </div>
             {/* Past-step action banner */}
-            {step.id === 'quote' && !['completed', 'pending_payment', 'pending_pickup', 'closed'].includes(jobData?.serviceOrder?.status ?? '') ? (
+            {flowType === 'repair' && step.id === 'quote' && !['completed', 'pending_payment', 'pending_pickup', 'closed'].includes(jobData?.serviceOrder?.status ?? '') ? (
               <div className="mt-6 rounded-2xl border border-blue-200/60 bg-blue-50/80 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold text-blue-800">ส่งกลับให้ช่างประเมิน</p>
@@ -344,132 +346,6 @@ const cleanDocumentNote = (raw?: string | null): string => {
   return text
 }
 
-function thaiAmountText(n: number): string {
-  const ones = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า']
-  const places = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน']
-  const cv = (num: number): string => {
-    if (num <= 0) return ''
-    const s = String(num); let r = ''
-    for (let i = 0; i < s.length; i++) {
-      const d = parseInt(s[i]); const place = s.length - 1 - i
-      if (!d) continue
-      if (place === 1 && d === 1) r += 'สิบ'
-      else if (place === 1 && d === 2) r += 'ยี่สิบ'
-      else r += ones[d] + (places[place] ?? '')
-    }
-    return r
-  }
-  const abs = Math.abs(Math.round(n))
-  const mil = Math.floor(abs / 1_000_000); const rem = abs % 1_000_000
-  let out = ''
-  if (mil) out += cv(mil) + 'ล้าน'
-  out += cv(rem) || (mil ? '' : 'ศูนย์')
-  return out + 'บาทถ้วน'
-}
-
-interface BillingDocDrawOpts {
-  docTitle: string; docSubTitle?: string; docNo: string; docDate: string; docRef?: string
-  branch: { name: string; address: string; phone: string; tax_id: string }
-  customerName: string; customerAddress?: string; customerPhone?: string; customerTaxId?: string
-  items: Array<{ name: string; qty: number; unit_price: number; discount: number; subtotal: number }>
-  subtotal: number; vatPercent: number; vatAmount: number; grandTotal: number
-  note?: string; sigLeftLabel: string; sigRightLabel: string
-  payment?: { method: string; amount: number; reference?: string } | null
-}
-
-function drawBillingDocCanvas(ctx: CanvasRenderingContext2D, w: number, h: number, opts: BillingDocDrawOpts) {
-  const pad = 72; const right = w - pad; let y = 64
-  const fmtN = (num: number) => toNumber(num).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const tx = (text: string, x: number, yy: number, size: number, color = '#111827', weight = 400, align: CanvasTextAlign = 'left') => {
-    ctx.font = `${weight} ${size}px sans-serif`; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(text, x, yy); ctx.textAlign = 'left'
-  }
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h)
-  // Company (left)
-  tx(opts.branch.name || 'บริษัท', pad, y + 28, 26, '#111827', 700)
-  tx(opts.branch.address || '', pad, y + 54, 15, '#4b5563')
-  tx(`เลขประจำตัวผู้เสียภาษี ${opts.branch.tax_id || '-'}`, pad, y + 74, 15, '#4b5563')
-  tx(`โทร: ${opts.branch.phone || '-'}`, pad, y + 94, 15, '#4b5563')
-  // Document title (right)
-  tx(opts.docTitle, right, y + 32, 38, '#111827', 700, 'right')
-  let mY = opts.docSubTitle ? y + 58 : y + 50
-  if (opts.docSubTitle) { tx(opts.docSubTitle, right, mY, 15, '#6b7280', 400, 'right'); mY += 28 }
-  tx(`เลขที่   ${opts.docNo}`, right, mY, 18, '#374151', 500, 'right'); mY += 24
-  tx(`วันที่   ${opts.docDate}`, right, mY, 18, '#374151', 500, 'right'); mY += 24
-  if (opts.docRef) tx(`อ้างอิง   ${opts.docRef}`, right, mY, 18, '#374151', 500, 'right')
-  y += 140
-  ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 2.5
-  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(right, y); ctx.stroke(); y += 28
-  // Customer
-  tx('ลูกค้า', pad, y, 14, '#9ca3af', 600); y += 22
-  tx(opts.customerName, pad, y, 22, '#111827', 700); y += 28
-  if (opts.customerAddress) { tx(opts.customerAddress, pad, y, 15, '#4b5563'); y += 22 }
-  if (opts.customerTaxId) { tx(`เลขประจำตัวผู้เสียภาษี ${opts.customerTaxId}`, pad, y, 15, '#4b5563'); y += 22 }
-  if (opts.customerPhone) { tx(`โทร ${opts.customerPhone}`, pad, y, 15, '#4b5563'); y += 22 }
-  y += 24
-  // Items table
-  const colW = [50, 490, 100, 150, 110, 196]
-  const colX = colW.reduce((acc, _w, i) => { acc.push(i === 0 ? pad : acc[i - 1] + colW[i - 1]); return acc }, [] as number[])
-  const tblW = colW.reduce((a, b) => a + b, 0); const rowH = 44
-  const hdrLabels = ['#', 'รายละเอียด', 'จำนวน', 'ราคาต่อหน่วย', 'ส่วนลด', 'มูลค่า']
-  const hdrAligns: CanvasTextAlign[] = ['center', 'left', 'center', 'right', 'right', 'right']
-  ctx.fillStyle = '#1f2937'; ctx.fillRect(pad, y, tblW, rowH)
-  hdrLabels.forEach((lbl, i) => {
-    const cx = hdrAligns[i] === 'center' ? colX[i] + colW[i] / 2 : hdrAligns[i] === 'right' ? colX[i] + colW[i] - 10 : colX[i] + 10
-    tx(lbl, cx, y + 28, 16, '#fff', 600, hdrAligns[i])
-  }); y += rowH
-  opts.items.slice(0, 22).forEach((item, idx) => {
-    ctx.fillStyle = idx % 2 === 0 ? '#fff' : '#f9fafb'; ctx.fillRect(pad, y, tblW, rowH)
-    ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 0.5; ctx.strokeRect(pad, y, tblW, rowH)
-    const by = y + 28
-    tx(String(idx + 1), colX[0] + colW[0] / 2, by, 16, '#374151', 400, 'center')
-    tx(item.name || '-', colX[1] + 10, by, 16, '#111827')
-    tx(String(toNumber(item.qty)), colX[2] + colW[2] / 2, by, 16, '#374151', 400, 'center')
-    tx(fmtN(toNumber(item.unit_price)), colX[3] + colW[3] - 10, by, 16, '#374151', 400, 'right')
-    tx(fmtN(toNumber(item.discount || 0)), colX[4] + colW[4] - 10, by, 16, '#374151', 400, 'right')
-    tx(fmtN(toNumber(item.subtotal)), colX[5] + colW[5] - 10, by, 16, '#111827', 500, 'right'); y += rowH
-  })
-  if (opts.items.length > 22) { tx(`... และอีก ${opts.items.length - 22} รายการ`, pad + 10, y + 28, 14, '#9ca3af'); y += rowH }
-  ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(pad + tblW, y); ctx.stroke(); y += 24
-  // Totals (right-aligned)
-  const totX = right - 380; const totRowH = 32
-  tx('รวมเป็นเงิน', totX, y + 22, 17, '#4b5563'); tx(`${fmtN(toNumber(opts.subtotal))} บาท`, right, y + 22, 17, '#374151', 500, 'right'); y += totRowH
-  tx(`ภาษีมูลค่าเพิ่ม ${toNumber(opts.vatPercent, 7)}%`, totX, y + 22, 17, '#4b5563'); tx(`${fmtN(toNumber(opts.vatAmount))} บาท`, right, y + 22, 17, '#374151', 500, 'right'); y += totRowH
-  ctx.strokeStyle = '#374151'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(totX, y + 4); ctx.lineTo(right, y + 4); ctx.stroke(); y += 10
-  tx('จำนวนเงินรวมทั้งสิ้น', totX, y + 28, 19, '#111827', 700); tx(`${fmtN(toNumber(opts.grandTotal))} บาท`, right, y + 28, 22, '#111827', 700, 'right'); y += 46
-  // Thai text amount
-  tx(`(${thaiAmountText(toNumber(opts.grandTotal))})`, pad, y, 17, '#374151'); y += 44
-  // Payment info section (for receipts)
-  if (opts.payment) {
-    const methodLabels: Record<string, string> = { cash: 'เงินสด', transfer: 'โอนเงิน', card: 'บัตรเครดิต', cheque: 'เช็ค' }
-    const methodLabel = methodLabels[opts.payment.method] ?? opts.payment.method
-    const payX = totX
-    ctx.strokeStyle = '#d1fae5'; ctx.lineWidth = 1
-    ctx.fillStyle = '#f0fdf4'; ctx.fillRect(pad, y - 6, tblW, opts.payment.reference ? 82 : 62)
-    ctx.strokeRect(pad, y - 6, tblW, opts.payment.reference ? 82 : 62)
-    tx('ข้อมูลการชำระเงิน', pad + 12, y + 14, 14, '#16a34a', 600); y += 28
-    tx('วิธีชำระเงิน', payX, y + 6, 16, '#4b5563'); tx(methodLabel, right, y + 6, 16, '#111827', 600, 'right'); y += 26
-    if (opts.payment.reference) {
-      const displayRef = opts.payment.reference.replace(/\s*\|\s*discount:[0-9.]+/g, '').trim()
-      if (displayRef) { tx('เลขอ้างอิง', payX, y + 6, 16, '#4b5563'); tx(displayRef, right, y + 6, 16, '#111827', 500, 'right'); y += 26 }
-    }
-    y += 6
-  }
-  // Note
-  if (opts.note) { tx('หมายเหตุ', pad, y, 14, '#9ca3af', 600); y += 22; tx(opts.note, pad, y, 15, '#4b5563') }
-  // Signature — always at bottom of page
-  const sigY = h - 210
-  ctx.strokeStyle = '#9ca3af'; ctx.lineWidth = 1; ctx.beginPath()
-  ctx.moveTo(pad + 20, sigY); ctx.lineTo(pad + 310, sigY)
-  ctx.moveTo(right - 310, sigY); ctx.lineTo(right - 20, sigY); ctx.stroke()
-  tx(opts.sigLeftLabel, pad + 165, sigY + 28, 15, '#6b7280', 400, 'center')
-  tx('วันที่ ____________________', pad + 165, sigY + 52, 14, '#9ca3af', 400, 'center')
-  tx(`ในนาม ${opts.customerName}`, pad + 165, sigY + 78, 13, '#374151', 400, 'center')
-  tx(opts.sigRightLabel, right - 165, sigY + 28, 15, '#6b7280', 400, 'center')
-  tx('วันที่ ____________________', right - 165, sigY + 52, 14, '#9ca3af', 400, 'center')
-  tx(`ในนาม ${opts.branch.name}`, right - 165, sigY + 78, 13, '#374151', 400, 'center')
-  tx('Sudyod Motor', w / 2, h - 30, 13, '#d1d5db', 400, 'center')
-}
 
 function drawWarrantyDocCanvas(
   ctx: CanvasRenderingContext2D, w: number, h: number,
@@ -735,7 +611,7 @@ const SO_STATUS_STEP: Record<string, number> = {
   in_progress: 5, completed: 5, pending_payment: 6, pending_pickup: 7, closed: 7,
 }
 const QT_STATUS_STEP_SALE: Record<string, number> = {
-  draft: 0, sent: 0, approved: 1, rejected: 0,
+  draft: 1, sent: 1, approved: 1, rejected: 0,
 }
 
 function buildJobData(so: ServiceOrder | null, qt: Quotation | null, sourceType: 'repair' | 'sale', sourceId: number | null, invoice: Invoice | null = null, latestPayment?: { method: string; amount: number; reference?: string; paid_at?: string } | null): JobData {
@@ -812,6 +688,7 @@ export function JobFlowPage() {
   const [flowType, setFlowType] = useState<string>(sourceType === 'repair' ? 'repair' : 'sale_no_deposit')
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [quotationDraft, setQuotationDraft] = useState<QuotationDraft | null>(null)
+  const [hasSignedDeliveryNote, setHasSignedDeliveryNote] = useState(false)
 
   const [isSlipModalOpen, setIsSlipModalOpen] = useState(false)
   const [isGeneratingSlip, setIsGeneratingSlip] = useState(false)
@@ -830,6 +707,7 @@ export function JobFlowPage() {
       setJobData(buildJobData(null, null, sourceType, null))
       setCurrentStep(0)
       setMaxStep(0)
+      setHasSignedDeliveryNote(false)
       return
     }
     if (id && !id.includes(':')) { setError('URL ไม่ถูกต้อง: กรุณาระบุประเภทงาน เช่น repair:23 หรือ sale:23'); setLoading(false); return }
@@ -838,6 +716,7 @@ export function JobFlowPage() {
     const fetchData = async () => {
       setLoading(true)
       setError(null)
+      setHasSignedDeliveryNote(false)
       try {
         if (sourceType === 'repair') {
           const { data: soRes } = await serviceOrderService.getServiceOrder(sourceId)
@@ -907,11 +786,22 @@ export function JobFlowPage() {
             const { data: dpRes } = await depositService.getDeposits({ quotation_id: qt.id, limit: 1 })
             hasDeposit = (dpRes.data?.length ?? 0) > 0
           } catch { /* no deposits */ }
-          setFlowType(hasDeposit ? 'sale_deposit' : 'sale_no_deposit')
+          const saleFlowType = hasDeposit ? 'sale_deposit' : 'sale_no_deposit'
+          setFlowType(saleFlowType)
+          let signedDnExists = false
+          try {
+            const { data: dnRes } = await deliveryNoteService.getDeliveryNotes({ owner_type: 'quotation', owner_id: qt.id, limit: 10 })
+            const rows = dnRes.data ?? []
+            signedDnExists = rows.some((dn) => Boolean(dn.signed_at))
+          } catch { /* no delivery notes yet */ }
+          setHasSignedDeliveryNote(signedDnExists)
           setJobData(buildJobData(null, qt, 'sale', sourceId, inv, saleLatestPayment))
           let saleStep = QT_STATUS_STEP_SALE[qt.status] ?? 0
           // advance to deliver (step 2) once invoice is paid
           if (inv?.status === 'paid' && saleStep <= 1) saleStep = 2
+          if (signedDnExists) {
+            saleStep = (FLOW_STEPS[saleFlowType]?.length ?? 1) - 1
+          }
           setMaxStep(saleStep)
           setCurrentStep(saleStep)
         }
@@ -947,6 +837,9 @@ export function JobFlowPage() {
     }
     if (!isCreateMode) {
       setRefreshTrigger((t) => t + 1)
+    }
+    if (sourceType === 'sale' && currentStep === steps.length - 1) {
+      setHasSignedDeliveryNote(true)
     }
     setQuotationDraft(null)
     const nextStep = Math.min(steps.length - 1, currentStep + 1)
@@ -1280,6 +1173,74 @@ export function JobFlowPage() {
     } finally { setIsGeneratingSlip(false) }
   }
 
+  const generateInvoiceDocumentById = async (invoiceId: number, docType: 'invoice' | 'receipt') => {
+    if (!jobData) return null
+    setIsGeneratingSlip(true)
+    try {
+      const { data } = await invoiceService.getInvoice(invoiceId)
+      const invoice = data.data ?? data
+      const latestPayment = invoice.payments && invoice.payments.length > 0
+        ? [...invoice.payments].sort((left, right) => new Date(right.paid_at).getTime() - new Date(left.paid_at).getTime())[0]
+        : undefined
+      const canvas = document.createElement('canvas')
+      const w = 1240
+      const h = 1754
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('สร้างภาพไม่สำเร็จ')
+
+      drawBillingDocCanvas(ctx, w, h, {
+        docTitle: docType === 'receipt' ? 'ใบกำกับภาษี/ใบเสร็จรับเงิน' : 'ใบแจ้งหนี้',
+        docSubTitle: docType === 'receipt' ? 'ต้นฉบับ' : undefined,
+        docNo: invoice.invoice_no ?? '-',
+        docDate: formatDate(invoice.updated_at ?? invoice.created_at ?? jobData.createdAt),
+        docRef: jobData.quotation?.quotation_no || undefined,
+        branch: {
+          name: invoice.branch?.name ?? jobData.branch.name,
+          address: invoice.branch?.address ?? jobData.branch.address,
+          phone: invoice.branch?.phone ?? jobData.branch.phone,
+          tax_id: invoice.branch?.tax_id ?? jobData.branch.tax_id,
+        },
+        customerName: invoice.customer?.type === 'corporate'
+          ? (invoice.customer.company_name ?? jobData.customerName)
+          : [invoice.customer?.first_name, invoice.customer?.last_name].filter(Boolean).join(' ') || jobData.customerName,
+        customerAddress: jobData.customerAddress || undefined,
+        customerPhone: jobData.customerPhone || undefined,
+        items: (invoice.items ?? []).map((item) => ({
+          id: item.id,
+          name: item.description,
+          qty: Number(item.quantity ?? 0),
+          unit_price: Number(item.unit_price ?? 0),
+          discount: Number(item.discount ?? 0),
+          subtotal: Number(item.subtotal ?? 0),
+          pricing_type: 'part' as const,
+        })),
+        subtotal: toNumber(invoice.subtotal),
+        vatPercent: toNumber(invoice.vat_percent, 7),
+        vatAmount: toNumber(invoice.vat_amount),
+        grandTotal: toNumber(invoice.grand_total),
+        note: jobData.note || undefined,
+        sigLeftLabel: docType === 'receipt' ? 'ผู้จ่ายเงิน' : 'ผู้เรียกเก็บ',
+        sigRightLabel: docType === 'receipt' ? 'ผู้รับเงิน' : 'ผู้อนุมัติ',
+        payment: docType === 'receipt' && latestPayment
+          ? {
+              method: latestPayment.method,
+              amount: Number(latestPayment.amount ?? 0),
+              reference: latestPayment.reference,
+            }
+          : undefined,
+      })
+
+      return await saveAndOpenSlip(canvas, docType)
+    } catch (e: any) {
+      toast.error(e?.message ?? 'ไม่สามารถสร้างเอกสารรูปภาพได้')
+      return null
+    } finally {
+      setIsGeneratingSlip(false)
+    }
+  }
+
   const generateWarrantySlipImage = async () => {
     if (!jobData) return null
     setIsGeneratingSlip(true)
@@ -1518,43 +1479,36 @@ export function JobFlowPage() {
   }
 
   const handleCopyImageLink = async () => {
-    let imageUrl = slipImageUrl
-    if (!imageUrl) {
-      const generated = await generateReceiveSlipImage()
-      imageUrl = generated?.imageUrl ?? null
-    }
-    if (!imageUrl) return
+    const invId = jobData?.invoice?.id
+    if (!invId) return
     try {
-      await navigator.clipboard.writeText(imageUrl)
-      toast.success('คัดลอกลิงก์รูปแล้ว (ลิงก์ชั่วคราวเฉพาะเครื่องนี้)')
+      await navigator.clipboard.writeText(`${window.location.origin}/billing/invoices/${invId}`)
+      toast.success('คัดลอกลิงก์แล้ว')
     } catch {
       toast.error('คัดลอกลิงก์ไม่สำเร็จ')
     }
   }
 
   const handleCopyPdfLink = async () => {
-    let pdfUrl = slipPdfUrl
-    if (!pdfUrl) {
-      const generated = await generateReceiveSlipImage()
-      pdfUrl = generated?.pdfUrl ?? null
-    }
-    if (!pdfUrl) return
+    const invId = jobData?.invoice?.id
+    if (!invId) return
     try {
-      await navigator.clipboard.writeText(pdfUrl)
-      toast.success('คัดลอกลิงก์ PDF แล้ว (ลิงก์ชั่วคราวเฉพาะเครื่องนี้)')
+      await navigator.clipboard.writeText(`${window.location.origin}/billing/invoices/${invId}`)
+      toast.success('คัดลอกลิงก์แล้ว')
     } catch {
       toast.error('คัดลอกลิงก์ไม่สำเร็จ')
     }
   }
 
   const currentStepId = steps[currentStep]?.id ?? ''
-  const isFlowCompleted = sourceType === 'repair' && jobData?.serviceOrder?.status === 'closed'
+  const isFlowCompleted = (sourceType === 'repair' && jobData?.serviceOrder?.status === 'closed') || (sourceType === 'sale' && hasSignedDeliveryNote)
   const printStepId = currentStepId
   const headerDocType: 'receive' | 'assess' | 'quote' | 'invoice' | 'receipt' | 'warranty' =
     currentStepId === 'quote' || currentStepId === 'approve' || currentStepId === 'deposit' ? 'quote'
       : currentStepId === 'assess' ? 'assess'
       : currentStepId === 'invoice' ? 'invoice'
-      : currentStepId === 'payment' ? 'receipt'
+      : currentStepId === 'payment'
+        ? (jobData?.invoice?.status === 'paid' ? 'receipt' : 'invoice')
       : currentStepId === 'deliver' ? 'warranty'
       : 'receive'
 
@@ -1678,6 +1632,7 @@ export function JobFlowPage() {
           if (idx >= 0) setCurrentStep(idx)
         }}
         onQuoteDraftChange={setQuotationDraft}
+        onPrintInvoiceDocument={generateInvoiceDocumentById}
         onPrintDN={() => { void generateDNSlipImage() }}
         onPrintWR={() => { void generateWarrantySlipImage() }}
         onWarrantyMonthsChange={(m) => setWarrantyMonthsForDoc(m)}
